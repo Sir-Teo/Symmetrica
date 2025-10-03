@@ -244,6 +244,144 @@ fn q_div(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
     q_norm(a.0 * b.1, a.1 * b.0)
 }
 
+// ---------- Limits (heuristic, polynomials only) ----------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitPoint {
+    Zero,
+    PosInf,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitResult {
+    Finite((i64, i64)),
+    Infinity,
+    Indeterminate,
+    Unsupported,
+}
+
+/// Try to compute limit for polynomial-like expressions in `var`.
+/// Supported:
+/// - point = Zero: returns constant term c0 as rational.
+/// - point = PosInf: if degree==0 returns constant; if degree>0 returns Infinity.
+pub fn limit_poly(store: &Store, id: ExprId, var: &str, point: LimitPoint) -> LimitResult {
+    fn const_term(store: &Store, id: ExprId, var: &str) -> Option<(i64, i64)> {
+        match (&store.get(id).op, &store.get(id).payload) {
+            (Op::Integer, Payload::Int(k)) => Some(((*k), 1)),
+            (Op::Rational, Payload::Rat(n, d)) => Some(((*n), (*d))),
+            (Op::Symbol, Payload::Sym(s)) => {
+                if s == var {
+                    Some((0, 1))
+                } else {
+                    None
+                }
+            }
+            (Op::Add, _) => {
+                let mut acc = (0, 1);
+                for &c in &store.get(id).children {
+                    let ct = const_term(store, c, var)?;
+                    acc = q_add(acc, ct);
+                }
+                Some(acc)
+            }
+            (Op::Mul, _) => {
+                let mut acc = (1, 1);
+                for &f in &store.get(id).children {
+                    let ct = const_term(store, f, var)?;
+                    acc = q_mul(acc, ct);
+                }
+                Some(acc)
+            }
+            (Op::Pow, _) => {
+                let n = store.get(id);
+                let base = n.children[0];
+                let exp = n.children[1];
+                match (&store.get(exp).op, &store.get(exp).payload) {
+                    (Op::Integer, Payload::Int(k)) if *k >= 0 => {
+                        let ct = const_term(store, base, var)?;
+                        // ct^k
+                        let mut acc = (1, 1);
+                        for _ in 0..(*k as usize) {
+                            acc = q_mul(acc, ct);
+                        }
+                        Some(acc)
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn degree(store: &Store, id: ExprId, var: &str) -> Option<isize> {
+        match (&store.get(id).op, &store.get(id).payload) {
+            (Op::Integer, Payload::Int(k)) => Some(if *k == 0 { -1 } else { 0 }),
+            (Op::Rational, Payload::Rat(n, _)) => Some(if *n == 0 { -1 } else { 0 }),
+            (Op::Symbol, Payload::Sym(s)) => {
+                if s == var {
+                    Some(1)
+                } else {
+                    None
+                }
+            }
+            (Op::Add, _) => {
+                let mut deg = -1;
+                for &c in &store.get(id).children {
+                    let cd = degree(store, c, var)?;
+                    if cd > deg {
+                        deg = cd;
+                    }
+                }
+                Some(deg)
+            }
+            (Op::Mul, _) => {
+                let mut deg = 0isize;
+                for &f in &store.get(id).children {
+                    let fd = degree(store, f, var)?;
+                    if fd < 0 {
+                        return Some(-1);
+                    }
+                    deg += fd;
+                }
+                Some(deg)
+            }
+            (Op::Pow, _) => {
+                let n = store.get(id);
+                let base = n.children[0];
+                let exp = n.children[1];
+                match (&store.get(exp).op, &store.get(exp).payload) {
+                    (Op::Integer, Payload::Int(k)) if *k >= 0 => {
+                        let bd = degree(store, base, var)?;
+                        if bd < 0 {
+                            Some(-1)
+                        } else {
+                            Some(bd * (*k as isize))
+                        }
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    match point {
+        LimitPoint::Zero => match const_term(store, id, var) {
+            Some(ct) => LimitResult::Finite(q_norm(ct.0, ct.1)),
+            None => LimitResult::Unsupported,
+        },
+        LimitPoint::PosInf => match degree(store, id, var) {
+            Some(d) if d < 0 => LimitResult::Finite((0, 1)),
+            Some(0) => match const_term(store, id, var) {
+                Some(ct) => LimitResult::Finite(q_norm(ct.0, ct.1)),
+                None => LimitResult::Unsupported,
+            },
+            Some(_) => LimitResult::Infinity,
+            None => LimitResult::Unsupported,
+        },
+    }
+}
+
 /// Maclaurin series up to `order` (inclusive) for a subset of expressions.
 /// Restrictions:
 /// - Only supports one variable `var`.
@@ -539,5 +677,29 @@ mod tests {
         assert_eq!(s.coeffs[2], (1, 1));
         assert_eq!(s.coeffs[3], (0, 1));
         assert_eq!(s.coeffs[4], (0, 1));
+    }
+
+    #[test]
+    fn limit_poly_zero_and_infinity() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // f(x) = x^2 + 3x + 2
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let three = st.int(3);
+        let three_x = st.mul(vec![three, x]);
+        let two2 = st.int(2);
+        let f = st.add(vec![x2, three_x, two2]);
+        let l0 = limit_poly(&st, f, "x", LimitPoint::Zero);
+        assert_eq!(l0, LimitResult::Finite((2, 1)));
+        let linf = limit_poly(&st, f, "x", LimitPoint::PosInf);
+        assert_eq!(linf, LimitResult::Infinity);
+
+        // g(x) = 5
+        let g = st.int(5);
+        let g0 = limit_poly(&st, g, "x", LimitPoint::Zero);
+        assert_eq!(g0, LimitResult::Finite((5, 1)));
+        let ginf = limit_poly(&st, g, "x", LimitPoint::PosInf);
+        assert_eq!(ginf, LimitResult::Finite((5, 1)));
     }
 }
