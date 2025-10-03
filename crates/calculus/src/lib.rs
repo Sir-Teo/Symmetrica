@@ -39,6 +39,7 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
         }
         Op::Pow => {
             // d/dx u^n = n * u^(n-1) * u' when n is integer
+            // General case: d/dx u^v = u^v * (v' * ln(u) + v * u'/u)
             let n = store.get(id);
             let base = n.children[0];
             let exp = n.children[1];
@@ -58,7 +59,21 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                     let term = store.mul(vec![k_val, pow_term, dbase]);
                     simplify(store, term)
                 }
-                _ => store.int(0),
+                _ => {
+                    // General power rule fallback
+                    let u_pow_v = store.pow(base, exp);
+                    let du = diff(store, base, var);
+                    let dv = diff(store, exp, var);
+                    let ln_u = store.func("ln", vec![base]);
+                    let dv_ln_u = store.mul(vec![dv, ln_u]);
+                    let minus_one = store.int(-1);
+                    let u_inv = store.pow(base, minus_one);
+                    let uprime_over_u = store.mul(vec![du, u_inv]);
+                    let v_times_uprime_over_u = store.mul(vec![exp, uprime_over_u]);
+                    let bracket = store.add(vec![dv_ln_u, v_times_uprime_over_u]);
+                    let out = store.mul(vec![u_pow_v, bracket]);
+                    simplify(store, out)
+                }
             }
         }
         Op::Function => {
@@ -701,5 +716,20 @@ mod tests {
         assert_eq!(g0, LimitResult::Finite((5, 1)));
         let ginf = limit_poly(&st, g, "x", LimitPoint::PosInf);
         assert_eq!(ginf, LimitResult::Finite((5, 1)));
+    }
+
+    #[test]
+    fn diff_x_pow_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let x_pow_x = st.pow(x, x);
+        let d = diff(&mut st, x_pow_x, "x");
+        // Expected: x^x * (ln x + 1)
+        let lnx = st.func("ln", vec![x]);
+        let one = st.int(1);
+        let bracket = st.add(vec![lnx, one]);
+        let x_pow_x_again = st.pow(x, x);
+        let expected = st.mul(vec![x_pow_x_again, bracket]);
+        assert_eq!(d, expected);
     }
 }
