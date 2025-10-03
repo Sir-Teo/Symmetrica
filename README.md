@@ -1,4 +1,5 @@
 # Symmetrica
+[![CI](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml/badge.svg)](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml)
 
 A lightweight, embeddable symbolic computation engine (CAS) in Rust.
 Core principles:
@@ -44,7 +45,10 @@ Core principles:
  - Canonical constructors for `Add`/`Mul`/`Pow`; deterministic ordering and stable digests.
  - Small rational arithmetic (i64) and precedence-aware pretty printer via `Store::to_string()`.
  - Simplifier (`crates/simplify`): constant folding, like-term/factor collection, rational normalization, and power-merge in products.
- - Calculus (`crates/calculus`): `diff()` for `Add`/`Mul`/`Pow` with integer exponents, plus `sin`/`cos`/`exp`/`ln` with chain rule; product rule; auto-simplifies results.
+ - Calculus (`crates/calculus`):
+   - `diff()` for `Add`/`Mul`/`Pow` with integer exponents, common funcs (`sin`/`cos`/`exp`/`ln`) with chain rule, and general power rule `d(u^v)`.
+   - `integrate()` conservative rules: constants/symbols, power rule (incl. `1/x = ln(x)`), linear `exp(ax+b)`/`sin(ax+b)`/`cos(ax+b)`, and `u'/u -> ln(u)`.
+   - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
  - Pattern/substitution (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
  - Polynomials (`crates/polys`): univariate dense over Q; division, GCD; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
  - Modular crates for future domains: `matrix`, `solver`, `assumptions`, `api`, `io`.
@@ -54,7 +58,7 @@ Core principles:
 
  - `crates/expr_core` — expression kernel: `Store`, `ExprId`, `Op`, `Payload`, canonical `add()/mul()/pow()`, `to_string()`.
  - `crates/simplify` — `simplify()` and `simplify_with()` using `assumptions::Context`; collects like terms and merges powers.
- - `crates/calculus` — `diff(&mut Store, ExprId, &str)` implements linear, product, and integer power rules.
+ - `crates/calculus` — `diff(&mut Store, ExprId, &str)` (incl. general power rule), `integrate(&mut Store, ExprId, &str)` (conservative rules), `maclaurin(&Store, ExprId, &str, order)`, and `limit_poly(&Store, ExprId, &str, LimitPoint)`.
  - `crates/pattern` — `subst_symbol(&mut Store, ExprId, sym, with)` tree substitution.
  - `crates/polys` — `UniPoly`, `expr_to_unipoly()`, `unipoly_to_expr()`; Euclidean `div_rem()` and `gcd()`.
  - `crates/assumptions` — 3‑valued `Truth` and `Context` (skeleton) used by `simplify`.
@@ -87,6 +91,15 @@ Core principles:
  use calculus::diff;
  let df = diff(&mut st, s, "x");
  println!("{}", st.to_string(df));
+ ```
+ Integrate with respect to `x`:
+
+ ```rust
+ use calculus::integrate;
+ let ix2 = integrate(&mut st, st.pow(x, st.int(2)), "x").unwrap();
+ let iinvx = integrate(&mut st, st.pow(x, st.int(-1)), "x").unwrap();
+ println!("{}", st.to_string(ix2));      // 1/3 x^3
+ println!("{}", st.to_string(iinvx));    // ln(x)
  ```
 
  Substitute `x -> (y+1)`:
@@ -164,6 +177,13 @@ cargo bench -p expr_core
 ## Release
 
 Tagging `v*.*.*` triggers `.github/workflows/release.yml` to build and upload artifacts. If `matika_cli` is present it is packaged per-OS.
+
+To cut a release locally:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
 
 ## Contributing
 
