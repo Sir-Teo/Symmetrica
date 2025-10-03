@@ -58,9 +58,13 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    pub fn get(&self, id: ExprId) -> &Node { &self.nodes[id.0] }
+    pub fn get(&self, id: ExprId) -> &Node {
+        &self.nodes[id.0]
+    }
 
     // ---- Constructors (atoms) ----
     pub fn sym<S: Into<String>>(&mut self, name: S) -> ExprId {
@@ -71,7 +75,9 @@ impl Store {
     }
     pub fn rat(&mut self, num: i64, den: i64) -> ExprId {
         let (n, d) = normalize_rat(num, den);
-        if d == 1 { return self.int(n); }
+        if d == 1 {
+            return self.int(n);
+        }
         self.intern(Op::Rational, Payload::Rat(n, d), vec![])
     }
     pub fn func<S: Into<String>>(&mut self, name: S, args: Vec<ExprId>) -> ExprId {
@@ -88,7 +94,9 @@ impl Store {
         for t in it {
             match self.get(t).op {
                 Op::Add => {
-                    for c in &self.get(t).children { terms.push(*c); }
+                    for c in &self.get(t).children {
+                        terms.push(*c);
+                    }
                 }
                 Op::Integer => {
                     if let Payload::Int(k) = &self.get(t).payload {
@@ -135,17 +143,23 @@ impl Store {
         for f in it {
             match self.get(f).op {
                 Op::Mul => {
-                    for c in &self.get(f).children { factors.push(*c); }
+                    for c in &self.get(f).children {
+                        factors.push(*c);
+                    }
                 }
                 Op::Integer => {
                     if let Payload::Int(k) = &self.get(f).payload {
-                        if *k == 0 { return self.int(0); }
+                        if *k == 0 {
+                            return self.int(0);
+                        }
                         num = rat_mul(num, (*k, 1));
                     }
                 }
                 Op::Rational => {
                     if let Payload::Rat(n, d) = &self.get(f).payload {
-                        if *n == 0 { return self.int(0); }
+                        if *n == 0 {
+                            return self.int(0);
+                        }
                         num = rat_mul(num, (*n, *d));
                     }
                 }
@@ -184,7 +198,10 @@ impl Store {
         }
         if let (Op::Integer, Payload::Int(0)) = (&self.get(exp).op, &self.get(exp).payload) {
             // 0^0 left as-is (non-simplifying) to avoid domain issues
-            if matches!((&self.get(base).op, &self.get(base).payload), (Op::Integer, Payload::Int(0))) {
+            if matches!(
+                (&self.get(base).op, &self.get(base).payload),
+                (Op::Integer, Payload::Int(0))
+            ) {
                 return self.intern(Op::Pow, Payload::None, vec![base, exp]);
             }
             return self.int(1);
@@ -195,24 +212,36 @@ impl Store {
     // ---- Printing (very small, precedence-aware) ----
     pub fn to_string(&self, id: ExprId) -> String {
         fn prec(op: &Op) -> u8 {
-            match op { Op::Add => 1, Op::Mul => 2, Op::Pow => 3, _ => 4 }
+            match op {
+                Op::Add => 1,
+                Op::Mul => 2,
+                Op::Pow => 3,
+                _ => 4,
+            }
         }
         fn go(st: &Store, id: ExprId, parent_prec: u8) -> String {
             let n = st.get(id);
             let s = match (&n.op, &n.payload) {
                 (Op::Integer, Payload::Int(k)) => k.to_string(),
-                (Op::Rational, Payload::Rat(a,b)) => format!("{}/{}", a, b),
+                (Op::Rational, Payload::Rat(a, b)) => format!("{}/{}", a, b),
                 (Op::Symbol, Payload::Sym(name)) => name.clone(),
                 (Op::Function, Payload::Func(name)) => {
-                    let args = n.children.iter().map(|c| go(st, *c, 0)).collect::<Vec<_>>().join(", ");
+                    let args =
+                        n.children.iter().map(|c| go(st, *c, 0)).collect::<Vec<_>>().join(", ");
                     format!("{name}({args})")
                 }
-                (Op::Add, _) => {
-                    n.children.iter().map(|c| go(st, *c, prec(&Op::Add))).collect::<Vec<_>>().join(" + ")
-                }
-                (Op::Mul, _) => {
-                    n.children.iter().map(|c| go(st, *c, prec(&Op::Mul))).collect::<Vec<_>>().join(" * ")
-                }
+                (Op::Add, _) => n
+                    .children
+                    .iter()
+                    .map(|c| go(st, *c, prec(&Op::Add)))
+                    .collect::<Vec<_>>()
+                    .join(" + "),
+                (Op::Mul, _) => n
+                    .children
+                    .iter()
+                    .map(|c| go(st, *c, prec(&Op::Mul)))
+                    .collect::<Vec<_>>()
+                    .join(" * "),
                 (Op::Pow, _) => {
                     let b = go(st, n.children[0], prec(&Op::Pow));
                     let e = go(st, n.children[1], prec(&Op::Pow));
@@ -220,7 +249,11 @@ impl Store {
                 }
                 _ => "<unknown>".into(),
             };
-            if prec(&n.op) < parent_prec { format!("({s})") } else { s }
+            if prec(&n.op) < parent_prec {
+                format!("({s})")
+            } else {
+                s
+            }
         }
         go(self, id, 0)
     }
@@ -236,7 +269,11 @@ impl Store {
         }
 
         // Compute digest for this node deterministically
-        let digest = digest_node(&op, &payload, &children.iter().map(|id| self.get(*id).digest).collect::<Vec<_>>());
+        let digest = digest_node(
+            &op,
+            &payload,
+            &children.iter().map(|id| self.get(*id).digest).collect::<Vec<_>>(),
+        );
 
         let id = ExprId(self.nodes.len());
         self.nodes.push(Node { op, payload, children, digest });
@@ -252,58 +289,104 @@ fn digest_node(op: &Op, payload: &Payload, child_digests: &[u64]) -> u64 {
     h.write_u8(op_tag(op));
     match payload {
         Payload::None => h.write_u8(0),
-        Payload::Int(k) => { h.write_u8(1); h.write_i64(*k); }
-        Payload::Rat(n,d) => { h.write_u8(2); h.write_i64(*n); h.write_i64(*d); }
-        Payload::Sym(s) => { h.write_u8(3); h.write_bytes(s.as_bytes()); }
-        Payload::Func(s) => { h.write_u8(4); h.write_bytes(s.as_bytes()); }
+        Payload::Int(k) => {
+            h.write_u8(1);
+            h.write_i64(*k);
+        }
+        Payload::Rat(n, d) => {
+            h.write_u8(2);
+            h.write_i64(*n);
+            h.write_i64(*d);
+        }
+        Payload::Sym(s) => {
+            h.write_u8(3);
+            h.write_bytes(s.as_bytes());
+        }
+        Payload::Func(s) => {
+            h.write_u8(4);
+            h.write_bytes(s.as_bytes());
+        }
     }
-    for &cd in child_digests { h.write_u64(cd); }
+    for &cd in child_digests {
+        h.write_u64(cd);
+    }
     h.finish()
 }
 
 fn op_tag(op: &Op) -> u8 {
     match op {
-        Op::Add => 1, Op::Mul => 2, Op::Pow => 3, Op::Symbol => 4,
-        Op::Integer => 5, Op::Rational => 6, Op::Function => 7,
+        Op::Add => 1,
+        Op::Mul => 2,
+        Op::Pow => 3,
+        Op::Symbol => 4,
+        Op::Integer => 5,
+        Op::Rational => 6,
+        Op::Function => 7,
     }
 }
 
 // Minimal FNV-1a 64 hasher (deterministic)
 struct Fnv64(u64);
 impl Fnv64 {
-    fn new() -> Self { Self(0xcbf29ce484222325) }
-    fn write_u8(&mut self, x: u8) { self.0 ^= x as u64; self.0 = self.0.wrapping_mul(0x100000001b3); }
-    fn write_i64(&mut self, x: i64) { self.write_u64(x as u64); }
-    fn write_u64(&mut self, x: u64) {
-        for b in x.to_le_bytes() { self.write_u8(b); }
+    fn new() -> Self {
+        Self(0xcbf29ce484222325)
     }
-    fn write_bytes(&mut self, bs: &[u8]) { for &b in bs { self.write_u8(b) } }
-    fn finish(&self) -> u64 { self.0 }
+    fn write_u8(&mut self, x: u8) {
+        self.0 ^= x as u64;
+        self.0 = self.0.wrapping_mul(0x100000001b3);
+    }
+    fn write_i64(&mut self, x: i64) {
+        self.write_u64(x as u64);
+    }
+    fn write_u64(&mut self, x: u64) {
+        for b in x.to_le_bytes() {
+            self.write_u8(b);
+        }
+    }
+    fn write_bytes(&mut self, bs: &[u8]) {
+        for &b in bs {
+            self.write_u8(b)
+        }
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
 }
 
 // ---------- Small rational helpers (i64) ----------
 
 fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 { return b.abs() }
-    if b == 0 { return a.abs() }
+    if a == 0 {
+        return b.abs();
+    }
+    if b == 0 {
+        return a.abs();
+    }
     while b != 0 {
         let t = a % b;
-        a = b; b = t;
+        a = b;
+        b = t;
     }
     a.abs()
 }
 fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
     assert!(den != 0, "zero denominator");
-    let mut n = num; let mut d = den;
-    if d < 0 { n = -n; d = -d; }
-    if n == 0 { return (0, 1); }
+    let mut n = num;
+    let mut d = den;
+    if d < 0 {
+        n = -n;
+        d = -d;
+    }
+    if n == 0 {
+        return (0, 1);
+    }
     let g = gcd_i64(n.abs(), d);
     (n / g, d / g)
 }
-fn rat_add(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+fn rat_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
     normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
 }
-fn rat_mul(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+fn rat_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
     normalize_rat(a.0 * b.0, a.1 * b.1)
 }
 

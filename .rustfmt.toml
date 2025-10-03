@@ -2,5 +2,5 @@ edition = "2021"
 max_width = 100
 use_small_heuristics = "Max"
 newline_style = "Unix"
-normalize_doc_attributes = true
-group_imports = "StdExternalCrate"
+# normalize_doc_attributes requires nightly rustfmt; commented out for stable CI
+# group_imports is a nightly rustfmt option; commented out to avoid warnings on stable CI

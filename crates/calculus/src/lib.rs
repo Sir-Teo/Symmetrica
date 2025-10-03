@@ -25,7 +25,11 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
             for i in 0..fs.len() {
                 let mut factors: Vec<ExprId> = Vec::with_capacity(fs.len());
                 for (j, &f) in fs.iter().enumerate() {
-                    if i == j { factors.push(diff(store, f, var)); } else { factors.push(f); }
+                    if i == j {
+                        factors.push(diff(store, f, var));
+                    } else {
+                        factors.push(f);
+                    }
                 }
                 let prod = store.mul(factors);
                 sum_terms.push(prod);
@@ -44,7 +48,9 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
             };
             match (exp_op, exp_payload) {
                 (Op::Integer, Payload::Int(k)) => {
-                    if k == 0 { return store.int(0); }
+                    if k == 0 {
+                        return store.int(0);
+                    }
                     let k_val = store.int(k);
                     let k_minus_1 = store.int(k - 1);
                     let pow_term = store.pow(base, k_minus_1);

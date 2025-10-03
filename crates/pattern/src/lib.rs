@@ -39,7 +39,10 @@ pub fn subst_symbol(store: &mut Store, id: ExprId, sym: &str, with_expr: ExprId)
             store.pow(b, e)
         }
         Op::Function => {
-            let name = match &store.get(id).payload { Payload::Func(s) => s.clone(), _ => "<f>".into() };
+            let name = match &store.get(id).payload {
+                Payload::Func(s) => s.clone(),
+                _ => "<f>".into(),
+            };
             let children = store.get(id).children.clone();
             let mapped = children
                 .into_iter()

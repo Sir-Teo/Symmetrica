@@ -11,30 +11,60 @@ use expr_core::{ExprId, Op, Payload, Store};
 pub struct Q(pub i64, pub i64); // (num, den), den>0, gcd(|num|,den)=1
 
 impl Q {
-    pub fn new(num: i64, den: i64) -> Self { normalize_rat(num, den) }
-    pub fn zero() -> Self { Q(0, 1) }
-    pub fn one() -> Self { Q(1, 1) }
-    pub fn is_zero(&self) -> bool { self.0 == 0 }
+    pub fn new(num: i64, den: i64) -> Self {
+        normalize_rat(num, den)
+    }
+    pub fn zero() -> Self {
+        Q(0, 1)
+    }
+    pub fn one() -> Self {
+        Q(1, 1)
+    }
+    pub fn is_zero(&self) -> bool {
+        self.0 == 0
+    }
 }
 
 fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 { return b.abs() }
-    if b == 0 { return a.abs() }
-    while b != 0 { let t = a % b; a = b; b = t; }
+    if a == 0 {
+        return b.abs();
+    }
+    if b == 0 {
+        return a.abs();
+    }
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
     a.abs()
 }
 fn normalize_rat(num: i64, den: i64) -> Q {
     assert!(den != 0, "zero denominator");
-    let mut n = num; let mut d = den;
-    if d < 0 { n = -n; d = -d; }
-    if n == 0 { return Q(0, 1); }
+    let mut n = num;
+    let mut d = den;
+    if d < 0 {
+        n = -n;
+        d = -d;
+    }
+    if n == 0 {
+        return Q(0, 1);
+    }
     let g = gcd_i64(n.abs(), d);
     Q(n / g, d / g)
 }
-fn add_q(a: Q, b: Q) -> Q { normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1) }
-fn sub_q(a: Q, b: Q) -> Q { add_q(a, Q(-b.0, b.1)) }
-fn mul_q(a: Q, b: Q) -> Q { normalize_rat(a.0 * b.0, a.1 * b.1) }
-fn div_q(a: Q, b: Q) -> Q { normalize_rat(a.0 * b.1, a.1 * b.0) }
+fn add_q(a: Q, b: Q) -> Q {
+    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
+}
+fn sub_q(a: Q, b: Q) -> Q {
+    add_q(a, Q(-b.0, b.1))
+}
+fn mul_q(a: Q, b: Q) -> Q {
+    normalize_rat(a.0 * b.0, a.1 * b.1)
+}
+fn div_q(a: Q, b: Q) -> Q {
+    normalize_rat(a.0 * b.1, a.1 * b.0)
+}
 
 // ---------- Univariate dense polynomial over Q ----------
 
@@ -50,10 +80,26 @@ impl UniPoly {
         trim_trailing_zeros(&mut coeffs);
         Self { var: var.into(), coeffs }
     }
-    pub fn zero<S: Into<String>>(var: S) -> Self { Self { var: var.into(), coeffs: vec![] } }
-    pub fn is_zero(&self) -> bool { self.coeffs.is_empty() }
-    pub fn degree(&self) -> Option<usize> { if self.is_zero() { None } else { Some(self.coeffs.len()-1) } }
-    pub fn leading_coeff(&self) -> Q { if let Some(d) = self.degree() { self.coeffs[d] } else { Q::zero() } }
+    pub fn zero<S: Into<String>>(var: S) -> Self {
+        Self { var: var.into(), coeffs: vec![] }
+    }
+    pub fn is_zero(&self) -> bool {
+        self.coeffs.is_empty()
+    }
+    pub fn degree(&self) -> Option<usize> {
+        if self.is_zero() {
+            None
+        } else {
+            Some(self.coeffs.len() - 1)
+        }
+    }
+    pub fn leading_coeff(&self) -> Q {
+        if let Some(d) = self.degree() {
+            self.coeffs[d]
+        } else {
+            Q::zero()
+        }
+    }
 
     pub fn add(&self, rhs: &Self) -> Self {
         assert_eq!(self.var, rhs.var);
@@ -77,19 +123,27 @@ impl UniPoly {
     }
     pub fn mul(&self, rhs: &Self) -> Self {
         assert_eq!(self.var, rhs.var);
-        if self.is_zero() || rhs.is_zero() { return Self::zero(&self.var) }
+        if self.is_zero() || rhs.is_zero() {
+            return Self::zero(&self.var);
+        }
         let mut coeffs = vec![Q::zero(); self.coeffs.len() + rhs.coeffs.len() - 1];
         for (i, &a) in self.coeffs.iter().enumerate() {
-            if a.is_zero() { continue; }
+            if a.is_zero() {
+                continue;
+            }
             for (j, &b) in rhs.coeffs.iter().enumerate() {
-                if b.is_zero() { continue; }
-                coeffs[i+j] = add_q(coeffs[i+j], mul_q(a, b));
+                if b.is_zero() {
+                    continue;
+                }
+                coeffs[i + j] = add_q(coeffs[i + j], mul_q(a, b));
             }
         }
         Self::new(self.var.clone(), coeffs)
     }
     pub fn monic(&self) -> Self {
-        if self.is_zero() { return self.clone(); }
+        if self.is_zero() {
+            return self.clone();
+        }
         let lc = self.leading_coeff();
         let inv = div_q(Q::one(), lc);
         let coeffs = self.coeffs.iter().map(|&c| mul_q(c, inv)).collect();
@@ -99,18 +153,26 @@ impl UniPoly {
     // Division with remainder: self = q*div + r, deg r < deg div
     pub fn div_rem(&self, div: &Self) -> Result<(Self, Self), &'static str> {
         assert_eq!(self.var, div.var);
-        if div.is_zero() { return Err("division by zero polynomial"); }
+        if div.is_zero() {
+            return Err("division by zero polynomial");
+        }
         let mut r = self.clone();
         let mut q = UniPoly::zero(&self.var);
-        if r.is_zero() { return Ok((q, r)); }
+        if r.is_zero() {
+            return Ok((q, r));
+        }
         let ddeg = div.degree().unwrap();
         let dlc = div.leading_coeff();
         while let Some(rdeg) = r.degree() {
-            if rdeg < ddeg { break; }
+            if rdeg < ddeg {
+                break;
+            }
             let shift = rdeg - ddeg;
             let coeff = div_q(r.leading_coeff(), dlc);
             // q += coeff * x^shift
-            if q.coeffs.len() <= shift { q.coeffs.resize(shift+1, Q::zero()); }
+            if q.coeffs.len() <= shift {
+                q.coeffs.resize(shift + 1, Q::zero());
+            }
             q.coeffs[shift] = add_q(q.coeffs[shift], coeff);
             // r -= (coeff * x^shift) * div
             let mut to_sub = vec![Q::zero(); shift + div.coeffs.len()];
@@ -118,7 +180,9 @@ impl UniPoly {
                 to_sub[shift + i] = mul_q(coeff, c);
             }
             r = r.sub(&UniPoly::new(self.var.clone(), to_sub));
-            if r.is_zero() { break; }
+            if r.is_zero() {
+                break;
+            }
         }
         Ok((q, r))
     }
@@ -136,19 +200,25 @@ impl UniPoly {
 }
 
 fn trim_trailing_zeros(v: &mut Vec<Q>) {
-    while v.last().is_some_and(|c| c.is_zero()) { v.pop(); }
+    while v.last().is_some_and(|c| c.is_zero()) {
+        v.pop();
+    }
 }
 
 // ---------- Expr ⟷ Poly conversions ----------
 
 pub fn expr_to_unipoly(store: &Store, id: ExprId, var: &str) -> Option<UniPoly> {
     fn as_int(store: &Store, id: ExprId) -> Option<i64> {
-        if let (Op::Integer, Payload::Int(k)) = (&store.get(id).op, &store.get(id).payload) { Some(*k) } else { None }
+        if let (Op::Integer, Payload::Int(k)) = (&store.get(id).op, &store.get(id).payload) {
+            Some(*k)
+        } else {
+            None
+        }
     }
     fn as_rat(store: &Store, id: ExprId) -> Option<Q> {
         match (&store.get(id).op, &store.get(id).payload) {
             (Op::Integer, Payload::Int(k)) => Some(Q(*k, 1)),
-            (Op::Rational, Payload::Rat(n,d)) => Some(Q(*n, *d)),
+            (Op::Rational, Payload::Rat(n, d)) => Some(Q(*n, *d)),
             _ => None,
         }
     }
@@ -160,28 +230,48 @@ pub fn expr_to_unipoly(store: &Store, id: ExprId, var: &str) -> Option<UniPoly> 
     fn term_to_monomial(store: &Store, id: ExprId, var: &str) -> Option<(Q, usize)> {
         match store.get(id).op {
             Op::Integer | Op::Rational => as_rat(store, id).map(|q| (q, 0)),
-            Op::Symbol => if as_symbol(store, id, var) { Some((Q(1,1), 1)) } else { None },
+            Op::Symbol => {
+                if as_symbol(store, id, var) {
+                    Some((Q(1, 1), 1))
+                } else {
+                    None
+                }
+            }
             Op::Pow => {
                 let n = store.get(id);
                 let base = n.children[0];
                 let exp = n.children[1];
-                if !as_symbol(store, base, var) { return None; }
+                if !as_symbol(store, base, var) {
+                    return None;
+                }
                 let k = as_int(store, exp)?;
-                if k < 0 { return None; }
-                Some((Q(1,1), k as usize))
+                if k < 0 {
+                    return None;
+                }
+                Some((Q(1, 1), k as usize))
             }
             Op::Mul => {
                 let mut coeff = Q::one();
                 let mut k: usize = 0;
                 for &f in &store.get(id).children {
-                    if let Some(q) = as_rat(store, f) { coeff = mul_q(coeff, q); continue; }
-                    if as_symbol(store, f, var) { k += 1; continue; }
+                    if let Some(q) = as_rat(store, f) {
+                        coeff = mul_q(coeff, q);
+                        continue;
+                    }
+                    if as_symbol(store, f, var) {
+                        k += 1;
+                        continue;
+                    }
                     if store.get(f).op == Op::Pow {
                         let b = store.get(f).children[0];
                         let e = store.get(f).children[1];
-                        if !as_symbol(store, b, var) { return None; }
+                        if !as_symbol(store, b, var) {
+                            return None;
+                        }
                         let kk = as_int(store, e)?;
-                        if kk < 0 { return None; }
+                        if kk < 0 {
+                            return None;
+                        }
                         k += kk as usize;
                         continue;
                     }
@@ -196,7 +286,7 @@ pub fn expr_to_unipoly(store: &Store, id: ExprId, var: &str) -> Option<UniPoly> 
     match store.get(id).op {
         Op::Integer | Op::Rational | Op::Symbol | Op::Pow | Op::Mul => {
             if let Some((q, k)) = term_to_monomial(store, id, var) {
-                let mut coeffs = vec![Q::zero(); k+1];
+                let mut coeffs = vec![Q::zero(); k + 1];
                 coeffs[k] = q;
                 return Some(UniPoly::new(var.to_string(), coeffs));
             }
@@ -215,13 +305,19 @@ pub fn expr_to_unipoly(store: &Store, id: ExprId, var: &str) -> Option<UniPoly> 
 }
 
 pub fn unipoly_to_expr(store: &mut Store, p: &UniPoly) -> ExprId {
-    if p.is_zero() { return store.int(0); }
+    if p.is_zero() {
+        return store.int(0);
+    }
     let mut terms: Vec<ExprId> = Vec::new();
     let x = store.sym(&p.var);
     for (k, &q) in p.coeffs.iter().enumerate() {
-        if q.is_zero() { continue; }
+        if q.is_zero() {
+            continue;
+        }
         let coeff = if q.1 == 1 { store.int(q.0) } else { store.rat(q.0, q.1) };
-        let term = if k == 0 { coeff } else {
+        let term = if k == 0 {
+            coeff
+        } else {
             let kint = store.int(k as i64);
             let pow = store.pow(x, kint);
             store.mul(vec![coeff, pow])
@@ -241,16 +337,16 @@ mod tests {
     fn unipoly_division_and_gcd() {
         // (x^2 + 3x + 2) / (x + 1) = x + 2, r = 0; gcd(x^2-1, x^2-x) = x-1
         let var = "x";
-        let p = UniPoly::new(var, vec![Q(2,1), Q(3,1), Q(1,1)]);
-        let d = UniPoly::new(var, vec![Q(1,1), Q(1,1)]);
+        let p = UniPoly::new(var, vec![Q(2, 1), Q(3, 1), Q(1, 1)]);
+        let d = UniPoly::new(var, vec![Q(1, 1), Q(1, 1)]);
         let (q, r) = p.div_rem(&d).unwrap();
         assert!(r.is_zero());
-        assert_eq!(q, UniPoly::new(var, vec![Q(2,1), Q(1,1)]));
+        assert_eq!(q, UniPoly::new(var, vec![Q(2, 1), Q(1, 1)]));
 
-        let p1 = UniPoly::new(var, vec![Q(-1,1), Q(0,1), Q(1,1)]); // x^2 - 1
-        let p2 = UniPoly::new(var, vec![Q(0,1), Q(-1,1), Q(1,1)]); // x^2 - x
+        let p1 = UniPoly::new(var, vec![Q(-1, 1), Q(0, 1), Q(1, 1)]); // x^2 - 1
+        let p2 = UniPoly::new(var, vec![Q(0, 1), Q(-1, 1), Q(1, 1)]); // x^2 - x
         let g = UniPoly::gcd(p1, p2);
-        assert_eq!(g, UniPoly::new(var, vec![Q(-1,1), Q(1,1)]).monic()); // x - 1
+        assert_eq!(g, UniPoly::new(var, vec![Q(-1, 1), Q(1, 1)]).monic()); // x - 1
     }
 
     #[test]
@@ -264,7 +360,7 @@ mod tests {
         let two2 = st.int(2);
         let expr = st.add(vec![p2, three_x, two2]);
         let p = expr_to_unipoly(&st, expr, "x").expect("convertible");
-        assert_eq!(p, UniPoly::new("x", vec![Q(2,1), Q(3,1), Q(1,1)]));
+        assert_eq!(p, UniPoly::new("x", vec![Q(2, 1), Q(3, 1), Q(1, 1)]));
         let back = unipoly_to_expr(&mut st, &p);
         assert_eq!(back, expr);
     }

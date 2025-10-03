@@ -2,12 +2,12 @@
 //! simplify: explicit passes on top of expr_core canonical constructors.
 //! v0: recursive simplify; collect-like-terms for Add; basic Pow/Mul cleanups.
 
-use expr_core::{ExprId, Op, Payload, Store};
 use assumptions::Context;
+use expr_core::{ExprId, Op, Payload, Store};
 
 /// Simplify with a default assumptions context.
 pub fn simplify(store: &mut Store, id: ExprId) -> ExprId {
-    let ctx = Context::default();
+    let ctx = Context;
     simplify_with(store, id, &ctx)
 }
 
@@ -30,12 +30,16 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
             store.pow(b, e)
         }
         Op::Function => {
-            let name = match &store.get(id).payload { Payload::Func(s) => s.clone(), _ => "<f>".into() };
+            let name = match &store.get(id).payload {
+                Payload::Func(s) => s.clone(),
+                _ => "<f>".into(),
+            };
             let child_ids = {
                 let n = store.get(id);
                 n.children.clone()
             };
-            let args = child_ids.into_iter().map(|c| simplify_rec(store, c, _ctx)).collect::<Vec<_>>();
+            let args =
+                child_ids.into_iter().map(|c| simplify_rec(store, c, _ctx)).collect::<Vec<_>>();
             store.func(name, args)
         }
         _ => id,
@@ -64,7 +68,9 @@ fn simplify_add(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
     // Rebuild sum; numeric-only terms are under base==1
     let mut new_terms: Vec<ExprId> = Vec::new();
     for (base, (n, d)) in map {
-        if n == 0 { continue; }
+        if n == 0 {
+            continue;
+        }
         let term = if is_one(store, base) {
             store.rat(n, d)
         } else if n == 1 && d == 1 {
@@ -75,7 +81,9 @@ fn simplify_add(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
         };
         new_terms.push(term);
     }
-    if new_terms.is_empty() { return store.int(0); }
+    if new_terms.is_empty() {
+        return store.int(0);
+    }
     store.add(new_terms)
 }
 
@@ -131,7 +139,7 @@ fn simplify_mul(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
 fn split_coeff(store: &mut Store, id: ExprId) -> ((i64, i64), ExprId) {
     match (&store.get(id).op, &store.get(id).payload) {
         (Op::Integer, Payload::Int(k)) => (((*k), 1), store.int(1)),
-        (Op::Rational, Payload::Rat(n,d)) => (((*n), (*d)), store.int(1)),
+        (Op::Rational, Payload::Rat(n, d)) => (((*n), (*d)), store.int(1)),
         (Op::Mul, _) => {
             let mut coeff = (1i64, 1i64);
             let mut rest: Vec<ExprId> = Vec::new();
@@ -141,8 +149,12 @@ fn split_coeff(store: &mut Store, id: ExprId) -> ((i64, i64), ExprId) {
             };
             for f in child_ids {
                 match (&store.get(f).op, &store.get(f).payload) {
-                    (Op::Integer, Payload::Int(k)) => { coeff = rat_mul(coeff, (*k, 1)); }
-                    (Op::Rational, Payload::Rat(n,d)) => { coeff = rat_mul(coeff, (*n, *d)); }
+                    (Op::Integer, Payload::Int(k)) => {
+                        coeff = rat_mul(coeff, (*k, 1));
+                    }
+                    (Op::Rational, Payload::Rat(n, d)) => {
+                        coeff = rat_mul(coeff, (*n, *d));
+                    }
                     _ => rest.push(f),
                 }
             }
@@ -159,22 +171,36 @@ fn is_one(store: &Store, id: ExprId) -> bool {
 
 // Local rational ops (mirror expr_core helpers)
 fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 { return b.abs() }
-    if b == 0 { return a.abs() }
-    while b != 0 { let t = a % b; a = b; b = t; }
+    if a == 0 {
+        return b.abs();
+    }
+    if b == 0 {
+        return a.abs();
+    }
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
     a.abs()
 }
 fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
-    let mut n = num; let mut d = den;
-    if d < 0 { n = -n; d = -d; }
-    if n == 0 { return (0, 1); }
+    let mut n = num;
+    let mut d = den;
+    if d < 0 {
+        n = -n;
+        d = -d;
+    }
+    if n == 0 {
+        return (0, 1);
+    }
     let g = gcd_i64(n.abs(), d);
     (n / g, d / g)
 }
-fn rat_add(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+fn rat_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
     normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
 }
-fn rat_mul(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+fn rat_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
     normalize_rat(a.0 * b.0, a.1 * b.1)
 }
 
