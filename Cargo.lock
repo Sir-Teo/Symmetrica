@@ -31,6 +31,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "arith"
+version = "0.1.0"
+
+[[package]]
 name = "assumptions"
 version = "0.1.0"
 dependencies = [
@@ -47,6 +51,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 name = "calculus"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "expr_core",
  "simplify",
 ]
@@ -165,6 +170,7 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 name = "expr_core"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "criterion",
  "simplify",
 ]
@@ -278,6 +284,7 @@ dependencies = [
 name = "polys"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "expr_core",
 ]
 
@@ -390,6 +397,7 @@ dependencies = [
 name = "simplify"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "assumptions",
  "expr_core",
 ]

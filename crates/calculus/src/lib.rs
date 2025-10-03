@@ -1,5 +1,6 @@
 //! Calculus v1 (minimal): structural differentiation for Add/Mul/Pow.
 
+use arith::{q_add, q_div, q_mul, q_norm, q_sub};
 use expr_core::{ExprId, Op, Payload, Store};
 use simplify::simplify;
 
@@ -216,47 +217,6 @@ impl Series {
         }
         Self { coeffs: out }
     }
-}
-
-fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 {
-        return b.abs();
-    }
-    if b == 0 {
-        return a.abs();
-    }
-    while b != 0 {
-        let t = a % b;
-        a = b;
-        b = t;
-    }
-    a.abs()
-}
-fn q_norm(n: i64, d: i64) -> (i64, i64) {
-    assert!(d != 0, "zero denominator");
-    let mut nn = n;
-    let mut dd = d;
-    if dd < 0 {
-        nn = -nn;
-        dd = -dd;
-    }
-    if nn == 0 {
-        return (0, 1);
-    }
-    let g = gcd_i64(nn.abs(), dd);
-    (nn / g, dd / g)
-}
-fn q_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    q_norm(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
-}
-fn q_sub(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    q_add(a, (-b.0, b.1))
-}
-fn q_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    q_norm(a.0 * b.0, a.1 * b.1)
-}
-fn q_div(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    q_norm(a.0 * b.1, a.1 * b.0)
 }
 
 // ---------- Limits (heuristic, polynomials only) ----------

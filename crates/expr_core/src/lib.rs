@@ -5,6 +5,7 @@
 //! - Basic numeric payload (i64 integers; small rationals)
 //! - Deterministic digest (FNV-1a 64) for canonical ordering
 
+use arith::{normalize_rat, rat_add, rat_mul};
 use std::collections::HashMap;
 
 // ---------- IDs & basic nodes ----------
@@ -353,42 +354,7 @@ impl Fnv64 {
     }
 }
 
-// ---------- Small rational helpers (i64) ----------
-
-fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 {
-        return b.abs();
-    }
-    if b == 0 {
-        return a.abs();
-    }
-    while b != 0 {
-        let t = a % b;
-        a = b;
-        b = t;
-    }
-    a.abs()
-}
-fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
-    assert!(den != 0, "zero denominator");
-    let mut n = num;
-    let mut d = den;
-    if d < 0 {
-        n = -n;
-        d = -d;
-    }
-    if n == 0 {
-        return (0, 1);
-    }
-    let g = gcd_i64(n.abs(), d);
-    (n / g, d / g)
-}
-fn rat_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
-}
-fn rat_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.0, a.1 * b.1)
-}
+// rational helpers now sourced from `arith` crate
 
 #[cfg(test)]
 mod tests {
@@ -540,5 +506,32 @@ mod tests {
         let mut st = Store::new();
         // This should panic due to assert! in normalize_rat
         let _ = st.rat(1, 0);
+    }
+
+    #[test]
+    fn test_arith_q_and_helpers() {
+        use arith::*;
+
+        // Q constructors and predicates
+        let q1 = Q::new(2, 4);
+        assert_eq!(q1, Q(1, 2));
+        assert!(!q1.is_zero());
+        assert!(Q::zero().is_zero());
+        assert_eq!(Q::one(), Q(1, 1));
+
+        // Q arithmetic
+        assert_eq!(add_q(Q(1, 2), Q(1, 3)), Q(5, 6));
+        assert_eq!(sub_q(Q(1, 2), Q(1, 3)), Q(1, 6));
+        assert_eq!(mul_q(Q(2, 3), Q(3, 5)), Q(2, 5));
+        assert_eq!(div_q(Q(2, 3), Q(4, 9)), Q(3, 2));
+
+        // Tuple helpers and gcd
+        assert_eq!(gcd_i64(54, 24), 6);
+        assert_eq!(q_norm(-2, -4), (1, 2));
+        assert_eq!(q_add((1, 2), (1, 3)), (5, 6));
+        assert_eq!(q_sub((1, 2), (1, 3)), (1, 6));
+        assert_eq!(q_mul((1, 2), (2, 3)), (1, 3));
+        assert_eq!(q_div((1, 2), (2, 3)), (3, 4));
+        assert_eq!(rat_sub((1, 2), (1, 2)), (0, 1));
     }
 }

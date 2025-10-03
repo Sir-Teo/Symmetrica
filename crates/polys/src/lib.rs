@@ -3,68 +3,8 @@
 //! - Division with remainder, Euclidean GCD
 //! - Conversions: Expr ⟷ Poly (for sums of monomials in a single symbol)
 
+use arith::{add_q, div_q, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
-
-// ---------- Rationals Q (i64) ----------
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Q(pub i64, pub i64); // (num, den), den>0, gcd(|num|,den)=1
-
-impl Q {
-    pub fn new(num: i64, den: i64) -> Self {
-        normalize_rat(num, den)
-    }
-    pub fn zero() -> Self {
-        Q(0, 1)
-    }
-    pub fn one() -> Self {
-        Q(1, 1)
-    }
-    pub fn is_zero(&self) -> bool {
-        self.0 == 0
-    }
-}
-
-fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 {
-        return b.abs();
-    }
-    if b == 0 {
-        return a.abs();
-    }
-    while b != 0 {
-        let t = a % b;
-        a = b;
-        b = t;
-    }
-    a.abs()
-}
-fn normalize_rat(num: i64, den: i64) -> Q {
-    assert!(den != 0, "zero denominator");
-    let mut n = num;
-    let mut d = den;
-    if d < 0 {
-        n = -n;
-        d = -d;
-    }
-    if n == 0 {
-        return Q(0, 1);
-    }
-    let g = gcd_i64(n.abs(), d);
-    Q(n / g, d / g)
-}
-fn add_q(a: Q, b: Q) -> Q {
-    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
-}
-fn sub_q(a: Q, b: Q) -> Q {
-    add_q(a, Q(-b.0, b.1))
-}
-fn mul_q(a: Q, b: Q) -> Q {
-    normalize_rat(a.0 * b.0, a.1 * b.1)
-}
-fn div_q(a: Q, b: Q) -> Q {
-    normalize_rat(a.0 * b.1, a.1 * b.0)
-}
 
 // ---------- Univariate dense polynomial over Q ----------
 

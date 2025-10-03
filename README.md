@@ -18,6 +18,7 @@ Core principles:
 - `crates/calculus`: differentiation for Add/Mul/Pow with integer exponents.
 - `crates/cli`: tiny demonstration CLI.
 - Skeleton/stubs: `solver`, `matrix`, `assumptions`, `api`, `io`.
+ - `crates/arith`: shared small-rational (i64) and gcd helpers used across crates.
 
 ## Quickstart
 
@@ -51,25 +52,10 @@ Core principles:
    - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
  - Pattern/substitution (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
  - Polynomials (`crates/polys`): univariate dense over Q; division, GCD; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
- - Modular crates for future domains: `matrix`, `solver`, `assumptions`, `api`, `io`.
- - Cross-platform CI with fmt, clippy, build, tests, docs, audit, deny, and coverage.
-
-## Architecture & crates
-
- - `crates/expr_core` — expression kernel: `Store`, `ExprId`, `Op`, `Payload`, canonical `add()/mul()/pow()`, `to_string()`.
- - `crates/simplify` — `simplify()` and `simplify_with()` using `assumptions::Context`; collects like terms and merges powers.
- - `crates/calculus` — `diff(&mut Store, ExprId, &str)` (incl. general power rule), `integrate(&mut Store, ExprId, &str)` (conservative rules), `maclaurin(&Store, ExprId, &str, order)`, and `limit_poly(&Store, ExprId, &str, LimitPoint)`.
- - `crates/pattern` — `subst_symbol(&mut Store, ExprId, sym, with)` tree substitution.
- - `crates/polys` — `UniPoly`, `expr_to_unipoly()`, `unipoly_to_expr()`; Euclidean `div_rem()` and `gcd()`.
- - `crates/assumptions` — 3‑valued `Truth` and `Context` (skeleton) used by `simplify`.
- - `crates/matrix`, `crates/solver`, `crates/api`, `crates/io` — stubs for upcoming features.
- - `crates/cli` — demo binary `matika_cli` showing building/printing/simplifying expressions.
- - `crates/tests_e2e` — integration tests scaffold.
-
 ## Usage examples
 
- Build and simplify an expression:
-
+Build and simplify an expression:
+{{ ... }}
  ```rust
  use expr_core::Store;
  use simplify::simplify;

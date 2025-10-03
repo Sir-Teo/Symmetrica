@@ -2,6 +2,7 @@
 //! simplify: explicit passes on top of expr_core canonical constructors.
 //! v0: recursive simplify; collect-like-terms for Add; basic Pow/Mul cleanups.
 
+use arith::{rat_add, rat_mul};
 use assumptions::Context;
 use expr_core::{ExprId, Op, Payload, Store};
 
@@ -167,41 +168,6 @@ fn split_coeff(store: &mut Store, id: ExprId) -> ((i64, i64), ExprId) {
 
 fn is_one(store: &Store, id: ExprId) -> bool {
     matches!((&store.get(id).op, &store.get(id).payload), (Op::Integer, Payload::Int(1)))
-}
-
-// Local rational ops (mirror expr_core helpers)
-fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
-    if a == 0 {
-        return b.abs();
-    }
-    if b == 0 {
-        return a.abs();
-    }
-    while b != 0 {
-        let t = a % b;
-        a = b;
-        b = t;
-    }
-    a.abs()
-}
-fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
-    let mut n = num;
-    let mut d = den;
-    if d < 0 {
-        n = -n;
-        d = -d;
-    }
-    if n == 0 {
-        return (0, 1);
-    }
-    let g = gcd_i64(n.abs(), d);
-    (n / g, d / g)
-}
-fn rat_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
-}
-fn rat_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.0, a.1 * b.1)
 }
 
 #[cfg(test)]
