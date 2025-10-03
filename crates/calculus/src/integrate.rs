@@ -1,0 +1,224 @@
+//! Integration rules (v1, conservative).
+
+use crate::diff::diff;
+use arith::{q_div, q_mul};
+use expr_core::{ExprId, Op, Payload, Store};
+use simplify::simplify;
+
+/// Try to integrate expression w.r.t. `var`. Returns None if rule not supported.
+pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    // helper: does expr depend on var?
+    fn depends_on_var(st: &Store, id: ExprId, var: &str) -> bool {
+        match (&st.get(id).op, &st.get(id).payload) {
+            (Op::Symbol, Payload::Sym(s)) => s == var,
+            (Op::Integer, _) | (Op::Rational, _) => false,
+            _ => st.get(id).children.iter().any(|&c| depends_on_var(st, c, var)),
+        }
+    }
+    // helper: extract numeric coefficient and rest from a product
+    fn split_coeff_mul(st: &mut Store, id: ExprId) -> ((i64, i64), ExprId) {
+        match (&st.get(id).op, &st.get(id).payload) {
+            (Op::Integer, Payload::Int(k)) => ((*k, 1), st.int(1)),
+            (Op::Rational, Payload::Rat(n, d)) => ((*n, *d), st.int(1)),
+            (Op::Mul, _) => {
+                let mut coeff = (1i64, 1i64);
+                let mut rest: Vec<ExprId> = Vec::new();
+                let children = st.get(id).children.clone();
+                for f in children {
+                    match (&st.get(f).op, &st.get(f).payload) {
+                        (Op::Integer, Payload::Int(k)) => {
+                            coeff = q_mul(coeff, (*k, 1));
+                        }
+                        (Op::Rational, Payload::Rat(n, d)) => {
+                            coeff = q_mul(coeff, (*n, *d));
+                        }
+                        _ => rest.push(f),
+                    }
+                }
+                let rest_id = if rest.is_empty() { st.int(1) } else { st.mul(rest) };
+                (coeff, rest_id)
+            }
+            _ => ((1, 1), id),
+        }
+    }
+    // helper: build coeff * expr
+    fn with_coeff(st: &mut Store, coeff: (i64, i64), expr: ExprId) -> ExprId {
+        if coeff == (1, 1) {
+            return expr;
+        }
+        let c = st.rat(coeff.0, coeff.1);
+        let prod = st.mul(vec![c, expr]);
+        simplify(st, prod)
+    }
+
+    match store.get(id).op {
+        Op::Integer => {
+            if let Payload::Int(k) = store.get(id).payload {
+                let x = store.sym(var);
+                let ck = store.int(k);
+                Some(store.mul(vec![ck, x]))
+            } else {
+                None
+            }
+        }
+        Op::Rational => {
+            if let Payload::Rat(n, d) = store.get(id).payload {
+                let x = store.sym(var);
+                let c = store.rat(n, d);
+                Some(store.mul(vec![c, x]))
+            } else {
+                None
+            }
+        }
+        Op::Symbol => match &store.get(id).payload {
+            Payload::Sym(s) if s == var => {
+                // ∫ x dx = x^2/2
+                let two = store.int(2);
+                let x = store.sym(var);
+                let x2 = store.pow(x, two);
+                let half = store.rat(1, 2);
+                Some(store.mul(vec![half, x2]))
+            }
+            _ => {
+                // treat as constant symbol c: ∫ c dx = c*x
+                let x = store.sym(var);
+                Some(store.mul(vec![id, x]))
+            }
+        },
+        Op::Add => {
+            let mut terms: Vec<ExprId> = Vec::new();
+            for &t in &store.get(id).children.clone() {
+                let it = integrate(store, t, var)?;
+                terms.push(it);
+            }
+            let sum = store.add(terms);
+            Some(simplify(store, sum))
+        }
+        Op::Mul => {
+            // factor out numeric coefficient
+            let (coeff, rest) = split_coeff_mul(store, id);
+            // f'/f pattern: look for a factor u^{-1} and check remaining equals u' up to numeric factor
+            if store.get(rest).op == Op::Mul {
+                let factors = store.get(rest).children.clone();
+                // iterate all positions to find u^{-1}
+                for (idx, &f) in factors.iter().enumerate() {
+                    if store.get(f).op == Op::Pow {
+                        let u_node = store.get(f);
+                        if u_node.children.len() == 2 {
+                            let u = u_node.children[0];
+                            let e = u_node.children[1];
+                            if matches!(
+                                (&store.get(e).op, &store.get(e).payload),
+                                (Op::Integer, Payload::Int(-1))
+                            ) {
+                                // build product of remaining factors
+                                let mut others: Vec<ExprId> =
+                                    Vec::with_capacity(factors.len().saturating_sub(1));
+                                for (j, &g) in factors.iter().enumerate() {
+                                    if j != idx {
+                                        others.push(g);
+                                    }
+                                }
+                                let others_id = if others.is_empty() {
+                                    store.int(1)
+                                } else {
+                                    store.mul(others)
+                                };
+                                // compare to u' up to numeric coefficient
+                                let du = diff(store, u, var);
+                                let (coeff_o, rest_o) = split_coeff_mul(store, others_id);
+                                let (coeff_d, rest_d) = split_coeff_mul(store, du);
+                                if rest_o == rest_d {
+                                    let scale = q_div(coeff_o, coeff_d);
+                                    let total = q_mul(coeff, scale);
+                                    let ln_u = store.func("ln", vec![u]);
+                                    return Some(with_coeff(store, total, ln_u));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // constant times integrable function, only if we truly factored something out
+            if coeff != (1, 1) {
+                let ir = integrate(store, rest, var)?;
+                Some(with_coeff(store, coeff, ir))
+            } else if rest != id {
+                let ir = integrate(store, rest, var)?;
+                Some(ir)
+            } else {
+                None
+            }
+        }
+        Op::Pow => {
+            // ∫ x^n dx rule
+            let base = store.get(id).children[0];
+            let exp = store.get(id).children[1];
+            if let (Op::Symbol, Payload::Sym(s)) = (&store.get(base).op, &store.get(base).payload) {
+                if s == var {
+                    let k_value = match (&store.get(exp).op, &store.get(exp).payload) {
+                        (Op::Integer, Payload::Int(k)) => Some(*k),
+                        _ => None,
+                    };
+                    if let Some(k) = k_value {
+                        if k == -1 {
+                            // ∫ x^-1 dx = ln x
+                            let ln = store.func("ln", vec![base]);
+                            return Some(ln);
+                        } else {
+                            // x^(k+1)/(k+1)
+                            let k1 = store.int(k + 1);
+                            let xkp1 = store.pow(base, k1);
+                            let coeff = q_div((1, 1), (k + 1, 1));
+                            return Some(with_coeff(store, coeff, xkp1));
+                        }
+                    }
+                }
+            }
+            None
+        }
+        Op::Function => {
+            // exp(ax+b), sin(ax+b), cos(ax+b)
+            let (fname, u) = {
+                let n = store.get(id);
+                let name = match &n.payload {
+                    Payload::Func(s) => s.clone(),
+                    _ => return None,
+                };
+                if n.children.len() != 1 {
+                    return None;
+                }
+                (name, n.children[0])
+            };
+            // check du is constant
+            let du = diff(store, u, var);
+            let a = match (&store.get(du).op, &store.get(du).payload) {
+                (Op::Integer, Payload::Int(k)) => (*k, 1),
+                (Op::Rational, Payload::Rat(n, d)) => (*n, *d),
+                _ => {
+                    // if independent of var entirely, treat whole function as constant
+                    if !depends_on_var(store, id, var) {
+                        let x = store.sym(var);
+                        return Some(store.mul(vec![id, x]));
+                    }
+                    return None;
+                }
+            };
+            if a == (0, 1) {
+                return None;
+            }
+            let inv_a = q_div((1, 1), a);
+            let res = match fname.as_str() {
+                "exp" => id,
+                "sin" => {
+                    let c = store.func("cos", vec![u]);
+                    let neg1 = store.int(-1);
+                    store.mul(vec![neg1, c])
+                }
+                "cos" => store.func("sin", vec![u]),
+                _ => return None,
+            };
+            Some(with_coeff(store, inv_a, res))
+        }
+    }
+}
