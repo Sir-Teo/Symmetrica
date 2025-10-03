@@ -85,8 +85,8 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                 "cos" => {
                     // (cos u)' = -sin(u) * u'
                     let sin_u = store.func("sin", vec![u]);
-                    let neg_one = store.int(-1);
-                    store.mul(vec![neg_one, sin_u, du])
+                    let neg1 = store.int(-1);
+                    store.mul(vec![neg1, sin_u, du])
                 }
                 "exp" => {
                     // (exp u)' = exp(u) * u'
@@ -95,8 +95,8 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                 }
                 "ln" | "log" => {
                     // (ln u)' = u' / u = u' * u^{-1}
-                    let neg_one = store.int(-1);
-                    let inv = store.pow(u, neg_one);
+                    let minus_one = store.int(-1);
+                    let inv = store.pow(u, minus_one);
                     store.mul(vec![du, inv])
                 }
                 _ => store.int(0),
@@ -164,9 +164,9 @@ mod tests {
         // d/dx cos(x) = -sin(x)
         let cosx2 = st.func("cos", vec![x]);
         let dcosx = super::diff(&mut st, cosx2, "x");
-        let neg_one = st.int(-1);
+        let neg1 = st.int(-1);
         let sinx2 = st.func("sin", vec![x]);
-        let neg_sinx = st.mul(vec![neg_one, sinx2]);
+        let neg_sinx = st.mul(vec![neg1, sinx2]);
         assert_eq!(dcosx, neg_sinx);
 
         // d/dx exp(x) = exp(x)
@@ -178,8 +178,8 @@ mod tests {
         // d/dx ln(x) = 1/x = x^-1
         let lnx = st.func("ln", vec![x]);
         let dlnx = super::diff(&mut st, lnx, "x");
-        let neg_one = st.int(-1);
-        let invx = st.pow(x, neg_one);
+        let minus_one = st.int(-1);
+        let invx = st.pow(x, minus_one);
         assert_eq!(dlnx, invx);
 
         // Chain rule: d/dx sin(x^2) = cos(x^2) * 2x
@@ -187,11 +187,11 @@ mod tests {
         let x2 = st.pow(x, two);
         let sin_x2 = st.func("sin", vec![x2]);
         let d_sin_x2 = super::diff(&mut st, sin_x2, "x");
-        let two2 = st.int(2);
-        let x2_again = st.pow(x, two2);
+        let two_exp = st.int(2);
+        let x2_again = st.pow(x, two_exp);
         let cos_x2 = st.func("cos", vec![x2_again]);
-        let two3 = st.int(2);
-        let two_x = st.mul(vec![two3, x]);
+        let two2 = st.int(2);
+        let two_x = st.mul(vec![two2, x]);
         let expected = st.mul(vec![cos_x2, two_x]);
         assert_eq!(d_sin_x2, expected);
     }
