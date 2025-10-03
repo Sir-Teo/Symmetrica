@@ -1,0 +1,16 @@
+[package]
+name = "tests_e2e"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Symmetrica end-to-end integration tests"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+expr_core = { path = "../expr_core" }
+simplify  = { path = "../simplify" }
+calculus  = { path = "../calculus" }
+polys     = { path = "../polys" }
+pattern   = { path = "../pattern" }

@@ -3,18 +3,30 @@
 //! v0: recursive simplify; collect-like-terms for Add; basic Pow/Mul cleanups.
 
 use expr_core::{ExprId, Op, Payload, Store};
+use assumptions::Context;
 
+/// Simplify with a default assumptions context.
 pub fn simplify(store: &mut Store, id: ExprId) -> ExprId {
+    let ctx = Context::default();
+    simplify_with(store, id, &ctx)
+}
+
+/// Simplify with an explicit assumptions context.
+pub fn simplify_with(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
+    simplify_rec(store, id, ctx)
+}
+
+fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
     match store.get(id).op {
-        Op::Add => simplify_add(store, id),
-        Op::Mul => simplify_mul(store, id),
+        Op::Add => simplify_add(store, id, _ctx),
+        Op::Mul => simplify_mul(store, id, _ctx),
         Op::Pow => {
             let (b_id, e_id) = {
                 let n = store.get(id);
                 (n.children[0], n.children[1])
             };
-            let b = simplify(store, b_id);
-            let e = simplify(store, e_id);
+            let b = simplify_rec(store, b_id, _ctx);
+            let e = simplify_rec(store, e_id, _ctx);
             store.pow(b, e)
         }
         Op::Function => {
@@ -23,14 +35,14 @@ pub fn simplify(store: &mut Store, id: ExprId) -> ExprId {
                 let n = store.get(id);
                 n.children.clone()
             };
-            let args = child_ids.into_iter().map(|c| simplify(store, c)).collect::<Vec<_>>();
+            let args = child_ids.into_iter().map(|c| simplify_rec(store, c, _ctx)).collect::<Vec<_>>();
             store.func(name, args)
         }
         _ => id,
     }
 }
 
-fn simplify_add(store: &mut Store, id: ExprId) -> ExprId {
+fn simplify_add(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
     // First simplify children
     let child_ids = {
         let n = store.get(id);
@@ -38,7 +50,7 @@ fn simplify_add(store: &mut Store, id: ExprId) -> ExprId {
     };
     let mut terms = Vec::new();
     for c in child_ids {
-        terms.push(simplify(store, c));
+        terms.push(simplify_rec(store, c, ctx));
     }
     // Split each term into (coeff, base), then collect coefficients per base
     use std::collections::HashMap;
@@ -67,14 +79,14 @@ fn simplify_add(store: &mut Store, id: ExprId) -> ExprId {
     store.add(new_terms)
 }
 
-fn simplify_mul(store: &mut Store, id: ExprId) -> ExprId {
+fn simplify_mul(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
     let child_ids = {
         let n = store.get(id);
         n.children.clone()
     };
     let mut factors = Vec::new();
     for c in child_ids {
-        factors.push(simplify(store, c));
+        factors.push(simplify_rec(store, c, ctx));
     }
 
     // Merge powers with same base: x^a * x^b -> x^(a+b)
@@ -99,7 +111,7 @@ fn simplify_mul(store: &mut Store, id: ExprId) -> ExprId {
             let acc = exp_map.remove(&base).unwrap_or_else(|| store.int(0));
             let sum = store.add(vec![acc, e]);
             // Re-simplify the exponent sum to keep it tidy
-            let sum_s = simplify(store, sum);
+            let sum_s = simplify_rec(store, sum, ctx);
             exp_map.insert(base, sum_s);
         } else {
             passthrough.push(f);

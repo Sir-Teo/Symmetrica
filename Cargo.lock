@@ -390,6 +390,7 @@ dependencies = [
 name = "simplify"
 version = "0.1.0"
 dependencies = [
+ "assumptions",
  "expr_core",
 ]
 
@@ -409,6 +410,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tests_e2e"
+version = "0.1.0"
+dependencies = [
+ "calculus",
+ "expr_core",
+ "pattern",
+ "polys",
+ "simplify",
 ]
 
 [[package]]

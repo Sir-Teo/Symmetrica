@@ -355,4 +355,66 @@ mod tests {
         let expected = st.mul(vec![x, rat23]);
         assert_eq!(m, expected);
     }
+
+    #[test]
+    fn test_rat_normalization() {
+        let mut st = Store::new();
+        // 2/4 -> 1/2
+        let a = st.rat(2, 4);
+        let b = st.rat(1, 2);
+        assert_eq!(a, b);
+        // 2/(-4) -> -1/2
+        let c = st.rat(2, -4);
+        let d = st.rat(-1, 2);
+        assert_eq!(c, d);
+        // 0/n -> 0 as integer
+        let e = st.rat(0, 5);
+        assert_eq!(e, st.int(0));
+    }
+
+    #[test]
+    fn test_flatten_add_and_identities() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let one = st.int(1);
+        let a = st.add(vec![x, zero]);
+        let b = st.add(vec![one, x]);
+        let nested = st.add(vec![a, b]);
+        // Expect flattened: x + x + 1 (numeric folded)
+        let expect = st.add(vec![x, x, one]);
+        assert_eq!(nested, expect);
+    }
+
+    #[test]
+    fn test_pow_rules_zero_one() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^1 -> x
+        let one = st.int(1);
+        let p1 = st.pow(x, one);
+        assert_eq!(p1, x);
+        // x^0 -> 1 for nonzero base
+        let zero = st.int(0);
+        let p0 = st.pow(x, zero);
+        assert_eq!(p0, st.int(1));
+        // 0^0 stays as Pow node
+        let zero2 = st.int(0);
+        let p_undefined = st.pow(zero, zero2);
+        assert!(matches!(st.get(p_undefined).op, Op::Pow));
+    }
+
+    #[test]
+    fn test_printer_precedence() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let sum = st.add(vec![y, two]);
+        let prod = st.mul(vec![x, sum]);
+        assert_eq!(st.to_string(prod), "x * (2 + y)");
+        let three = st.int(3);
+        let pow = st.pow(sum, three);
+        assert_eq!(st.to_string(pow), "(2 + y)^3");
+    }
 }
