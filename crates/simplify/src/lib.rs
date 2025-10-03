@@ -278,4 +278,63 @@ mod tests {
         let expected = st.mul(vec![six, px5]);
         assert_eq!(s, expected);
     }
+
+    #[test]
+    fn cancel_like_terms_to_zero() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let m_two = st.int(-2);
+        let two_x = st.mul(vec![two, x]);
+        let m_two_x = st.mul(vec![m_two, x]);
+        let expr = st.add(vec![two_x, m_two_x]);
+        let s = super::simplify(&mut st, expr);
+        assert_eq!(s, st.int(0));
+    }
+
+    #[test]
+    fn combine_multiple_powers_and_plain_factors() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let three = st.int(3);
+        let p2 = st.pow(x, two);
+        let p3 = st.pow(x, three);
+        let p2y = st.mul(vec![p2, y]);
+        let p3y = st.mul(vec![p3, y]);
+        let expr = st.mul(vec![p2y, p3y]);
+        let s = super::simplify(&mut st, expr);
+        let five = st.int(5);
+        let two_e = st.int(2);
+        let px5 = st.pow(x, five);
+        let y2 = st.pow(y, two_e);
+        let expected = st.mul(vec![px5, y2]);
+        assert_eq!(s, expected);
+    }
+
+    #[test]
+    fn fold_numeric_rationals_in_add() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let third = st.rat(1, 3);
+        let expr = st.add(vec![half, third]);
+        let s = super::simplify(&mut st, expr);
+        assert_eq!(s, st.rat(5, 6));
+    }
+
+    #[test]
+    fn simplify_inside_function_arguments() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let zero = st.int(0);
+        let one = st.int(1);
+        let arg1 = st.add(vec![x, zero]);
+        let arg2 = st.mul(vec![one, y]);
+        let f = st.func("f", vec![arg1, arg2]);
+        let s = super::simplify(&mut st, f);
+        let expected = st.func("f", vec![x, y]);
+        assert_eq!(s, expected);
+    }
 }

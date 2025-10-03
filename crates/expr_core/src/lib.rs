@@ -500,4 +500,45 @@ mod tests {
         let pow = st.pow(sum, three);
         assert_eq!(st.to_string(pow), "(2 + y)^3");
     }
+
+    #[test]
+    fn test_function_construction_and_printing() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let sum = st.add(vec![y, two]); // canonical prints as 2 + y
+        let f = st.func("f", vec![x, sum]);
+        assert_eq!(st.to_string(f), "f(x, 2 + y)");
+    }
+
+    #[test]
+    fn test_function_argument_order_matters() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let f_xy = st.func("f", vec![x, y]);
+        let f_yx = st.func("f", vec![y, x]);
+        assert_ne!(f_xy, f_yx, "function args are ordered and not canonicalized");
+    }
+
+    #[test]
+    fn test_mul_flatten_and_sorting() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let y_two = st.mul(vec![y, two]);
+        let nested = st.mul(vec![x, y_two]);
+        let flat = st.mul(vec![x, y, two]);
+        assert_eq!(nested, flat);
+    }
+
+    #[test]
+    #[should_panic(expected = "zero denominator")]
+    fn test_rat_zero_denominator_panics() {
+        let mut st = Store::new();
+        // This should panic due to assert! in normalize_rat
+        let _ = st.rat(1, 0);
+    }
 }
