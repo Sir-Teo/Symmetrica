@@ -5,6 +5,7 @@
 mod tests {
     use calculus::diff;
     use expr_core::Store;
+    use io::to_latex;
     use pattern::subst_symbol;
     use polys::{expr_to_unipoly, unipoly_to_expr};
     use simplify::simplify;
@@ -77,5 +78,22 @@ mod tests {
         let two2 = st.int(2);
         let expected = st.pow(y1, two2);
         assert_eq!(s, expected);
+    }
+
+    #[test]
+    fn e2e_latex_print_basic_expr() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let three = st.int(3);
+        let three_x = st.mul(vec![three, x]);
+        let two_c = st.int(2);
+        let e = st.add(vec![x2, three_x, two_c]);
+        let s = to_latex(&st, e);
+        // Check key fragments without relying on term order beyond determinism
+        assert!(s.contains("x^{2}"));
+        assert!(s.contains("3 \\cdot x"));
+        assert!(s.contains("2"));
     }
 }

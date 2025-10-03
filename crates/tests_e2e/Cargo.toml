@@ -14,3 +14,4 @@ simplify  = { path = "../simplify" }
 calculus  = { path = "../calculus" }
 polys     = { path = "../polys" }
 pattern   = { path = "../pattern" }
+io        = { path = "../io" }

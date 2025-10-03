@@ -1,0 +1,12 @@
+[package]
+name = "plot"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "SVG plotting utilities for Symmetrica expressions"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+expr_core = { path = "../expr_core" }

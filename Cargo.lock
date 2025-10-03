@@ -281,6 +281,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "plot"
+version = "0.1.0"
+dependencies = [
+ "expr_core",
+]
+
+[[package]]
 name = "polys"
 version = "0.1.0"
 dependencies = [
@@ -426,6 +433,7 @@ version = "0.1.0"
 dependencies = [
  "calculus",
  "expr_core",
+ "io",
  "pattern",
  "polys",
  "simplify",
