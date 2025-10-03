@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build Artifacts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace --release
+
+      - name: Package CLI
+        run: |
+          mkdir -p dist
+          # Package the CLI binary if present
+          if cargo metadata --format-version 1 | jq -r '.packages[].name' | grep -q '^matika_cli$'; then
+            BIN_NAME=matika_cli
+            TARGET_DIR=target/release
+            if [ "${{ runner.os }}" = "Windows" ]; then
+              7z a dist/${BIN_NAME}-windows.zip ${TARGET_DIR}/${BIN_NAME}.exe
+            elif [ "${{ runner.os }}" = "macOS" ]; then
+              tar -czf dist/${BIN_NAME}-macos.tar.gz -C ${TARGET_DIR} ${BIN_NAME}
+            else
+              tar -czf dist/${BIN_NAME}-linux.tar.gz -C ${TARGET_DIR} ${BIN_NAME}
+            fi
+          fi
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: symmetrica-${{ runner.os }}
+          path: dist/*

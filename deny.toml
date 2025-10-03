@@ -1,0 +1,28 @@
+# cargo-deny configuration
+
+[advisories]
+ignore = []
+
+[bans]
+deny = []
+#wildcards are common in rust ecosystem, allow but show warnings
+multiple-versions = "warn"
+wildcards = "allow"
+
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "BSD-2-Clause",
+  "ISC",
+  "MPL-2.0",
+  "Unicode-DFS-2016",
+  "Unlicense",
+  "Zlib",
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

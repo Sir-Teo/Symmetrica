@@ -1,0 +1,11 @@
+[package]
+name = "expr_core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Symmetrica expression core: immutable DAG with hash-consing and canonical constructors"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]

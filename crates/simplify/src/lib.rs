@@ -1,0 +1,161 @@
+#![deny(warnings)]
+//! simplify: explicit passes on top of expr_core canonical constructors.
+//! v0: recursive simplify; collect-like-terms for Add; basic Pow/Mul cleanups.
+
+use expr_core::{ExprId, Op, Payload, Store};
+
+pub fn simplify(store: &mut Store, id: ExprId) -> ExprId {
+    match store.get(id).op {
+        Op::Add => simplify_add(store, id),
+        Op::Mul => simplify_mul(store, id),
+        Op::Pow => {
+            let (b_id, e_id) = {
+                let n = store.get(id);
+                (n.children[0], n.children[1])
+            };
+            let b = simplify(store, b_id);
+            let e = simplify(store, e_id);
+            store.pow(b, e)
+        }
+        Op::Function => {
+            let name = match &store.get(id).payload { Payload::Func(s) => s.clone(), _ => "<f>".into() };
+            let child_ids = {
+                let n = store.get(id);
+                n.children.clone()
+            };
+            let args = child_ids.into_iter().map(|c| simplify(store, c)).collect::<Vec<_>>();
+            store.func(name, args)
+        }
+        _ => id,
+    }
+}
+
+fn simplify_add(store: &mut Store, id: ExprId) -> ExprId {
+    // First simplify children
+    let child_ids = {
+        let n = store.get(id);
+        n.children.clone()
+    };
+    let mut terms = Vec::new();
+    for c in child_ids {
+        terms.push(simplify(store, c));
+    }
+    // Split each term into (coeff, base), then collect coefficients per base
+    use std::collections::HashMap;
+    let mut map: HashMap<ExprId, (i64, i64)> = HashMap::new(); // base -> rational coeff (num, den)
+    for t in terms {
+        let (coeff, base) = split_coeff(store, t);
+        let entry = map.entry(base).or_insert((0, 1));
+        *entry = rat_add(*entry, coeff);
+    }
+
+    // Rebuild sum; numeric-only terms are under base==1
+    let mut new_terms: Vec<ExprId> = Vec::new();
+    for (base, (n, d)) in map {
+        if n == 0 { continue; }
+        let term = if is_one(store, base) {
+            store.rat(n, d)
+        } else if n == 1 && d == 1 {
+            base
+        } else {
+            let coeff = store.rat(n, d);
+            store.mul(vec![coeff, base])
+        };
+        new_terms.push(term);
+    }
+    if new_terms.is_empty() { return store.int(0); }
+    store.add(new_terms)
+}
+
+fn simplify_mul(store: &mut Store, id: ExprId) -> ExprId {
+    let child_ids = {
+        let n = store.get(id);
+        n.children.clone()
+    };
+    let mut factors = Vec::new();
+    for c in child_ids {
+        factors.push(simplify(store, c));
+    }
+    // TODO: optional: merge powers with same base (x^a * x^b -> x^(a+b))
+    store.mul(factors)
+}
+
+/// Split term into (coeff rational, base expr) where term == coeff * base
+fn split_coeff(store: &mut Store, id: ExprId) -> ((i64, i64), ExprId) {
+    match (&store.get(id).op, &store.get(id).payload) {
+        (Op::Integer, Payload::Int(k)) => (((*k), 1), store.int(1)),
+        (Op::Rational, Payload::Rat(n,d)) => (((*n), (*d)), store.int(1)),
+        (Op::Mul, _) => {
+            let mut coeff = (1i64, 1i64);
+            let mut rest: Vec<ExprId> = Vec::new();
+            let child_ids = {
+                let n = store.get(id);
+                n.children.clone()
+            };
+            for f in child_ids {
+                match (&store.get(f).op, &store.get(f).payload) {
+                    (Op::Integer, Payload::Int(k)) => { coeff = rat_mul(coeff, (*k, 1)); }
+                    (Op::Rational, Payload::Rat(n,d)) => { coeff = rat_mul(coeff, (*n, *d)); }
+                    _ => rest.push(f),
+                }
+            }
+            let base = if rest.is_empty() { store.int(1) } else { store.mul(rest) };
+            (coeff, base)
+        }
+        _ => ((1, 1), id),
+    }
+}
+
+fn is_one(store: &Store, id: ExprId) -> bool {
+    matches!((&store.get(id).op, &store.get(id).payload), (Op::Integer, Payload::Int(1)))
+}
+
+// Local rational ops (mirror expr_core helpers)
+fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
+    if a == 0 { return b.abs() }
+    if b == 0 { return a.abs() }
+    while b != 0 { let t = a % b; a = b; b = t; }
+    a.abs()
+}
+fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
+    let mut n = num; let mut d = den;
+    if d < 0 { n = -n; d = -d; }
+    if n == 0 { return (0, 1); }
+    let g = gcd_i64(n.abs(), d);
+    (n / g, d / g)
+}
+fn rat_add(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
+}
+fn rat_mul(a: (i64,i64), b: (i64,i64)) -> (i64,i64) {
+    normalize_rat(a.0 * b.0, a.1 * b.1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn idempotent_and_collect_like_terms() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let three = st.int(3);
+        let three_x = st.mul(vec![three, x]);
+        let half = st.rat(1, 2);
+        let half_x = st.mul(vec![half, x]);
+        let expr = st.add(vec![two_x, three_x, half_x, half]);
+
+        let s1 = simplify(&mut st, expr);
+        let s2 = simplify(&mut st, s1);
+        assert_eq!(s1, s2, "simplify must be idempotent");
+
+        // Expected: (2+3+1/2)x + 1/2 = (11/2)x + 1/2
+        let coeff = st.rat(11, 2);
+        let term = st.mul(vec![coeff, x]);
+        let half2 = st.rat(1, 2);
+        let expected = st.add(vec![term, half2]);
+        assert_eq!(s1, expected);
+    }
+}

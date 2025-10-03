@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/expr_core",
+  "crates/simplify",
+  "crates/cli",
+  "crates/polys",
+  "crates/calculus",
+  "crates/solver",
+  "crates/matrix",
+  "crates/assumptions",
+  "crates/api",
+  "crates/io",
+]
+
+[workspace.package]
+edition = "2021"
