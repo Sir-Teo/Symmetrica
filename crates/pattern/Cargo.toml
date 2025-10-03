@@ -1,9 +1,9 @@
 [package]
-name = "calculus"
+name = "pattern"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Symmetrica calculus module (stub)"
+description = "Symmetrica pattern/substitution v1"
 
 [lib]
 path = "src/lib.rs"

@@ -10,6 +10,7 @@ members = [
   "crates/matrix",
   "crates/assumptions",
   "crates/api",
+  "crates/pattern",
   "crates/io",
 ]
 

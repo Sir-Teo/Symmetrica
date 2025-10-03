@@ -9,3 +9,7 @@ description = "Symmetrica expression core: immutable DAG with hash-consing and c
 path = "src/lib.rs"
 
 [dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+simplify = { path = "../simplify" }
