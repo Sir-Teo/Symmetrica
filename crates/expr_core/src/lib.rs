@@ -51,15 +51,10 @@ struct NodeKey {
 
 // ---------- Store (arena + interner) ----------
 
+#[derive(Default)]
 pub struct Store {
     nodes: Vec<Node>,
     interner: HashMap<NodeKey, ExprId>,
-}
-
-impl Default for Store {
-    fn default() -> Self {
-        Self { nodes: Vec::new(), interner: HashMap::new() }
-    }
 }
 
 impl Store {

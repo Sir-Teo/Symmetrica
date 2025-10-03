@@ -76,8 +76,43 @@ fn simplify_mul(store: &mut Store, id: ExprId) -> ExprId {
     for c in child_ids {
         factors.push(simplify(store, c));
     }
-    // TODO: optional: merge powers with same base (x^a * x^b -> x^(a+b))
-    store.mul(factors)
+
+    // Merge powers with same base: x^a * x^b -> x^(a+b)
+    use std::collections::HashMap;
+    let mut exp_map: HashMap<ExprId, ExprId> = HashMap::new();
+    let mut passthrough: Vec<ExprId> = Vec::new();
+    for f in factors {
+        // Skip numeric factors from power-collection (expr_core::mul already folded them)
+        let (base, exp_opt) = match (&store.get(f).op, &store.get(f).payload) {
+            (Op::Pow, _) => {
+                let n = store.get(f);
+                (n.children[0], Some(n.children[1]))
+            }
+            (Op::Integer, _) | (Op::Rational, _) => {
+                passthrough.push(f);
+                continue;
+            }
+            _ => (f, Some(store.int(1))),
+        };
+
+        if let Some(e) = exp_opt {
+            let acc = exp_map.remove(&base).unwrap_or_else(|| store.int(0));
+            let sum = store.add(vec![acc, e]);
+            // Re-simplify the exponent sum to keep it tidy
+            let sum_s = simplify(store, sum);
+            exp_map.insert(base, sum_s);
+        } else {
+            passthrough.push(f);
+        }
+    }
+
+    let mut rebuilt: Vec<ExprId> = passthrough;
+    for (base, exp) in exp_map {
+        // If exponent is 1, just emit the base
+        let term = if is_one(store, exp) { base } else { store.pow(base, exp) };
+        rebuilt.push(term);
+    }
+    store.mul(rebuilt)
 }
 
 /// Split term into (coeff rational, base expr) where term == coeff * base
@@ -157,5 +192,52 @@ mod tests {
         let half2 = st.rat(1, 2);
         let expected = st.add(vec![term, half2]);
         assert_eq!(s1, expected);
+    }
+
+    #[test]
+    fn combine_powers_simple() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let p2 = st.pow(x, two);
+        let three = st.int(3);
+        let p3 = st.pow(x, three);
+        let e = st.mul(vec![p2, p3]);
+        let s = super::simplify(&mut st, e);
+        let five = st.int(5);
+        let expected = st.pow(x, five);
+        assert_eq!(s, expected);
+    }
+
+    #[test]
+    fn combine_powers_with_unit_base() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let p2 = st.pow(x, two);
+        let e = st.mul(vec![p2, x]);
+        let s = super::simplify(&mut st, e);
+        let three = st.int(3);
+        let expected = st.pow(x, three);
+        assert_eq!(s, expected);
+    }
+
+    #[test]
+    fn combine_powers_and_coefficients() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let twoe = st.int(2);
+        let p2 = st.pow(x, twoe);
+        let threee = st.int(3);
+        let p3 = st.pow(x, threee);
+        let e = st.mul(vec![two, p2, three, p3]);
+        let s = super::simplify(&mut st, e);
+        let six = st.int(6);
+        let five = st.int(5);
+        let px5 = st.pow(x, five);
+        let expected = st.mul(vec![six, px5]);
+        assert_eq!(s, expected);
     }
 }
