@@ -3,10 +3,26 @@ name = "api"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Symmetrica API/bindings crate (stub)"
+description = "Symmetrica Python bindings via PyO3"
 
 [lib]
+name = "symmetrica"
+crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
 expr_core = { path = "../expr_core" }
+simplify = { path = "../simplify" }
+calculus = { path = "../calculus" }
+solver = { path = "../solver" }
+matrix = { path = "../matrix" }
+polys = { path = "../polys" }
+pattern = { path = "../pattern" }
+io = { path = "../io" }
+evalf = { path = "../evalf" }
+plot = { path = "../plot" }
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+
+[features]
+default = []
+python = ["pyo3"]
