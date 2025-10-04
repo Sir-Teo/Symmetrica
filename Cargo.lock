@@ -838,12 +838,18 @@ dependencies = [
 name = "tests_e2e"
 version = "0.1.0"
 dependencies = [
+ "arith",
+ "assumptions",
  "calculus",
+ "evalf",
  "expr_core",
  "io",
+ "matrix",
  "pattern",
+ "plot",
  "polys",
  "simplify",
+ "solver",
 ]
 
 [[package]]

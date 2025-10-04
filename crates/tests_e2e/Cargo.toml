@@ -15,3 +15,9 @@ calculus  = { path = "../calculus" }
 polys     = { path = "../polys" }
 pattern   = { path = "../pattern" }
 io        = { path = "../io" }
+arith     = { path = "../arith" }
+solver    = { path = "../solver" }
+matrix    = { path = "../matrix" }
+evalf     = { path = "../evalf" }
+plot      = { path = "../plot" }
+assumptions = { path = "../assumptions" }

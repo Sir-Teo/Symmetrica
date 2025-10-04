@@ -368,4 +368,65 @@ mod tests {
         let parsed = from_sexpr(&mut st2, &s).expect("parse");
         assert_eq!(st.to_string(rat), st2.to_string(parsed));
     }
+
+    #[test]
+    fn sexpr_single_element_mul() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let single_mul = st.mul(vec![x]);
+        // Single-element mul returns the element itself
+        assert_eq!(single_mul, x);
+        let s = to_sexpr(&st, single_mul);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(single_mul), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_function_no_args() {
+        let mut st = Store::new();
+        let f = st.func("f", vec![]);
+        let s = to_sexpr(&st, f);
+        // Function with no args should be serializable
+        assert!(s.contains("Fn") && s.contains("f"));
+    }
+
+    #[test]
+    fn sexpr_complex_nested_expression() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        // ((x^2) * y) + (sin(x + y))
+        let x2 = st.pow(x, two);
+        let prod = st.mul(vec![x2, y]);
+        let sum_args = st.add(vec![x, y]);
+        let sin_sum = st.func("sin", vec![sum_args]);
+        let expr = st.add(vec![prod, sin_sum]);
+
+        let s = to_sexpr(&st, expr);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(expr), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_quoted_symbol_names() {
+        let mut st = Store::new();
+        let s = "(Sym \"x_1\")";
+        let parsed = from_sexpr(&mut st, s).expect("parse");
+        assert!(st.to_string(parsed).contains("x_1"));
+    }
+
+    #[test]
+    fn sexpr_whitespace_handling() {
+        let mut st = Store::new();
+        // Extra whitespace should be handled
+        let s = "(  +   ( Int   1 )   ( Int   2 )  )";
+        let parsed = from_sexpr(&mut st, s).expect("parse");
+        let one = st.int(1);
+        let two = st.int(2);
+        let expected = st.add(vec![one, two]);
+        assert_eq!(st.to_string(parsed), st.to_string(expected));
+    }
 }

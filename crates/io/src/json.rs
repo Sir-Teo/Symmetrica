@@ -398,4 +398,63 @@ mod tests {
         let parsed = from_json(&mut st2, &s).expect("parse");
         assert_eq!(st.to_string(rat), st2.to_string(parsed));
     }
+
+    #[test]
+    fn json_function_with_multiple_args() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let z = st.sym("z");
+        let f = st.func("f", vec![x, y, z]);
+        let s = to_json(&st, f);
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(f), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_pow_roundtrip() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let pow_expr = st.pow(x, three);
+        let s = to_json(&st, pow_expr);
+        assert!(s.contains("\"Pow\""));
+        assert!(s.contains("\"base\""));
+        assert!(s.contains("\"exp\""));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(pow_expr), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_empty_add_mul() {
+        let mut st = Store::new();
+        // Empty add canonicalizes to 0
+        let empty_add = st.add(vec![]);
+        assert_eq!(empty_add, st.int(0));
+        let s = to_json(&st, empty_add);
+        assert!(s.contains("\"Integer\""));
+    }
+
+    #[test]
+    fn json_negative_integer() {
+        let mut st = Store::new();
+        let neg = st.int(-42);
+        let s = to_json(&st, neg);
+        assert!(s.contains("-42"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(neg), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_negative_rational() {
+        let mut st = Store::new();
+        let neg_rat = st.rat(-3, 4);
+        let s = to_json(&st, neg_rat);
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(neg_rat), st2.to_string(parsed));
+    }
 }

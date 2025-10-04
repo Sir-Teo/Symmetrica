@@ -6,6 +6,7 @@
 mod python_bindings {
     use pyo3::exceptions::PyValueError;
     use pyo3::prelude::*;
+    use pyo3::types::PyModule;
 
     use calculus::{diff, integrate};
     use evalf::{eval, EvalContext};
@@ -53,7 +54,7 @@ mod python_bindings {
         }
 
         /// Add two expressions
-        fn __add__(&self, other: &Expr) -> Self {
+        fn __add__(&self, other: PyRef<Expr>) -> Self {
             let mut store = Store::new();
             let id1 = self.rebuild_in(&mut store);
             let id2 = other.rebuild_in(&mut store);
@@ -62,7 +63,7 @@ mod python_bindings {
         }
 
         /// Subtract two expressions
-        fn __sub__(&self, other: &Expr) -> Self {
+        fn __sub__(&self, other: PyRef<Expr>) -> Self {
             let mut store = Store::new();
             let id1 = self.rebuild_in(&mut store);
             let id2 = other.rebuild_in(&mut store);
@@ -73,7 +74,7 @@ mod python_bindings {
         }
 
         /// Multiply two expressions
-        fn __mul__(&self, other: &Expr) -> Self {
+        fn __mul__(&self, other: PyRef<Expr>) -> Self {
             let mut store = Store::new();
             let id1 = self.rebuild_in(&mut store);
             let id2 = other.rebuild_in(&mut store);
@@ -82,7 +83,7 @@ mod python_bindings {
         }
 
         /// Divide two expressions (returns rational expression)
-        fn __truediv__(&self, other: &Expr) -> Self {
+        fn __truediv__(&self, other: PyRef<Expr>) -> Self {
             let mut store = Store::new();
             let id1 = self.rebuild_in(&mut store);
             let id2 = other.rebuild_in(&mut store);
@@ -93,7 +94,7 @@ mod python_bindings {
         }
 
         /// Raise expression to a power
-        fn __pow__(&self, other: &Expr, _mod: Option<&PyAny>) -> Self {
+        fn __pow__(&self, other: PyRef<Expr>, _mod: Option<&Bound<'_, PyAny>>) -> Self {
             let mut store = Store::new();
             let id1 = self.rebuild_in(&mut store);
             let id2 = other.rebuild_in(&mut store);
@@ -151,7 +152,7 @@ mod python_bindings {
         }
 
         /// Substitute a symbol with another expression
-        fn subs(&self, var: String, val: &Expr) -> Self {
+        fn subs(&self, var: String, val: PyRef<Expr>) -> Self {
             let mut store = Store::new();
             let id = self.rebuild_in(&mut store);
             let val_id = val.rebuild_in(&mut store);
@@ -252,69 +253,75 @@ mod python_bindings {
         }
     }
 
+    /// Create common mathematical functions
+    #[pyfunction]
+    fn sin(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("sin".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn cos(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("cos".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn tan(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("tan".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn exp(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("exp".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn ln(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("ln".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn log(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let id = store.func("log".to_string(), vec![arg]);
+        Expr { store, id }
+    }
+
+    #[pyfunction]
+    fn sqrt(x: PyRef<Expr>) -> Expr {
+        let mut store = Store::new();
+        let arg = x.rebuild_in(&mut store);
+        let half = store.rat(1, 2);
+        let id = store.pow(arg, half);
+        Expr { store, id }
+    }
+
     /// Helper functions module
     #[pymodule]
-    pub fn symmetrica(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn symmetrica(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<Expr>()?;
-
-        /// Create common mathematical functions
-        #[pyfn(m)]
-        fn sin(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("sin".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn cos(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("cos".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn tan(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("tan".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn exp(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("exp".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn ln(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("ln".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn log(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let id = store.func("log".to_string(), vec![arg]);
-            Expr { store, id }
-        }
-
-        #[pyfn(m)]
-        fn sqrt(x: &Expr) -> Expr {
-            let mut store = Store::new();
-            let arg = x.rebuild_in(&mut store);
-            let half = store.rat(1, 2);
-            let id = store.pow(arg, half);
-            Expr { store, id }
-        }
-
+        m.add_function(wrap_pyfunction!(sin, m)?)?;
+        m.add_function(wrap_pyfunction!(cos, m)?)?;
+        m.add_function(wrap_pyfunction!(tan, m)?)?;
+        m.add_function(wrap_pyfunction!(exp, m)?)?;
+        m.add_function(wrap_pyfunction!(ln, m)?)?;
+        m.add_function(wrap_pyfunction!(log, m)?)?;
+        m.add_function(wrap_pyfunction!(sqrt, m)?)?;
         Ok(())
     }
 }

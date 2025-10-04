@@ -144,4 +144,101 @@ mod tests {
         let out = apply_best_rule_by_node_count(&mut st, expr, &rules).unwrap();
         assert_eq!(out, st.int(0));
     }
+
+    #[test]
+    fn rule_with_guard_blocks_match() {
+        fn always_false(_: &Store, _: &Bindings) -> bool {
+            false
+        }
+
+        let rules = vec![Rule {
+            name: "guarded",
+            pattern: Pat::Any("x".into()),
+            guard: Some(always_false),
+            build: |st, _| st.int(999),
+        }];
+
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let out = apply_first_rule(&mut st, x, &rules);
+        assert!(out.is_none());
+    }
+
+    #[test]
+    fn rule_with_guard_allows_match() {
+        fn always_true(_: &Store, _: &Bindings) -> bool {
+            true
+        }
+
+        let rules = vec![Rule {
+            name: "guarded",
+            pattern: Pat::Integer(42),
+            guard: Some(always_true),
+            build: |st, _| st.int(0),
+        }];
+
+        let mut st = Store::new();
+        let expr = st.int(42);
+        let out = apply_first_rule(&mut st, expr, &rules).unwrap();
+        assert_eq!(out, st.int(0));
+    }
+
+    #[test]
+    fn no_rules_returns_none() {
+        let rules: Vec<Rule> = vec![];
+        let mut st = Store::new();
+        let x = st.sym("x");
+        assert!(apply_first_rule(&mut st, x, &rules).is_none());
+        assert!(apply_best_rule_by_node_count(&mut st, x, &rules).is_none());
+    }
+
+    #[test]
+    fn rule_returning_same_expr_is_skipped() {
+        let rules = vec![Rule {
+            name: "identity",
+            pattern: Pat::Any("x".into()),
+            guard: None,
+            build: |_, b| *b.get("x").unwrap(),
+        }];
+
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // Rule matches but returns same expr, should be treated as no-op
+        let out = apply_first_rule(&mut st, x, &rules);
+        assert!(out.is_none());
+    }
+
+    #[test]
+    fn multiple_rules_first_matching_wins() {
+        let rules = vec![
+            Rule {
+                name: "rule1",
+                pattern: Pat::Integer(5),
+                guard: None,
+                build: |st, _| st.int(100),
+            },
+            Rule {
+                name: "rule2",
+                pattern: Pat::Any("x".into()),
+                guard: None,
+                build: |st, _| st.int(200),
+            },
+        ];
+
+        let mut st = Store::new();
+        let five = st.int(5);
+        let out = apply_first_rule(&mut st, five, &rules).unwrap();
+        assert_eq!(out, st.int(100)); // First rule matches
+    }
+
+    #[test]
+    fn count_nodes_shared_subexpr() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x + x shares the x node
+        let expr = st.add(vec![x, x]);
+        let count = count_nodes(&st, expr);
+        // Should count: expr node + x node = 2 (not 3 due to sharing)
+        assert_eq!(count, 2);
+    }
 }

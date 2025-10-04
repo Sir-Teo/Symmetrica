@@ -205,4 +205,143 @@ mod tests {
         let b = match_expr(&st, &pat, sin_x2).expect("should match");
         assert_eq!(*b.get("u").unwrap(), x2);
     }
+
+    #[test]
+    fn match_any_binds_same_variable_consistently() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x + x should match with both "a"s binding to same x
+        let expr = st.add(vec![x, x]);
+        let pat = Pat::Add(vec![Pat::Any("a".into()), Pat::Any("a".into())]);
+        let b = match_expr(&st, &pat, expr).expect("should match");
+        assert_eq!(b.len(), 1);
+        assert_eq!(*b.get("a").unwrap(), x);
+    }
+
+    #[test]
+    fn match_any_fails_when_variable_binds_different_values() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let expr = st.add(vec![x, y]);
+        // Try to match x + y with a + a (same variable twice)
+        let pat = Pat::Add(vec![Pat::Any("a".into()), Pat::Any("a".into())]);
+        assert!(match_expr(&st, &pat, expr).is_none());
+    }
+
+    #[test]
+    fn match_integer_literal() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let pat = Pat::Integer(5);
+        assert!(match_expr(&st, &pat, five).is_some());
+
+        let pat_wrong = Pat::Integer(3);
+        assert!(match_expr(&st, &pat_wrong, five).is_none());
+    }
+
+    #[test]
+    fn match_rational_literal() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let pat = Pat::Rational(1, 2);
+        assert!(match_expr(&st, &pat, half).is_some());
+
+        let pat_wrong = Pat::Rational(1, 3);
+        assert!(match_expr(&st, &pat_wrong, half).is_none());
+    }
+
+    #[test]
+    fn match_symbol_literal() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let pat = Pat::Symbol("x".into());
+        assert!(match_expr(&st, &pat, x).is_some());
+
+        let pat_wrong = Pat::Symbol("y".into());
+        assert!(match_expr(&st, &pat_wrong, x).is_none());
+    }
+
+    #[test]
+    fn match_nested_mul_add() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        // (x + y) * 2
+        let sum = st.add(vec![x, y]);
+        let expr = st.mul(vec![sum, two]);
+
+        let pat = Pat::Mul(vec![
+            Pat::Add(vec![Pat::Any("a".into()), Pat::Any("b".into())]),
+            Pat::Integer(2),
+        ]);
+        let b = match_expr(&st, &pat, expr).expect("should match");
+        assert!(b.contains_key("a"));
+        assert!(b.contains_key("b"));
+    }
+
+    #[test]
+    fn match_function_wrong_name() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let pat = Pat::Function("cos".into(), vec![Pat::Any("u".into())]);
+        assert!(match_expr(&st, &pat, sinx).is_none());
+    }
+
+    #[test]
+    fn match_function_wrong_arity() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let f = st.func("f", vec![x]);
+        let pat = Pat::Function("f".into(), vec![Pat::Any("a".into()), Pat::Any("b".into())]);
+        assert!(match_expr(&st, &pat, f).is_none());
+    }
+
+    #[test]
+    fn match_pow_pattern() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let n = st.int(3);
+        let pow_expr = st.pow(x, n);
+
+        let pat = Pat::Pow(Box::new(Pat::Symbol("x".into())), Box::new(Pat::Any("exp".into())));
+        let b = match_expr(&st, &pat, pow_expr).expect("should match");
+        assert_eq!(*b.get("exp").unwrap(), n);
+    }
+
+    #[test]
+    fn match_ac_empty_fails() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expr = st.add(vec![x]);
+        let pat = Pat::Add(vec![]);
+        assert!(match_expr(&st, &pat, expr).is_none());
+    }
+
+    #[test]
+    fn match_ac_different_arity_fails() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let z = st.sym("z");
+        let expr = st.add(vec![x, y, z]);
+        let pat = Pat::Add(vec![Pat::Any("a".into()), Pat::Any("b".into())]);
+        assert!(match_expr(&st, &pat, expr).is_none());
+    }
+
+    #[test]
+    fn match_mul_three_terms_commutative() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        // 2 * x * y
+        let expr = st.mul(vec![two, x, y]);
+
+        // Pattern: x * y * 2 (different order)
+        let pat = Pat::Mul(vec![Pat::Symbol("x".into()), Pat::Symbol("y".into()), Pat::Integer(2)]);
+        assert!(match_expr(&st, &pat, expr).is_some());
+    }
 }

@@ -84,4 +84,70 @@ mod tests {
         let two = st.int(2);
         assert_eq!(out, st.mul(vec![two, x]));
     }
+
+    #[test]
+    fn pipeline_with_zero_steps_returns_original() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let ctx = AssumptionsContext::new();
+        let rules: Vec<Rule> = vec![];
+        let out = rewrite_pipeline(&mut st, x, &ctx, &rules, 0);
+        assert_eq!(out, x);
+    }
+
+    #[test]
+    fn pipeline_converges_early() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let sin0 = st.func("sin", vec![zero]);
+        let ctx = AssumptionsContext::new();
+        let rules: Vec<Rule> = vec![];
+        // Should converge to 0 in fewer than 10 steps
+        let out = rewrite_pipeline(&mut st, sin0, &ctx, &rules, 10);
+        assert_eq!(out, st.int(0));
+    }
+
+    #[test]
+    fn pipeline_with_registry_rules() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sin_x = st.func("sin", vec![x]);
+
+        // Rule to simplify sin(x) to a constant (artificial example)
+        let rules = vec![Rule {
+            name: "sin(x)->42",
+            pattern: crate::ac::Pat::Function("sin".into(), vec![crate::ac::Pat::Any("u".into())]),
+            guard: None,
+            build: |st, _| st.int(42),
+        }];
+
+        let ctx = AssumptionsContext::new();
+        let out = rewrite_pipeline(&mut st, sin_x, &ctx, &rules, 5);
+        // Rule should apply and return 42
+        assert_eq!(out, st.int(42));
+    }
+
+    #[test]
+    fn pipeline_combines_all_passes() {
+        let mut st = Store::new();
+        let mut ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        ctx.assume("x", assumptions::Prop::Positive);
+
+        // Complex: sin(0) + exp(ln(x)) + x^1
+        // Should become: 0 + x + x -> 2*x
+        let zero = st.int(0);
+        let sin0 = st.func("sin", vec![zero]);
+        let lnx = st.func("ln", vec![x]);
+        let exp_lnx = st.func("exp", vec![lnx]);
+        let one = st.int(1);
+        let x1 = st.pow(x, one);
+        let expr = st.add(vec![sin0, exp_lnx, x1]);
+
+        let rules: Vec<Rule> = vec![];
+        let out = rewrite_pipeline(&mut st, expr, &ctx, &rules, 10);
+        let two = st.int(2);
+        let expected = st.mul(vec![two, x]);
+        assert_eq!(out, expected);
+    }
 }

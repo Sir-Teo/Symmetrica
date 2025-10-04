@@ -196,4 +196,82 @@ mod tests {
         let out = rewrite_domain(&mut st, sqrt_x2, &ctx);
         assert_eq!(out, x);
     }
+
+    #[test]
+    fn sqrt_x2_no_change_without_assumption() {
+        let mut st = Store::new();
+        let ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sqrt_x2 = st.func("sqrt", vec![x2]);
+        let out = rewrite_domain(&mut st, sqrt_x2, &ctx);
+        assert_eq!(out, sqrt_x2); // No change without positivity assumption
+    }
+
+    #[test]
+    fn ln_pow_no_change_with_rational_exponent() {
+        let mut st = Store::new();
+        let mut ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        ctx.assume("x", Prop::Positive);
+        let half = st.rat(1, 2);
+        let x_half = st.pow(x, half);
+        let ln_x_half = st.func("ln", vec![x_half]);
+        let out = rewrite_domain(&mut st, ln_x_half, &ctx);
+        // Should not apply rule since exponent is not integer
+        assert_eq!(out, ln_x_half);
+    }
+
+    #[test]
+    fn nested_domain_rewrites() {
+        let mut st = Store::new();
+        let mut ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        ctx.assume("x", Prop::Positive);
+        // exp(ln(x)) + exp(ln(x)) with x>0 -> x + x
+        let lnx1 = st.func("ln", vec![x]);
+        let exp1 = st.func("exp", vec![lnx1]);
+        let lnx2 = st.func("ln", vec![x]);
+        let exp2 = st.func("exp", vec![lnx2]);
+        let expr = st.add(vec![exp1, exp2]);
+
+        let out = rewrite_domain(&mut st, expr, &ctx);
+        let expected = st.add(vec![x, x]);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn domain_rewrite_in_mul() {
+        let mut st = Store::new();
+        let mut ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        ctx.assume("x", Prop::Positive);
+        let two = st.int(2);
+        // 2 * exp(ln(x))
+        let lnx = st.func("ln", vec![x]);
+        let exp_lnx = st.func("exp", vec![lnx]);
+        let expr = st.mul(vec![two, exp_lnx]);
+
+        let out = rewrite_domain(&mut st, expr, &ctx);
+        let expected = st.mul(vec![two, x]);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn ln_pow_with_negative_exponent() {
+        let mut st = Store::new();
+        let mut ctx = AssumptionsContext::new();
+        let x = st.sym("x");
+        ctx.assume("x", Prop::Positive);
+        let neg_two = st.int(-2);
+        let x_neg2 = st.pow(x, neg_two);
+        let ln_expr = st.func("ln", vec![x_neg2]);
+        let out = rewrite_domain(&mut st, ln_expr, &ctx);
+        // Should produce -2 * ln(x)
+        let lnx = st.func("ln", vec![x]);
+        let neg_two_2 = st.int(-2);
+        let expected = st.mul(vec![neg_two_2, lnx]);
+        assert_eq!(out, expected);
+    }
 }
