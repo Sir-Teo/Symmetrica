@@ -259,6 +259,78 @@ let result = a.inverse().unwrap();
 assert!(result.is_none());  // Not invertible
 ```
 
+## Matrix Rank
+
+```rust
+pub fn rank(&self) -> usize
+```
+
+Computes the rank of the matrix (number of linearly independent rows/columns) using row reduction to row echelon form.
+
+**Algorithm:**
+1. Perform row reduction with partial pivoting
+2. Count number of non-zero rows in row echelon form
+3. Return the count (equals number of pivot positions)
+
+**Properties:**
+- For an m×n matrix: `rank ≤ min(m, n)`
+- Full rank square matrix: `rank = n` and det ≠ 0
+- Rank-deficient square matrix: `rank < n` and det = 0
+- Rank is invariant under row operations
+
+**Examples:**
+
+**Full rank square matrix:**
+```rust
+let m = MatrixQ::identity(5);
+assert_eq!(m.rank(), 5);
+
+let m2 = MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]);
+assert_eq!(m2.rank(), 3);  // Full rank
+```
+
+**Rank-deficient matrix:**
+```rust
+// Singular matrix: second row = 2 × first row
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+assert_eq!(m.rank(), 1);
+```
+
+**Rectangular matrices:**
+```rust
+// 2×3 matrix with rank 2 (full row rank)
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+assert_eq!(m.rank(), 2);
+
+// 3×2 matrix with rank 2 (full column rank)
+let m = MatrixQ::from_i64(3, 2, &[1, 0, 0, 1, 0, 0]);
+assert_eq!(m.rank(), 2);
+```
+
+**Rank-1 matrix:**
+```rust
+// All rows are multiples of the first row
+let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 2, 4, 6, 3, 6, 9]);
+assert_eq!(m.rank(), 1);
+```
+
+**Zero matrix:**
+```rust
+let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+assert_eq!(m.rank(), 0);
+```
+
+**Relationship with determinant:**
+```rust
+// For square matrices:
+// - rank = n  ⟺  det ≠ 0  (invertible)
+// - rank < n  ⟺  det = 0  (singular)
+
+let m = MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]);
+assert_eq!(m.rank(), 3);
+assert_ne!(m.det_bareiss().unwrap(), Q(0, 1));
+```
+
 ## Linear System Solving
 
 ```rust
@@ -362,6 +434,7 @@ assert!(A.solve_bareiss(&b).is_err());
 - **mul**: O(n³) for n×n matrices (standard algorithm)
 - **det_bareiss**: O(n³) for n×n matrix (Gaussian elimination)
 - **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
+- **rank**: O(min(m,n)²·max(m,n)) for m×n matrix (row reduction)
 - **solve_bareiss**: O(n⁴) due to Cramer's rule (n determinants of size n)
 
 ### Space Complexity
@@ -369,11 +442,12 @@ assert!(A.solve_bareiss(&b).is_err());
 - **mul**: O(n²) for result matrix
 - **det_bareiss**: O(n²) for matrix copy during elimination
 - **inverse**: O(2n²) for augmented matrix
+- **rank**: O(mn) for matrix copy during row reduction
 - **solve_bareiss**: O(n²) for temporary matrices
 
 ### Practical Limits
 - **add/sub/mul**: Efficient for any reasonable size
-- **det/inverse**: Efficient for n ≤ 100
+- **det/inverse/rank**: Efficient for n ≤ 100
 - **solve**: Usable for n ≤ 20 (Cramer's rule is slow)
 - For larger systems, use iterative methods or factorizations (not implemented)
 
@@ -390,13 +464,14 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite:
+Comprehensive test suite (44 unit tests + 2 property tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
 - **Subtraction**: Element-wise, self-subtraction to zero
 - **Multiplication**: 2×2, identity, rectangular matrices, dimension errors
 - **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
+- **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, relationship with determinant
 - **Error conditions**: Non-square matrices, dimension mismatches
 - **Edge cases**: Zero-size matrices
 
@@ -423,10 +498,10 @@ Only exact rational arithmetic. For numerical work, use external libraries like 
 
 ### Missing Advanced Operations
 Still not implemented:
-- Rank computation
 - LU/QR/Cholesky decomposition
 - Eigenvalues/eigenvectors
 - Singular Value Decomposition (SVD)
+- Nullspace and column space basis computation
 
 ### Inefficient for Large Systems
 - Cramer's rule for solving is O(n⁴)

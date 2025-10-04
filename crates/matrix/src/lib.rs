@@ -244,6 +244,69 @@ impl MatrixQ {
         }
         Ok(Some(MatrixQ::new(n, n, inv_data)))
     }
+
+    /// Compute the rank of the matrix using row reduction.
+    /// Returns the number of linearly independent rows (or columns).
+    pub fn rank(&self) -> usize {
+        if self.rows == 0 || self.cols == 0 {
+            return 0;
+        }
+
+        // Create working copy for row reduction
+        let mut a = self.clone();
+        let mut rank = 0;
+        let mut pivot_col = 0;
+
+        // Row reduction to row echelon form
+        for pivot_row in 0..self.rows {
+            if pivot_col >= self.cols {
+                break;
+            }
+
+            // Find pivot in current column
+            let mut found_pivot = false;
+            for search_row in pivot_row..self.rows {
+                if !a.get(search_row, pivot_col).is_zero() {
+                    // Swap rows if needed
+                    if search_row != pivot_row {
+                        for c in 0..self.cols {
+                            let temp = a.get(pivot_row, c);
+                            a.set(pivot_row, c, a.get(search_row, c));
+                            a.set(search_row, c, temp);
+                        }
+                    }
+                    found_pivot = true;
+                    break;
+                }
+            }
+
+            if !found_pivot {
+                // No pivot in this column, move to next column
+                pivot_col += 1;
+                continue;
+            }
+
+            // We found a pivot at (pivot_row, pivot_col)
+            rank += 1;
+            let pivot_val = a.get(pivot_row, pivot_col);
+
+            // Eliminate below the pivot
+            for row in (pivot_row + 1)..self.rows {
+                let factor = div_q(a.get(row, pivot_col), pivot_val);
+                if factor.is_zero() {
+                    continue;
+                }
+                for col in pivot_col..self.cols {
+                    let val = sub_q(a.get(row, col), mul_q(factor, a.get(pivot_row, col)));
+                    a.set(row, col, val);
+                }
+            }
+
+            pivot_col += 1;
+        }
+
+        rank
+    }
 }
 
 #[cfg(test)]
@@ -511,5 +574,122 @@ mod tests {
         let x2 = vec![x2_mat.get(0, 0), x2_mat.get(1, 0)];
 
         assert_eq!(x1, x2);
+    }
+
+    // ========== Rank Tests ==========
+
+    #[test]
+    fn rank_full_rank_square() {
+        // Full rank 3x3 matrix
+        let m = MatrixQ::from_i64(3, 3, &[1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        assert_eq!(m.rank(), 3);
+    }
+
+    #[test]
+    fn rank_full_rank_rectangular() {
+        // 2x3 matrix with rank 2
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        assert_eq!(m.rank(), 2);
+    }
+
+    #[test]
+    fn rank_singular_matrix() {
+        // Singular 3x3 matrix (third row = first + second)
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 5, 7, 9]);
+        assert_eq!(m.rank(), 2);
+    }
+
+    #[test]
+    fn rank_zero_matrix() {
+        let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(m.rank(), 0);
+    }
+
+    #[test]
+    fn rank_one_matrix() {
+        // Rank-1 matrix: all rows are multiples of first row
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 2, 4, 6, 3, 6, 9]);
+        assert_eq!(m.rank(), 1);
+    }
+
+    #[test]
+    fn rank_identity() {
+        let m = MatrixQ::identity(5);
+        assert_eq!(m.rank(), 5);
+    }
+
+    #[test]
+    fn rank_tall_matrix() {
+        // 3x2 matrix with full column rank
+        let m = MatrixQ::from_i64(3, 2, &[1, 0, 0, 1, 0, 0]);
+        assert_eq!(m.rank(), 2);
+    }
+
+    #[test]
+    fn rank_wide_matrix() {
+        // 2x4 matrix
+        let m = MatrixQ::from_i64(2, 4, &[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(m.rank(), 2);
+    }
+
+    #[test]
+    fn rank_with_rational_entries() {
+        // Matrix with rational entries
+        let m = MatrixQ::new(
+            2,
+            2,
+            vec![Q(1, 2), Q(1, 3), Q(1, 4), Q(1, 6)], // [[1/2, 1/3], [1/4, 1/6]]
+                                                      // Second row is 1/2 of first row
+        );
+        assert_eq!(m.rank(), 1);
+    }
+
+    #[test]
+    fn rank_empty_matrix() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        assert_eq!(m.rank(), 0);
+    }
+
+    #[test]
+    fn rank_one_row() {
+        let m = MatrixQ::from_i64(1, 5, &[1, 2, 3, 4, 5]);
+        assert_eq!(m.rank(), 1);
+    }
+
+    #[test]
+    fn rank_one_column() {
+        let m = MatrixQ::from_i64(5, 1, &[1, 2, 3, 4, 5]);
+        assert_eq!(m.rank(), 1);
+    }
+
+    #[test]
+    fn rank_equals_min_dimension() {
+        // For a 3x5 matrix, rank ≤ min(3,5) = 3
+        let m = MatrixQ::from_i64(3, 5, &[1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 0, 0, 1, 2, 3]);
+        assert_eq!(m.rank(), 3);
+    }
+
+    #[test]
+    fn rank_deficient_square() {
+        // 4x4 matrix with rank 3 (last row is zero)
+        let m = MatrixQ::from_i64(4, 4, &[1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]);
+        assert_eq!(m.rank(), 3);
+    }
+
+    #[test]
+    fn rank_relationship_with_determinant() {
+        // Full rank square matrix has non-zero determinant
+        let m = MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]);
+        let rank = m.rank();
+        let det = m.det_bareiss().unwrap();
+        assert_eq!(rank, 3);
+        assert!(!det.is_zero());
+
+        // Rank-deficient matrix has zero determinant
+        let m2 = MatrixQ::from_i64(3, 3, &[1, 2, 3, 2, 4, 6, 3, 6, 9]);
+        let rank2 = m2.rank();
+        let det2 = m2.det_bareiss().unwrap();
+        assert!(rank2 < 3);
+        assert!(det2.is_zero());
     }
 }
