@@ -2,6 +2,9 @@
 //! pattern v1: basic substitution utilities.
 //! - Substitute a symbol with an expression throughout a tree.
 
+pub mod ac;
+pub mod rewrite;
+
 use expr_core::{ExprId, Op, Payload, Store};
 
 /// Substitute all occurrences of symbol `sym` with `with_expr` inside `id`.
