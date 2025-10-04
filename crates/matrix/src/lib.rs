@@ -175,6 +175,26 @@ impl MatrixQ {
         MatrixQ::new(self.cols, self.rows, data)
     }
 
+    /// Multiply the matrix by a scalar (rational number).
+    /// Returns a new matrix where each element is multiplied by the scalar.
+    pub fn scalar_mul(&self, scalar: Q) -> MatrixQ {
+        let data = self.data.iter().map(|&x| mul_q(x, scalar)).collect();
+        MatrixQ::new(self.rows, self.cols, data)
+    }
+
+    /// Compute the trace (sum of diagonal elements) of a square matrix.
+    /// Returns Err if the matrix is not square.
+    pub fn trace(&self) -> Result<Q, &'static str> {
+        if self.rows != self.cols {
+            return Err("trace requires square matrix");
+        }
+        let mut sum = Q::zero();
+        for i in 0..self.rows {
+            sum = add_q(sum, self.get(i, i));
+        }
+        Ok(sum)
+    }
+
     /// Compute the determinant using the Bareiss fraction-free algorithm.
     /// Returns Ok(Some(A^-1)) if invertible; Ok(None) if singular; Err if not square.
     pub fn inverse(&self) -> Result<Option<MatrixQ>, &'static str> {
@@ -948,6 +968,168 @@ mod tests {
         let ab_t = ab.transpose();
         let bt_at = b.transpose().mul(&a.transpose()).unwrap();
         assert_eq!(ab_t, bt_at);
+    }
+
+    // ========== Scalar Multiplication Tests ==========
+
+    #[test]
+    fn scalar_mul_basic() {
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let result = m.scalar_mul(Q(3, 1));
+        assert_eq!(result.get(0, 0), Q(3, 1));
+        assert_eq!(result.get(0, 1), Q(6, 1));
+        assert_eq!(result.get(1, 0), Q(9, 1));
+        assert_eq!(result.get(1, 1), Q(12, 1));
+    }
+
+    #[test]
+    fn scalar_mul_zero() {
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let result = m.scalar_mul(Q::zero());
+        assert_eq!(result.get(0, 0), Q::zero());
+        assert_eq!(result.get(0, 1), Q::zero());
+        assert_eq!(result.get(1, 0), Q::zero());
+        assert_eq!(result.get(1, 1), Q::zero());
+    }
+
+    #[test]
+    fn scalar_mul_one() {
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let result = m.scalar_mul(Q::one());
+        assert_eq!(result, m);
+    }
+
+    #[test]
+    fn scalar_mul_negative() {
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let result = m.scalar_mul(Q(-1, 1));
+        assert_eq!(result.get(0, 0), Q(-1, 1));
+        assert_eq!(result.get(0, 1), Q(-2, 1));
+        assert_eq!(result.get(1, 0), Q(-3, 1));
+        assert_eq!(result.get(1, 1), Q(-4, 1));
+    }
+
+    #[test]
+    fn scalar_mul_rational() {
+        let m = MatrixQ::from_i64(2, 2, &[2, 4, 6, 8]);
+        let result = m.scalar_mul(Q(1, 2));
+        assert_eq!(result.get(0, 0), Q(1, 1));
+        assert_eq!(result.get(0, 1), Q(2, 1));
+        assert_eq!(result.get(1, 0), Q(3, 1));
+        assert_eq!(result.get(1, 1), Q(4, 1));
+    }
+
+    #[test]
+    fn scalar_mul_rectangular() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let result = m.scalar_mul(Q(2, 1));
+        assert_eq!(result.rows, 2);
+        assert_eq!(result.cols, 3);
+        assert_eq!(result.get(0, 2), Q(6, 1));
+        assert_eq!(result.get(1, 2), Q(12, 1));
+    }
+
+    #[test]
+    fn scalar_mul_distributive_over_addition() {
+        // c(A + B) = cA + cB
+        let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let b = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+        let c = Q(3, 1);
+        let left = a.add(&b).unwrap().scalar_mul(c);
+        let right = a.scalar_mul(c).add(&b.scalar_mul(c)).unwrap();
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn scalar_mul_associative() {
+        // (ab)M = a(bM)
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let a = Q(2, 1);
+        let b = Q(3, 1);
+        let ab = mul_q(a, b);
+        let left = m.scalar_mul(ab);
+        let right = m.scalar_mul(b).scalar_mul(a);
+        assert_eq!(left, right);
+    }
+
+    // ========== Trace Tests ==========
+
+    #[test]
+    fn trace_2x2() {
+        // [[1, 2], [3, 4]] has trace = 1 + 4 = 5
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        assert_eq!(m.trace().unwrap(), Q(5, 1));
+    }
+
+    #[test]
+    fn trace_3x3() {
+        // [[1, 2, 3], [4, 5, 6], [7, 8, 9]] has trace = 1 + 5 + 9 = 15
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(m.trace().unwrap(), Q(15, 1));
+    }
+
+    #[test]
+    fn trace_identity() {
+        let m = MatrixQ::identity(5);
+        assert_eq!(m.trace().unwrap(), Q(5, 1));
+    }
+
+    #[test]
+    fn trace_zero_matrix() {
+        let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(m.trace().unwrap(), Q::zero());
+    }
+
+    #[test]
+    fn trace_with_rational_entries() {
+        // [[1/2, 1/3], [1/4, 1/5]] has trace = 1/2 + 1/5 = 7/10
+        let m = MatrixQ::new(2, 2, vec![Q(1, 2), Q(1, 3), Q(1, 4), Q(1, 5)]);
+        assert_eq!(m.trace().unwrap(), Q(7, 10));
+    }
+
+    #[test]
+    fn trace_non_square_error() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        assert!(m.trace().is_err());
+    }
+
+    #[test]
+    fn trace_additive_property() {
+        // tr(A + B) = tr(A) + tr(B)
+        let a = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let b = MatrixQ::from_i64(3, 3, &[9, 8, 7, 6, 5, 4, 3, 2, 1]);
+        let sum = a.add(&b).unwrap();
+        let tr_sum = sum.trace().unwrap();
+        let sum_tr = add_q(a.trace().unwrap(), b.trace().unwrap());
+        assert_eq!(tr_sum, sum_tr);
+    }
+
+    #[test]
+    fn trace_scalar_multiplication_property() {
+        // tr(cA) = c·tr(A)
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let c = Q(3, 1);
+        let cm = m.scalar_mul(c);
+        let tr_cm = cm.trace().unwrap();
+        let c_tr_m = mul_q(c, m.trace().unwrap());
+        assert_eq!(tr_cm, c_tr_m);
+    }
+
+    #[test]
+    fn trace_transpose_property() {
+        // tr(A^T) = tr(A)
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(m.trace().unwrap(), m.transpose().trace().unwrap());
+    }
+
+    #[test]
+    fn trace_cyclic_property() {
+        // tr(AB) = tr(BA) for compatible dimensions
+        let a = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let b = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+        let ab = a.mul(&b).unwrap(); // 2x2
+        let ba = b.mul(&a).unwrap(); // 3x3
+        assert_eq!(ab.trace().unwrap(), ba.trace().unwrap());
     }
 
     // ========== Nullspace Tests ==========

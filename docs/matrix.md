@@ -287,6 +287,117 @@ let bt_at = b.transpose().mul(&a.transpose()).unwrap();
 assert_eq!(ab_t, bt_at);
 ```
 
+### Scalar Multiplication
+
+```rust
+pub fn scalar_mul(&self, scalar: Q) -> MatrixQ
+```
+
+Multiplies every element of the matrix by a scalar (rational number).
+
+**Properties:**
+- c(A + B) = cA + cB (distributive over addition)
+- (ab)M = a(bM) (associative with scalar multiplication)
+- 1·A = A (identity)
+- 0·A = 0 (zero matrix)
+
+**Examples:**
+
+**Basic scalar multiplication:**
+```rust
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let result = m.scalar_mul(Q(3, 1));
+// [[3, 6], [9, 12]]
+```
+
+**Scalar with rational number:**
+```rust
+let m = MatrixQ::from_i64(2, 2, &[2, 4, 6, 8]);
+let half = m.scalar_mul(Q(1, 2));
+// [[1, 2], [3, 4]]
+```
+
+**Negating a matrix:**
+```rust
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let neg_m = m.scalar_mul(Q(-1, 1));
+// [[-1, -2], [-3, -4]]
+```
+
+**Distributive property:**
+```rust
+// c(A + B) = cA + cB
+let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let b = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+let c = Q(3, 1);
+let left = a.add(&b).unwrap().scalar_mul(c);
+let right = a.scalar_mul(c).add(&b.scalar_mul(c)).unwrap();
+assert_eq!(left, right);
+```
+
+### Trace
+
+```rust
+pub fn trace(&self) -> Result<Q, &'static str>
+```
+
+Computes the trace (sum of diagonal elements) of a square matrix.
+
+**Properties:**
+- tr(A + B) = tr(A) + tr(B) (additive)
+- tr(cA) = c·tr(A) (scalar multiplication)
+- tr(A^T) = tr(A) (transpose invariant)
+- tr(AB) = tr(BA) (cyclic property)
+- For identity matrix I_n: tr(I) = n
+
+**Examples:**
+
+**Basic trace:**
+```rust
+// [[1, 2], [3, 4]] has trace = 1 + 4 = 5
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+assert_eq!(m.trace().unwrap(), Q(5, 1));
+```
+
+**Identity matrix:**
+```rust
+let m = MatrixQ::identity(5);
+assert_eq!(m.trace().unwrap(), Q(5, 1));
+```
+
+**With rational entries:**
+```rust
+// [[1/2, 1/3], [1/4, 1/5]] has trace = 1/2 + 1/5 = 7/10
+let m = MatrixQ::new(2, 2, vec![Q(1, 2), Q(1, 3), Q(1, 4), Q(1, 5)]);
+assert_eq!(m.trace().unwrap(), Q(7, 10));
+```
+
+**Additive property:**
+```rust
+// tr(A + B) = tr(A) + tr(B)
+let a = MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]);
+let b = MatrixQ::from_i64(3, 3, &[9, 8, 7, 6, 5, 4, 3, 2, 1]);
+let tr_sum = a.add(&b).unwrap().trace().unwrap();
+let sum_tr = add_q(a.trace().unwrap(), b.trace().unwrap());
+assert_eq!(tr_sum, sum_tr);
+```
+
+**Cyclic property:**
+```rust
+// tr(AB) = tr(BA)
+let a = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let b = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+let ab = a.mul(&b).unwrap(); // 2×2
+let ba = b.mul(&a).unwrap(); // 3×3
+assert_eq!(ab.trace().unwrap(), ba.trace().unwrap());
+```
+
+**Non-square matrix error:**
+```rust
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+assert!(m.trace().is_err());
+```
+
 ## Matrix Inversion
 
 ```rust
@@ -587,6 +698,8 @@ assert!(A.solve_bareiss(&b).is_err());
 - **add/sub**: O(n²) for n×n matrix (element-wise operations)
 - **mul**: O(n³) for n×n matrices (standard algorithm)
 - **transpose**: O(n²) for n×n matrix (element copying)
+- **scalar_mul**: O(n²) for n×n matrix (element-wise multiplication)
+- **trace**: O(n) for n×n matrix (sum diagonal elements)
 - **det_bareiss**: O(n³) for n×n matrix (Gaussian elimination)
 - **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
 - **rank**: O(min(m,n)²·max(m,n)) for m×n matrix (row reduction)
@@ -597,6 +710,8 @@ assert!(A.solve_bareiss(&b).is_err());
 - **add/sub**: O(n²) for result matrix
 - **mul**: O(n²) for result matrix
 - **transpose**: O(n²) for transposed matrix
+- **scalar_mul**: O(n²) for result matrix
+- **trace**: O(1) (single rational number)
 - **det_bareiss**: O(n²) for matrix copy during elimination
 - **inverse**: O(2n²) for augmented matrix
 - **rank**: O(mn) for matrix copy during row reduction
@@ -622,13 +737,15 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite (68 unit tests + 2 property tests):
+Comprehensive test suite (86 unit tests + 2 property tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
 - **Subtraction**: Element-wise, self-subtraction to zero
 - **Multiplication**: 2×2, identity, rectangular matrices, dimension errors
 - **Transpose**: Square, rectangular, symmetric, involution property, algebraic properties
+- **Scalar multiplication**: Basic, zero, one, negative, rational, distributive, associative properties
+- **Trace**: Basic, identity, rational entries, additive, scalar multiplication, transpose, cyclic properties
 - **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
 - **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, rank-nullity theorem
 - **Nullspace**: Trivial/non-trivial cases, rank-nullity theorem, verification via Ax=0
