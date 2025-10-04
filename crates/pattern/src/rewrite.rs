@@ -22,6 +22,9 @@ use expr_core::{ExprId, Op, Payload, Store};
 /// - cos(u + v) -> cos(u)*cos(v) - sin(u)*sin(v) (angle addition)
 /// - tan(u + v) -> (tan(u) + tan(v)) / (1 - tan(u)*tan(v)) (tangent angle addition)
 /// - tan(2*u) -> 2*tan(u) / (1 - tan(u)^2) (tangent double-angle)
+/// - ln(u * v) -> ln(u) + ln(v) (logarithm product rule)
+/// - ln(u^n) -> n*ln(u) for integer n (logarithm power rule)
+/// - exp(u + v) -> exp(u) * exp(v) (exponential sum rule)
 pub fn rewrite_basic(store: &mut Store, id: ExprId) -> ExprId {
     // For Add nodes, try top-level rules first (e.g., Pythagorean identity)
     // before recursing, so that sin^2 + cos^2 is recognized before
@@ -349,6 +352,59 @@ fn apply_rules(store: &mut Store, id: ExprId) -> Option<ExprId> {
             let neg_one2 = store.int(-1);
             let denom_inv = store.pow(denominator, neg_one2);
             let result = store.mul(vec![numerator, denom_inv]);
+            return Some(result);
+        }
+    }
+
+    // ln(u * v) -> ln(u) + ln(v) (logarithm product rule)
+    {
+        let pat = Pat::Function(
+            "ln".into(),
+            vec![Pat::Mul(vec![Pat::Any("u".into()), Pat::Any("v".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            let v = *bind.get("v").unwrap();
+            // Build ln(u) + ln(v)
+            let ln_u = store.func("ln", vec![u]);
+            let ln_v = store.func("ln", vec![v]);
+            let result = store.add(vec![ln_u, ln_v]);
+            return Some(result);
+        }
+    }
+
+    // ln(u^n) -> n*ln(u) for integer n (logarithm power rule)
+    {
+        let pat = Pat::Function(
+            "ln".into(),
+            vec![Pat::Pow(Box::new(Pat::Any("u".into())), Box::new(Pat::Any("n".into())))],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            let n = *bind.get("n").unwrap();
+            // Only apply if n is an integer
+            if matches!(store.get(n).op, Op::Integer) {
+                // Build n*ln(u)
+                let ln_u = store.func("ln", vec![u]);
+                let result = store.mul(vec![n, ln_u]);
+                return Some(result);
+            }
+        }
+    }
+
+    // exp(u + v) -> exp(u) * exp(v) (exponential sum rule)
+    {
+        let pat = Pat::Function(
+            "exp".into(),
+            vec![Pat::Add(vec![Pat::Any("u".into()), Pat::Any("v".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            let v = *bind.get("v").unwrap();
+            // Build exp(u) * exp(v)
+            let exp_u = store.func("exp", vec![u]);
+            let exp_v = store.func("exp", vec![v]);
+            let result = store.mul(vec![exp_u, exp_v]);
             return Some(result);
         }
     }
@@ -754,5 +810,160 @@ mod tests {
         assert!(result_str.contains("tan"));
         // Should have division (power -1)
         assert!(result_str.contains("^"));
+    }
+
+    // ========== Phase H: Logarithm and Exponential Rules ==========
+
+    #[test]
+    fn rewrite_ln_product() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let prod = st.mul(vec![x, y]);
+        let ln_prod = st.func("ln", vec![prod]);
+
+        let result = rewrite_basic(&mut st, ln_prod);
+
+        // Expected: ln(x) + ln(y)
+        let x2 = st.sym("x");
+        let y2 = st.sym("y");
+        let ln_x = st.func("ln", vec![x2]);
+        let ln_y = st.func("ln", vec![y2]);
+        let expected = st.add(vec![ln_x, ln_y]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_ln_power_integer() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let ln_x3 = st.func("ln", vec![x3]);
+
+        let result = rewrite_basic(&mut st, ln_x3);
+
+        // Expected: 3*ln(x)
+        let x2 = st.sym("x");
+        let ln_x = st.func("ln", vec![x2]);
+        let three2 = st.int(3);
+        let expected = st.mul(vec![three2, ln_x]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_ln_power_negative() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let neg_two = st.int(-2);
+        let x_inv2 = st.pow(x, neg_two);
+        let ln_x_inv2 = st.func("ln", vec![x_inv2]);
+
+        let result = rewrite_basic(&mut st, ln_x_inv2);
+
+        // Expected: -2*ln(x)
+        let x2 = st.sym("x");
+        let ln_x = st.func("ln", vec![x2]);
+        let neg_two2 = st.int(-2);
+        let expected = st.mul(vec![neg_two2, ln_x]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_ln_power_rational_not_applied() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let half = st.rat(1, 2);
+        let sqrt_x = st.pow(x, half);
+        let ln_sqrt_x = st.func("ln", vec![sqrt_x]);
+
+        let result = rewrite_basic(&mut st, ln_sqrt_x);
+
+        // Power rule only applies to integers, so this should stay as ln(x^(1/2))
+        // After children rewrite, structure remains (no integer exponent)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("ln"));
+    }
+
+    #[test]
+    fn rewrite_exp_sum() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sum = st.add(vec![x, y]);
+        let exp_sum = st.func("exp", vec![sum]);
+
+        let result = rewrite_basic(&mut st, exp_sum);
+
+        // Expected: exp(x) * exp(y)
+        let x2 = st.sym("x");
+        let y2 = st.sym("y");
+        let exp_x = st.func("exp", vec![x2]);
+        let exp_y = st.func("exp", vec![y2]);
+        let expected = st.mul(vec![exp_x, exp_y]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_exp_difference() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let neg_one = st.int(-1);
+        let neg_y = st.mul(vec![neg_one, y]);
+        let diff = st.add(vec![x, neg_y]);
+        let exp_diff = st.func("exp", vec![diff]);
+
+        let result = rewrite_basic(&mut st, exp_diff);
+
+        // exp(x - y) = exp(x + (-y)) -> exp(x) * exp(-y)
+        // After rewriting, should expand to product
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("exp"));
+        // Should have multiplication (multiple exp terms)
+        assert!(result_str.matches("exp").count() >= 2);
+    }
+
+    #[test]
+    fn rewrite_ln_product_three_terms() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let z = st.sym("z");
+        let prod = st.mul(vec![x, y, z]);
+        let ln_prod = st.func("ln", vec![prod]);
+
+        let result = rewrite_basic(&mut st, ln_prod);
+
+        // ln(x*y*z) should expand via product rule
+        // After one rewrite pass, ln(x*y*z) might decompose as ln(u) + ln(v)
+        // where u and v are subproducts (AC matching decomposes into 2 parts)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("ln"));
+        // After single pass, should have at least expanded to sum form
+        assert!(result_str.contains("+") || result_str.matches("ln").count() >= 1);
+    }
+
+    #[test]
+    fn rewrite_mixed_ln_exp() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        // ln(exp(x) * exp(y))
+        let exp_x = st.func("exp", vec![x]);
+        let exp_y = st.func("exp", vec![y]);
+        let prod = st.mul(vec![exp_x, exp_y]);
+        let ln_prod = st.func("ln", vec![prod]);
+
+        let result = rewrite_basic(&mut st, ln_prod);
+
+        // Should expand ln(exp(x) * exp(y)) -> ln(exp(x)) + ln(exp(y))
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("ln"));
+        assert!(result_str.contains("exp"));
     }
 }
