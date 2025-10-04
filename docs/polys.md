@@ -184,6 +184,107 @@ let decomp = p.square_free_decomposition();
 
 **Use Case**: Useful for simplifying polynomials before factorization or integration.
 
+## Multivariate Sparse Polynomials
+
+### MultiPoly
+
+```rust
+pub struct MultiPoly {
+    pub terms: BTreeMap<Monomial, Q>,
+}
+```
+
+Multivariate sparse polynomials represented as a map from monomials to coefficients. Each monomial is a product of variables raised to non-negative integer powers.
+
+**Representation**: Sparse - only non-zero terms are stored.
+
+**Construction**:
+```rust
+pub fn zero() -> Self
+pub fn constant(c: Q) -> Self
+pub fn var<S: Into<String>>(name: S) -> Self
+```
+
+**Examples:**
+```rust
+use polys::MultiPoly;
+use arith::Q;
+use std::collections::BTreeMap;
+
+// Create variables
+let x = MultiPoly::var("x");
+let y = MultiPoly::var("y");
+
+// Build polynomial: 2xy + 3x + 5
+let xy = x.mul(&y);
+let two = MultiPoly::constant(Q(2, 1));
+let three = MultiPoly::constant(Q(3, 1));
+let five = MultiPoly::constant(Q(5, 1));
+
+let p = two.mul(&xy).add(&three.mul(&x)).add(&five);
+
+// Evaluate at x=2, y=3
+let mut vals = BTreeMap::new();
+vals.insert("x".to_string(), Q(2, 1));
+vals.insert("y".to_string(), Q(3, 1));
+let result = p.eval(&vals).unwrap();  // 2*2*3 + 3*2 + 5 = 23
+```
+
+### Operations
+
+**Arithmetic**:
+```rust
+pub fn add(&self, other: &Self) -> Self
+pub fn sub(&self, other: &Self) -> Self  
+pub fn mul(&self, other: &Self) -> Self
+```
+
+**Queries**:
+```rust
+pub fn is_zero(&self) -> bool
+pub fn total_degree(&self) -> usize  // Max degree of any monomial
+pub fn num_terms(&self) -> usize     // Number of non-zero terms
+```
+
+**Evaluation**:
+```rust
+pub fn eval(&self, vals: &BTreeMap<String, Q>) -> Option<Q>
+```
+
+### Monomial
+
+```rust
+pub struct Monomial(BTreeMap<String, usize>);
+```
+
+Represents a monomial (product of variables with exponents). Example: `x²yz³` is stored as `{"x": 2, "y": 1, "z": 3}`.
+
+**Operations**:
+```rust
+pub fn one() -> Self                    // Constant monomial (1)
+pub fn var<S: Into<String>>(name: S) -> Self  
+pub fn mul(&self, other: &Self) -> Self  // Multiply by adding exponents
+pub fn degree(&self) -> usize            // Total degree
+pub fn eval(&self, vals: &BTreeMap<String, Q>) -> Option<Q>
+```
+
+### Example: Polynomial Expansion
+
+```rust
+// Expand (x + 1)(y + 2) = xy + 2x + y + 2
+let x = MultiPoly::var("x");
+let y = MultiPoly::var("y");
+let one = MultiPoly::constant(Q(1, 1));
+let two = MultiPoly::constant(Q(2, 1));
+
+let x_plus_1 = x.add(&one);
+let y_plus_2 = y.add(&two);
+let expanded = x_plus_1.mul(&y_plus_2);
+
+assert_eq!(expanded.num_terms(), 4);
+assert_eq!(expanded.total_degree(), 2);
+```
+
 ### Resultant
 
 ```rust
@@ -408,6 +509,7 @@ Bidirectional conversion for seamless integration with expression trees.
 
 ## Performance
 
+### Univariate (UniPoly)
 - **Addition/Subtraction**: O(max(deg(p), deg(q)))
 - **Multiplication**: O(deg(p) × deg(q))
 - **Division**: O(deg(dividend) × deg(divisor))
@@ -417,25 +519,37 @@ Bidirectional conversion for seamless integration with expression trees.
 - **Discriminant**: O(deg³) (resultant computation)
 - **Partial fractions**: O(deg³) worst case (root finding + deflation)
 
+### Multivariate (MultiPoly)
+- **Addition/Subtraction**: O(min(|p|, |q|)) where |p| is number of terms
+- **Multiplication**: O(|p| × |q|) worst case (all term pairs)
+- **Evaluation**: O(|p| × max_degree) for total_degree terms
+
 ## Limitations
 
-- **Univariate only**: No multivariate polynomial support
-- **Dense representation**: Inefficient for sparse polynomials
+- **Univariate algorithms**: Division, GCD, resultants only for univariate polynomials
 - **Rational coefficients**: No algebraic extensions (e.g., Q[√2])
 - **Partial fractions**: Limited to distinct linear factors over Q
+- **Multivariate factorization**: Not yet implemented (Gröbner bases future work)
 
 ## Testing
 
 Comprehensive test suite:
-- Arithmetic operations (add, sub, mul)
-- Division with remainder
-- GCD computation
-- Square-free decomposition (various multiplicities and edge cases)
-- Resultants (common roots, no common roots, edge cases)
-- Discriminants (repeated roots, distinct roots, various degrees)
-- Expression conversion roundtrips
-- Partial fractions (simple, improper, edge cases)
-- Derivative and evaluation
+- **Univariate polynomials**:
+  - Arithmetic operations (add, sub, mul)
+  - Division with remainder
+  - GCD computation
+  - Square-free decomposition (various multiplicities and edge cases)
+  - Resultants (common roots, no common roots, edge cases)
+  - Discriminants (repeated roots, distinct roots, various degrees)
+  - Expression conversion roundtrips
+  - Partial fractions (simple, improper, edge cases)
+  - Derivative and evaluation
+- **Multivariate polynomials**:
+  - Sparse arithmetic (add, sub, mul)
+  - Polynomial expansion
+  - Evaluation at multiple variables
+  - Monomial multiplication
+  - Edge cases (zero, constant, missing variables)
 
 Run tests:
 ```bash
@@ -444,12 +558,12 @@ cargo test -p polys
 
 ## Future Enhancements
 
-- Sparse polynomial representation
-- Multivariate polynomials
 - Complete factorization over Q (building on square-free decomposition)
-- Gröbner bases
+- Gröbner bases for multivariate ideal operations
+- Multivariate GCD and resultants
 - Support for algebraic number fields
 - Optimized resultant computation (subresultant PRS)
+- Polynomial division for multivariate polynomials
 
 ## Example: Polynomial Algebra
 

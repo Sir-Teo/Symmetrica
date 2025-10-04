@@ -79,7 +79,7 @@ A lightweight, embeddable symbolic computation engine (CAS) in Rust for symbolic
    - `integrate()` conservative rules: constants/symbols, power rule (incl. `1/x = ln(x)`), linear `exp(ax+b)`/`sin(ax+b)`/`cos(ax+b)`, and `u'/u -> ln(u)`.
    - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
  - Pattern/substitution (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
- - Polynomials (`crates/polys`): univariate dense over Q; division, GCD, square-free decomposition, resultants, discriminants; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
+ - Polynomials (`crates/polys`): univariate dense and multivariate sparse over Q; division, GCD, square-free decomposition, resultants, discriminants; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
 ## Usage Examples
 
 ### Build and Simplify Expressions

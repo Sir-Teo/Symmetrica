@@ -2,11 +2,13 @@
 //! - Univariate dense polynomials over Q (i64 rationals)
 //! - Division with remainder, Euclidean GCD, square-free decomposition
 //! - Resultants and discriminants
-//! - Conversions: Expr ⟷ Poly (for sums of monomials in a single symbol)
+//! - Multivariate sparse polynomials over Q
+//! - Conversions: Expr ⟷ Poly (for sums of monomials in single or multiple symbols)
 
 use arith::{add_q, div_q, gcd_i64, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
 use matrix::MatrixQ;
+use std::collections::BTreeMap;
 
 // ---------- Univariate dense polynomial over Q ----------
 
@@ -568,6 +570,156 @@ pub fn partial_fractions_simple(num: &UniPoly, den: &UniPoly) -> Option<(UniPoly
     Some((q, terms))
 }
 
+// ---------- Multivariate sparse polynomial over Q ----------
+
+/// A monomial: product of variables raised to non-negative integer powers.
+/// Represented as a sorted map from variable name to exponent.
+/// Example: x^2 * y * z^3 is represented as {"x": 2, "y": 1, "z": 3}
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Monomial(BTreeMap<String, usize>);
+
+impl Monomial {
+    pub fn one() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    pub fn var<S: Into<String>>(name: S) -> Self {
+        let mut map = BTreeMap::new();
+        map.insert(name.into(), 1);
+        Self(map)
+    }
+
+    pub fn degree(&self) -> usize {
+        self.0.values().sum()
+    }
+
+    /// Multiply two monomials by adding exponents
+    pub fn mul(&self, other: &Self) -> Self {
+        let mut result = self.0.clone();
+        for (var, &exp) in &other.0 {
+            *result.entry(var.clone()).or_insert(0) += exp;
+        }
+        // Remove zero exponents
+        result.retain(|_, &mut exp| exp > 0);
+        Self(result)
+    }
+
+    /// Evaluate monomial at given variable assignments
+    pub fn eval(&self, vals: &BTreeMap<String, Q>) -> Option<Q> {
+        let mut result = Q::one();
+        for (var, &exp) in &self.0 {
+            let val = vals.get(var)?;
+            for _ in 0..exp {
+                result = mul_q(result, *val);
+            }
+        }
+        Some(result)
+    }
+}
+
+/// Multivariate sparse polynomial over Q
+/// Represented as a map from monomial to coefficient
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultiPoly {
+    /// Map from monomial to coefficient; zero coefficients should be removed
+    pub terms: BTreeMap<Monomial, Q>,
+}
+
+impl MultiPoly {
+    pub fn zero() -> Self {
+        Self { terms: BTreeMap::new() }
+    }
+
+    pub fn constant(c: Q) -> Self {
+        if c.is_zero() {
+            return Self::zero();
+        }
+        let mut terms = BTreeMap::new();
+        terms.insert(Monomial::one(), c);
+        Self { terms }
+    }
+
+    pub fn var<S: Into<String>>(name: S) -> Self {
+        let mut terms = BTreeMap::new();
+        terms.insert(Monomial::var(name), Q::one());
+        Self { terms }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.terms.is_empty()
+    }
+
+    /// Total degree: maximum degree of any monomial
+    pub fn total_degree(&self) -> usize {
+        self.terms.keys().map(|m| m.degree()).max().unwrap_or(0)
+    }
+
+    /// Add two polynomials
+    pub fn add(&self, other: &Self) -> Self {
+        let mut result = self.terms.clone();
+        for (mon, &coeff) in &other.terms {
+            let new_coeff = add_q(result.get(mon).copied().unwrap_or(Q::zero()), coeff);
+            if new_coeff.is_zero() {
+                result.remove(mon);
+            } else {
+                result.insert(mon.clone(), new_coeff);
+            }
+        }
+        Self { terms: result }
+    }
+
+    /// Subtract two polynomials
+    pub fn sub(&self, other: &Self) -> Self {
+        let mut result = self.terms.clone();
+        for (mon, &coeff) in &other.terms {
+            let new_coeff = sub_q(result.get(mon).copied().unwrap_or(Q::zero()), coeff);
+            if new_coeff.is_zero() {
+                result.remove(mon);
+            } else {
+                result.insert(mon.clone(), new_coeff);
+            }
+        }
+        Self { terms: result }
+    }
+
+    /// Multiply two polynomials
+    pub fn mul(&self, other: &Self) -> Self {
+        if self.is_zero() || other.is_zero() {
+            return Self::zero();
+        }
+
+        let mut result: BTreeMap<Monomial, Q> = BTreeMap::new();
+        for (m1, &c1) in &self.terms {
+            for (m2, &c2) in &other.terms {
+                let mon = m1.mul(m2);
+                let coeff = mul_q(c1, c2);
+                let new_coeff = add_q(result.get(&mon).copied().unwrap_or(Q::zero()), coeff);
+                if new_coeff.is_zero() {
+                    result.remove(&mon);
+                } else {
+                    result.insert(mon, new_coeff);
+                }
+            }
+        }
+        Self { terms: result }
+    }
+
+    /// Evaluate polynomial at given variable assignments
+    pub fn eval(&self, vals: &BTreeMap<String, Q>) -> Option<Q> {
+        let mut result = Q::zero();
+        for (mon, &coeff) in &self.terms {
+            let mon_val = mon.eval(vals)?;
+            result = add_q(result, mul_q(coeff, mon_val));
+        }
+        Some(result)
+    }
+
+    /// Number of terms (non-zero coefficients)
+    pub fn num_terms(&self) -> usize {
+        self.terms.len()
+    }
+}
+
 // ---------- Tests ----------
 
 #[cfg(test)]
@@ -993,5 +1145,166 @@ mod tests {
         let f = UniPoly::new("x", vec![Q(1, 1), Q(3, 1), Q(2, 1)]);
         let disc = f.discriminant().unwrap();
         assert_eq!(disc, Q(1, 1));
+    }
+
+    // ========== Multivariate Polynomial Tests ==========
+
+    #[test]
+    fn multipoly_zero_and_constant() {
+        let zero = MultiPoly::zero();
+        assert!(zero.is_zero());
+        assert_eq!(zero.total_degree(), 0);
+
+        let c = MultiPoly::constant(Q(5, 1));
+        assert!(!c.is_zero());
+        assert_eq!(c.total_degree(), 0);
+        assert_eq!(c.num_terms(), 1);
+    }
+
+    #[test]
+    fn multipoly_var() {
+        let x = MultiPoly::var("x");
+        assert_eq!(x.total_degree(), 1);
+        assert_eq!(x.num_terms(), 1);
+    }
+
+    #[test]
+    fn multipoly_add() {
+        // x + y
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let sum = x.add(&y);
+        assert_eq!(sum.num_terms(), 2);
+        assert_eq!(sum.total_degree(), 1);
+
+        // x + x = 2x
+        let double_x = x.add(&x);
+        assert_eq!(double_x.num_terms(), 1);
+        let mx = Monomial::var("x");
+        assert_eq!(double_x.terms.get(&mx), Some(&Q(2, 1)));
+    }
+
+    #[test]
+    fn multipoly_sub() {
+        // x - y
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let diff = x.sub(&y);
+        assert_eq!(diff.num_terms(), 2);
+
+        // x - x = 0
+        let zero = x.sub(&x);
+        assert!(zero.is_zero());
+    }
+
+    #[test]
+    fn multipoly_mul_simple() {
+        // x * y = xy
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let prod = x.mul(&y);
+        assert_eq!(prod.num_terms(), 1);
+        assert_eq!(prod.total_degree(), 2);
+    }
+
+    #[test]
+    fn multipoly_mul_expansion() {
+        // (x + 1)(y + 2) = xy + 2x + y + 2
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let one = MultiPoly::constant(Q(1, 1));
+        let two = MultiPoly::constant(Q(2, 1));
+
+        let x_plus_1 = x.add(&one);
+        let y_plus_2 = y.add(&two);
+        let prod = x_plus_1.mul(&y_plus_2);
+
+        assert_eq!(prod.num_terms(), 4);
+        assert_eq!(prod.total_degree(), 2);
+    }
+
+    #[test]
+    fn multipoly_eval() {
+        // p = 2xy + 3x + 5
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let xy = x.mul(&y);
+        let two = MultiPoly::constant(Q(2, 1));
+        let three = MultiPoly::constant(Q(3, 1));
+        let five = MultiPoly::constant(Q(5, 1));
+
+        let two_xy = two.mul(&xy);
+        let three_x = three.mul(&x);
+        let p = two_xy.add(&three_x).add(&five);
+
+        let mut vals = BTreeMap::new();
+        vals.insert("x".to_string(), Q(2, 1));
+        vals.insert("y".to_string(), Q(3, 1));
+
+        // 2*2*3 + 3*2 + 5 = 12 + 6 + 5 = 23
+        let result = p.eval(&vals).unwrap();
+        assert_eq!(result, Q(23, 1));
+    }
+
+    #[test]
+    fn multipoly_eval_missing_var() {
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let p = x.mul(&y);
+
+        let mut vals = BTreeMap::new();
+        vals.insert("x".to_string(), Q(2, 1));
+        // Missing y
+
+        assert!(p.eval(&vals).is_none());
+    }
+
+    #[test]
+    fn monomial_mul() {
+        // x^2 * y * x^3 * z = x^5 * y * z
+        let m1 = Monomial::var("x").mul(&Monomial::var("x")); // x^2
+        let m2 = Monomial::var("y");
+        let m3 = Monomial::var("x").mul(&Monomial::var("x")).mul(&Monomial::var("x")); // x^3
+        let m4 = Monomial::var("z");
+
+        let result = m1.mul(&m2).mul(&m3).mul(&m4);
+        assert_eq!(result.0.get("x"), Some(&5));
+        assert_eq!(result.0.get("y"), Some(&1));
+        assert_eq!(result.0.get("z"), Some(&1));
+        assert_eq!(result.degree(), 7);
+    }
+
+    #[test]
+    fn multipoly_zero_mul() {
+        let x = MultiPoly::var("x");
+        let zero = MultiPoly::zero();
+        let prod = x.mul(&zero);
+        assert!(prod.is_zero());
+    }
+
+    #[test]
+    fn multipoly_three_var_polynomial() {
+        // p = x^2 + xy + yz + z^2
+        let x = MultiPoly::var("x");
+        let y = MultiPoly::var("y");
+        let z = MultiPoly::var("z");
+
+        let x2 = x.mul(&x);
+        let xy = x.mul(&y);
+        let yz = y.mul(&z);
+        let z2 = z.mul(&z);
+
+        let p = x2.add(&xy).add(&yz).add(&z2);
+        assert_eq!(p.num_terms(), 4);
+        assert_eq!(p.total_degree(), 2);
+
+        let mut vals = BTreeMap::new();
+        vals.insert("x".to_string(), Q(1, 1));
+        vals.insert("y".to_string(), Q(2, 1));
+        vals.insert("z".to_string(), Q(3, 1));
+
+        // 1 + 2 + 6 + 9 = 18
+        let result = p.eval(&vals).unwrap();
+        assert_eq!(result, Q(18, 1));
     }
 }
