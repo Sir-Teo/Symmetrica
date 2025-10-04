@@ -7,6 +7,11 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 expr_core = { path = "../expr_core" }
 simplify  = { path = "../simplify" }
+io = { path = "../io" }
+calculus = { path = "../calculus" }
+polys = { path = "../polys" }
+plot = { path = "../plot" }
+solver = { path = "../solver" }
 
 [[bin]]
 name = "matika_cli"

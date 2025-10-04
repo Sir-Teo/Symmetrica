@@ -53,6 +53,7 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "expr_core",
+ "polys",
  "simplify",
 ]
 
@@ -234,14 +235,20 @@ checksum = "58f929b4d672ea937a23a1ab494143d968337a5f47e56d0815df1e0890ddf174"
 name = "matika_cli"
 version = "0.1.0"
 dependencies = [
+ "calculus",
  "expr_core",
+ "io",
+ "plot",
+ "polys",
  "simplify",
+ "solver",
 ]
 
 [[package]]
 name = "matrix"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "expr_core",
 ]
 
@@ -413,7 +420,9 @@ dependencies = [
 name = "solver"
 version = "0.1.0"
 dependencies = [
+ "arith",
  "expr_core",
+ "polys",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@
 //! - Division with remainder, Euclidean GCD
 //! - Conversions: Expr ⟷ Poly (for sums of monomials in a single symbol)
 
-use arith::{add_q, div_q, mul_q, sub_q, Q};
+use arith::{add_q, div_q, gcd_i64, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
 
 // ---------- Univariate dense polynomial over Q ----------
@@ -39,6 +39,28 @@ impl UniPoly {
         } else {
             Q::zero()
         }
+    }
+
+    pub fn deriv(&self) -> Self {
+        if self.coeffs.len() <= 1 {
+            return Self::zero(self.var.clone());
+        }
+        let mut out: Vec<Q> = Vec::with_capacity(self.coeffs.len() - 1);
+        for (k, &c) in self.coeffs.iter().enumerate().skip(1) {
+            // d/dx c_k x^k = (k) * c_k x^{k-1}
+            let factor = Q(k as i64, 1);
+            out.push(mul_q(c, factor));
+        }
+        Self::new(self.var.clone(), out)
+    }
+
+    pub fn eval_q(&self, x: Q) -> Q {
+        // Horner's method
+        let mut acc = Q::zero();
+        for &c in self.coeffs.iter().rev() {
+            acc = add_q(mul_q(acc, x), c);
+        }
+        acc
     }
 
     pub fn add(&self, rhs: &Self) -> Self {
@@ -267,6 +289,137 @@ pub fn unipoly_to_expr(store: &mut Store, p: &UniPoly) -> ExprId {
     store.add(terms)
 }
 
+/// Partial fractions for denominators that factor into distinct linear factors over Q.
+/// Returns (quotient, terms), where terms are (A_i, r_i) representing A_i/(x - r_i).
+/// Only handles the simple case (no repeated factors). Returns None if factoring fails.
+pub fn partial_fractions_simple(num: &UniPoly, den: &UniPoly) -> Option<(UniPoly, Vec<(Q, Q)>)> {
+    if num.var != den.var {
+        return None;
+    }
+
+    // Long division to extract polynomial part.
+    let (q, r) = num.div_rem(den).ok()?;
+
+    // Factor denominator into distinct rational linear factors using Rational Root Theorem.
+    fn lcm_i64(a: i64, b: i64) -> i64 {
+        if a == 0 || b == 0 {
+            return 0;
+        }
+        (a / gcd_i64(a.abs(), b.abs())) * b
+    }
+    fn clear_denominators(p: &UniPoly) -> (Vec<i64>, i64) {
+        let mut l = 1i64;
+        for &Q(_, d) in &p.coeffs {
+            let dd = d.abs().max(1);
+            l = if l == 0 { dd } else { lcm_i64(l, dd) };
+        }
+        let mut ints = Vec::with_capacity(p.coeffs.len());
+        for &Q(n, d) in &p.coeffs {
+            ints.push(n * (if d == 0 { 0 } else { l / d }));
+        }
+        (ints, l)
+    }
+    fn divisors(mut n: i64) -> Vec<i64> {
+        if n < 0 {
+            n = -n;
+        }
+        if n == 0 {
+            // convention: only 0; callers handle specially
+            return vec![0];
+        }
+        let mut ds = Vec::new();
+        let mut i = 1;
+        while (i as i128) * (i as i128) <= (n as i128) {
+            if n % i == 0 {
+                ds.push(i);
+                if i != n / i {
+                    ds.push(n / i);
+                }
+            }
+            i += 1;
+        }
+        ds
+    }
+    fn deflate_by_root(p: &UniPoly, r: Q) -> Option<UniPoly> {
+        let var = p.var.clone();
+        let mut new_coeffs: Vec<Q> = Vec::with_capacity(p.coeffs.len().saturating_sub(1));
+        let mut acc = Q::zero();
+        for &c in p.coeffs.iter().rev() {
+            acc = add_q(mul_q(acc, r), c);
+            new_coeffs.push(acc);
+        }
+        if !acc.is_zero() {
+            return None;
+        }
+        new_coeffs.pop();
+        new_coeffs.reverse();
+        Some(UniPoly::new(var, new_coeffs))
+    }
+
+    // Collect distinct rational roots (with multiplicity 1) by repeated deflation.
+    let mut den_work = den.clone();
+    let mut roots: Vec<Q> = Vec::new();
+    loop {
+        match den_work.degree() {
+            None | Some(0) => break,
+            Some(1) => {
+                // ax + b => root = -b/a
+                let a = den_work.coeffs.get(1).copied().unwrap_or(Q::zero());
+                let b = den_work.coeffs.first().copied().unwrap_or(Q::zero());
+                if a.is_zero() {
+                    return None;
+                }
+                let root = div_q(Q(-b.0, b.1), a);
+                roots.push(root);
+                break;
+            }
+            Some(_) => {
+                let (ints, _) = clear_denominators(&den_work);
+                let lc = *ints.last().unwrap_or(&0);
+                let ct = *ints.first().unwrap_or(&0);
+                let mut found = None;
+                'outer: for qd in divisors(lc).into_iter().flat_map(|q| vec![q, -q]) {
+                    if qd == 0 {
+                        continue;
+                    }
+                    for pn in divisors(ct).into_iter().flat_map(|pn| vec![pn, -pn]) {
+                        let r = Q(pn, qd);
+                        if den_work.eval_q(r).is_zero() {
+                            found = Some(r);
+                            break 'outer;
+                        }
+                    }
+                }
+                let r = found?;
+                roots.push(r);
+                den_work = deflate_by_root(&den_work, r)?;
+            }
+        }
+    }
+
+    // Ensure distinct (no repeated roots): derivative at each root must be non-zero.
+    let dprime = den.deriv();
+    for &rv in &roots {
+        if dprime.eval_q(rv).is_zero() {
+            return None;
+        }
+    }
+
+    // Compute residues A_i = r(root_i) / den'(root_i)
+    let mut terms: Vec<(Q, Q)> = Vec::with_capacity(roots.len());
+    for &rv in &roots {
+        let numv = r.eval_q(rv);
+        let denv = dprime.eval_q(rv);
+        if denv.is_zero() {
+            return None;
+        }
+        let a = div_q(numv, denv);
+        terms.push((a, rv));
+    }
+
+    Some((q, terms))
+}
+
 // ---------- Tests ----------
 
 #[cfg(test)]
@@ -303,5 +456,29 @@ mod tests {
         assert_eq!(p, UniPoly::new("x", vec![Q(2, 1), Q(3, 1), Q(1, 1)]));
         let back = unipoly_to_expr(&mut st, &p);
         assert_eq!(back, expr);
+    }
+
+    #[test]
+    fn partial_fractions_simple_linear_denominator() {
+        // (2x+3)/(x^2+3x+2) = 1/(x+1) + 1/(x+2)
+        let var = "x";
+        let num = UniPoly::new(var, vec![Q(3, 1), Q(2, 1)]); // 3 + 2x
+        let den = UniPoly::new(var, vec![Q(2, 1), Q(3, 1), Q(1, 1)]); // 2 + 3x + x^2
+        let (q, terms) = partial_fractions_simple(&num, &den).expect("pf");
+        assert!(q.is_zero());
+        assert_eq!(terms.len(), 2);
+        let mut ok1 = false;
+        let mut ok2 = false;
+        for (a, r) in terms {
+            // (A, root)
+            if r == Q(-1, 1) {
+                assert_eq!(a, Q(1, 1));
+                ok1 = true;
+            } else if r == Q(-2, 1) {
+                assert_eq!(a, Q(1, 1));
+                ok2 = true;
+            }
+        }
+        assert!(ok1 && ok2);
     }
 }

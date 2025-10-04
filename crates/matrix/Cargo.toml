@@ -10,3 +10,4 @@ path = "src/lib.rs"
 
 [dependencies]
 expr_core = { path = "../expr_core" }
+arith = { path = "../arith" }

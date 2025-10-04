@@ -271,4 +271,69 @@ mod tests {
         let lnu = st.func("ln", vec![u]);
         assert_eq!(ie, lnu);
     }
+
+    #[test]
+    fn integrate_rational_via_partial_fractions_and_diff_check() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // f(x) = (2x + 3) / (x^2 + 3x + 2)
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let three = st.int(3);
+        let num = st.add(vec![two_x, three]);
+        let two2 = st.int(2);
+        let three2 = st.int(3);
+        let two_exp = st.int(2);
+        let x2 = st.pow(x, two_exp);
+        let three_x = st.mul(vec![three2, x]);
+        let den = st.add(vec![x2, three_x, two2]);
+        let minus_one = st.int(-1);
+        let inv_den = st.pow(den, minus_one);
+        let f = st.mul(vec![num, inv_den]);
+        let f_s = simplify::simplify(&mut st, f); // canonicalize integrand
+
+        // Integrate and compare with ln(x+1)+ln(x+2)
+        let int = super::integrate(&mut st, f_s, "x").expect("pf integrable");
+        let one = st.int(1);
+        let xp1 = st.add(vec![x, one]);
+        let lnxp1 = st.func("ln", vec![xp1]);
+        let two_c = st.int(2);
+        let xp2 = st.add(vec![x, two_c]);
+        let lnxp2 = st.func("ln", vec![xp2]);
+        let expected = st.add(vec![lnxp1, lnxp2]);
+        assert_eq!(st.to_string(int), st.to_string(expected));
+    }
+
+    #[test]
+    fn integrate_rational_another_case() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // f(x) = (3x + 5) / (x^2 + 3x + 2) -> 2*ln(x+1) + ln(x+2)
+        let three = st.int(3);
+        let three_x = st.mul(vec![three, x]);
+        let five = st.int(5);
+        let num = st.add(vec![three_x, five]);
+        let two = st.int(2);
+        let three2 = st.int(3);
+        let two_exp = st.int(2);
+        let x2 = st.pow(x, two_exp);
+        let three_x2 = st.mul(vec![three2, x]);
+        let den = st.add(vec![x2, three_x2, two]);
+        let minus_one = st.int(-1);
+        let inv_den = st.pow(den, minus_one);
+        let f = st.mul(vec![num, inv_den]);
+        let f_s = simplify::simplify(&mut st, f);
+
+        let int = super::integrate(&mut st, f_s, "x").expect("pf integrable");
+        let one = st.int(1);
+        let xp1 = st.add(vec![x, one]);
+        let ln1 = st.func("ln", vec![xp1]);
+        let two_c = st.int(2);
+        let term1 = st.mul(vec![two_c, ln1]);
+        let two2 = st.int(2);
+        let xp2 = st.add(vec![x, two2]);
+        let ln2 = st.func("ln", vec![xp2]);
+        let expected = st.add(vec![term1, ln2]);
+        assert_eq!(int, expected);
+    }
 }

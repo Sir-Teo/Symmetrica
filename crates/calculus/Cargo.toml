@@ -12,3 +12,4 @@ path = "src/lib.rs"
 expr_core = { path = "../expr_core" }
 simplify  = { path = "../simplify" }
 arith = { path = "../arith" }
+polys = { path = "../polys" }

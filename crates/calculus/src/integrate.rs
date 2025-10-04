@@ -1,8 +1,9 @@
 //! Integration rules (v1, conservative).
 
 use crate::diff::diff;
-use arith::{q_div, q_mul};
+use arith::{q_div, q_mul, Q};
 use expr_core::{ExprId, Op, Payload, Store};
+use polys::{expr_to_unipoly, partial_fractions_simple, UniPoly};
 use simplify::simplify;
 
 /// Try to integrate expression w.r.t. `var`. Returns None if rule not supported.
@@ -95,6 +96,10 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             Some(simplify(store, sum))
         }
         Op::Mul => {
+            // Prefer rational integration via partial fractions if applicable
+            if let Some(res) = integrate_rational(store, id, var) {
+                return Some(res);
+            }
             // factor out numeric coefficient
             let (coeff, rest) = split_coeff_mul(store, id);
             // f'/f pattern: look for a factor u^{-1} and check remaining equals u' up to numeric factor
@@ -147,7 +152,8 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
                 let ir = integrate(store, rest, var)?;
                 Some(ir)
             } else {
-                None
+                // Try rational integration via partial fractions
+                integrate_rational(store, id, var)
             }
         }
         Op::Pow => {
@@ -174,6 +180,10 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
                         }
                     }
                 }
+            }
+            // Try ∫ 1/den(x) dx via partial fractions if den splits
+            if let Some(res) = integrate_rational(store, id, var) {
+                return Some(res);
             }
             None
         }
@@ -221,4 +231,134 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             Some(with_coeff(store, inv_a, res))
         }
     }
+}
+
+// Attempt to interpret `id` as a rational function num/den in variable `var` and integrate
+// using partial fractions for denominators that split into distinct linear factors over Q.
+fn integrate_rational(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    // Extract numerator and denominator polynomials if expression is of the form
+    //   Mul(..., Pow(den, -1)) or just Pow(den, -1) or a plain rational polynomial (den=1)
+    fn decompose(st: &mut Store, id: ExprId, var: &str) -> Option<(UniPoly, UniPoly)> {
+        match st.get(id).op {
+            Op::Pow => {
+                let n = st.get(id);
+                let b = n.children[0];
+                let e = n.children[1];
+                if matches!((&st.get(e).op, &st.get(e).payload), (Op::Integer, Payload::Int(-1))) {
+                    let den = expr_to_unipoly(st, b, var)?;
+                    let num = UniPoly::new(var, vec![Q(1, 1)]);
+                    return Some((num, den));
+                }
+                None
+            }
+            Op::Mul => {
+                let children = st.get(id).children.clone();
+                let mut den_opt: Option<ExprId> = None;
+                let mut num_factors: Vec<ExprId> = Vec::new();
+                for &c in &children {
+                    if st.get(c).op == Op::Pow {
+                        let n = st.get(c);
+                        if n.children.len() == 2 {
+                            let e = n.children[1];
+                            if matches!(
+                                (&st.get(e).op, &st.get(e).payload),
+                                (Op::Integer, Payload::Int(-1))
+                            ) {
+                                if den_opt.is_some() {
+                                    return None;
+                                } // only support single reciprocal
+                                den_opt = Some(n.children[0]);
+                                continue;
+                            }
+                        }
+                    }
+                    num_factors.push(c);
+                }
+                let den_e = den_opt?;
+                let num_expr = if num_factors.is_empty() {
+                    None
+                } else {
+                    Some(st.mul(num_factors))
+                };
+                let num_poly = match num_expr {
+                    Some(ne) => expr_to_unipoly(st, ne, var)?,
+                    None => UniPoly::new(var, vec![Q(1, 1)]),
+                };
+                let den_poly = expr_to_unipoly(st, den_e, var)?;
+                Some((num_poly, den_poly))
+            }
+            _ => None,
+        }
+    }
+
+    let (num, den) = decompose(st, id, var)?;
+    // Proper handling using partial fractions (includes quotient if improper)
+    let (q, terms) = partial_fractions_simple(&num, &den)?;
+
+    // Integrate polynomial quotient q(x) term-wise to expression
+    fn poly_integral_expr(st: &mut Store, p: &UniPoly) -> ExprId {
+        if p.is_zero() {
+            return st.int(0);
+        }
+        let x = st.sym(&p.var);
+        let mut terms_expr: Vec<ExprId> = Vec::new();
+        for (k, &c) in p.coeffs.iter().enumerate() {
+            if c.is_zero() {
+                continue;
+            }
+            // ∫ c x^k dx = c * x^{k+1}/(k+1)
+            let k1 = (k as i64) + 1;
+            let coeff = q_div((c.0, c.1), (k1, 1));
+            let k1_expr = st.int(k1);
+            let pow = st.pow(x, k1_expr);
+            let term = if coeff.1 == 1 {
+                let c_int = st.int(coeff.0);
+                st.mul(vec![c_int, pow])
+            } else {
+                let c_rat = st.rat(coeff.0, coeff.1);
+                st.mul(vec![c_rat, pow])
+            };
+            terms_expr.push(term);
+        }
+        st.add(terms_expr)
+    }
+
+    let mut parts: Vec<ExprId> = Vec::new();
+    let poly_int = poly_integral_expr(st, &q);
+    if !matches!((&st.get(poly_int).op, &st.get(poly_int).payload), (Op::Integer, Payload::Int(0)))
+    {
+        parts.push(poly_int);
+    }
+
+    // ∫ A/(x - a) dx = A * ln(x - a)
+    let x = st.sym(var);
+    for (residue, root) in terms {
+        let neg_a = (-root.0, root.1);
+        let c_neg = if neg_a.1 == 1 {
+            st.int(neg_a.0)
+        } else {
+            st.rat(neg_a.0, neg_a.1)
+        };
+        let x_minus_a = st.add(vec![x, c_neg]);
+        let ln = st.func("ln", vec![x_minus_a]);
+        let term = if residue == Q(1, 1) {
+            ln
+        } else if residue == Q(-1, 1) {
+            let m1 = st.int(-1);
+            st.mul(vec![m1, ln])
+        } else if residue.1 == 1 {
+            let c_res = st.int(residue.0);
+            st.mul(vec![c_res, ln])
+        } else {
+            let c_res = st.rat(residue.0, residue.1);
+            st.mul(vec![c_res, ln])
+        };
+        parts.push(term);
+    }
+
+    if parts.is_empty() {
+        return None;
+    }
+    let sum = st.add(parts);
+    Some(simplify(st, sum))
 }
