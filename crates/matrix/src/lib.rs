@@ -94,6 +94,7 @@ impl MatrixQ {
 
     /// Solve A x = b using fraction-free Bareiss elimination.
     /// Returns Ok(Some(x)) if unique solution exists; Ok(None) if singular; Err on misuse.
+    #[allow(clippy::needless_range_loop)]
     pub fn solve_bareiss(&self, b: &[Q]) -> Result<Option<Vec<Q>>, &'static str> {
         if self.rows != self.cols {
             return Err("solve requires square matrix");
@@ -113,8 +114,8 @@ impl MatrixQ {
         let mut x = vec![Q::zero(); n];
         for col in 0..n {
             let mut a_col = self.clone();
-            for r in 0..n {
-                a_col.set(r, col, b[r]);
+            for (r, &br) in b.iter().enumerate() {
+                a_col.set(r, col, br);
             }
             let det_i = a_col.det_bareiss()?;
             x[col] = div_q(det_i, det_a);

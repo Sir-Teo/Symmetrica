@@ -481,4 +481,46 @@ mod tests {
         }
         assert!(ok1 && ok2);
     }
+
+    #[test]
+    fn partial_fractions_improper_fraction() {
+        // x^3 / (x+1) has quotient x^2 - x + 1 and remainder -1
+        let var = "x";
+        let num = UniPoly::new(var, vec![Q(0, 1), Q(0, 1), Q(0, 1), Q(1, 1)]);
+        let den = UniPoly::new(var, vec![Q(1, 1), Q(1, 1)]);
+        let (q, terms) = partial_fractions_simple(&num, &den).expect("pf");
+        assert_eq!(q.degree(), Some(2));
+        assert_eq!(terms.len(), 1);
+        assert_eq!(terms[0].1, Q(-1, 1)); // root at -1
+    }
+
+    #[test]
+    fn partial_fractions_mismatched_vars() {
+        let num = UniPoly::new("x", vec![Q(1, 1)]);
+        let den = UniPoly::new("y", vec![Q(1, 1), Q(1, 1)]);
+        assert!(partial_fractions_simple(&num, &den).is_none());
+    }
+
+    #[test]
+    fn partial_fractions_repeated_root_returns_none() {
+        // (x+1) / (x+1)^2 has a repeated root, not supported
+        let var = "x";
+        let num = UniPoly::new(var, vec![Q(1, 1), Q(1, 1)]);
+        let den = UniPoly::new(var, vec![Q(1, 1), Q(2, 1), Q(1, 1)]); // (x+1)^2 = x^2 + 2x + 1
+                                                                      // This should detect that the same root appears twice
+        let result = partial_fractions_simple(&num, &den);
+        // The function will try to deflate and fail to find distinct roots
+        // Since (x+1)^2 will yield root -1 once, then deflating again gives (x+1) again => same root
+        // We test that it returns None (cannot factor into distinct linear terms)
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn partial_fractions_no_rational_roots() {
+        // x^2 + 1 has no rational roots
+        let var = "x";
+        let num = UniPoly::new(var, vec![Q(1, 1)]);
+        let den = UniPoly::new(var, vec![Q(1, 1), Q(0, 1), Q(1, 1)]); // 1 + x^2
+        assert!(partial_fractions_simple(&num, &den).is_none());
+    }
 }

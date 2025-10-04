@@ -34,8 +34,10 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
                     if let Op::Pow = store.get(b).op {
                         let bb = store.get(b).children[0];
                         let ee = store.get(b).children[1];
-                        if matches!((&store.get(ee).op, &store.get(ee).payload), (Op::Integer, Payload::Int(2)))
-                            && is_positive_symbol(_ctx, store, bb)
+                        if matches!(
+                            (&store.get(ee).op, &store.get(ee).payload),
+                            (Op::Integer, Payload::Int(2))
+                        ) && is_positive_symbol(_ctx, store, bb)
                         {
                             return bb;
                         }

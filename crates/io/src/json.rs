@@ -357,4 +357,45 @@ mod tests {
         let parsed = from_json(&mut st2, &s).expect("parse");
         assert_eq!(st.to_string(expr), st2.to_string(parsed));
     }
+
+    #[test]
+    fn json_parse_errors() {
+        let mut st = Store::new();
+        // Missing closing brace
+        assert!(from_json(&mut st, "{\"Symbol\": ").is_err());
+        // Invalid integer
+        assert!(from_json(&mut st, "{\"Integer\": abc}").is_err());
+        // Unexpected token
+        assert!(from_json(&mut st, "{\"Symbol\": 123}").is_err());
+        // Missing field
+        assert!(from_json(&mut st, "{\"Pow\": {\"base\": {\"Symbol\": \"x\"}}}").is_err());
+        // Wrong type for Add children
+        assert!(from_json(&mut st, "{\"Add\": 5}").is_err());
+    }
+
+    #[test]
+    fn json_nested_objects() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sum = st.add(vec![x, y]);
+        let two = st.int(2);
+        let prod = st.mul(vec![sum, two]);
+        let s = to_json(&st, prod);
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(prod), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_rational() {
+        let mut st = Store::new();
+        let rat = st.rat(5, 3);
+        let s = to_json(&st, rat);
+        assert!(s.contains("\"num\""));
+        assert!(s.contains("\"den\""));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(rat), st2.to_string(parsed));
+    }
 }

@@ -327,4 +327,45 @@ mod tests {
         let id2 = from_sexpr(&mut st2, &out).expect("parse2");
         assert_eq!(st.to_string(id), st2.to_string(id2));
     }
+
+    #[test]
+    fn sexpr_parse_errors() {
+        let mut st = Store::new();
+        // Unmatched paren
+        assert!(from_sexpr(&mut st, "(+ (Int 1)").is_err());
+        // Trailing tokens
+        assert!(from_sexpr(&mut st, "(Int 5) extra").is_err());
+        // Expected symbol
+        assert!(from_sexpr(&mut st, "(Sym)").is_err());
+        // Expected integer
+        assert!(from_sexpr(&mut st, "(Int)").is_err());
+        // Invalid quoted string (unclosed)
+        assert!(from_sexpr(&mut st, "(Sym \"unclosed").is_err());
+        // Unknown head
+        assert!(from_sexpr(&mut st, "(Unknown 1)").is_err());
+    }
+
+    #[test]
+    fn sexpr_nested_add_mul() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let prod = st.mul(vec![two, x]);
+        let sum = st.add(vec![prod, y]);
+        let s = to_sexpr(&st, sum);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(sum), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_rational() {
+        let mut st = Store::new();
+        let rat = st.rat(-7, 4);
+        let s = to_sexpr(&st, rat);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(rat), st2.to_string(parsed));
+    }
 }

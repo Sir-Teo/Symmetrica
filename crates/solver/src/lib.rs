@@ -263,4 +263,50 @@ mod tests {
         assert!(s0.contains("^"));
         assert!(s1.contains("^"));
     }
+
+    #[test]
+    fn solve_cubic_rational_roots() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^3 - x = 0 -> roots 0, ±1
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let m1 = st.int(-1);
+        let minus_x = st.mul(vec![m1, x]);
+        let e = st.add(vec![x3, minus_x]);
+        let mut roots = solve_univariate(&mut st, e, "x").expect("solved");
+        roots.sort_by_key(|r| st.to_string(*r));
+        let rs: Vec<String> = roots.into_iter().map(|r| st.to_string(r)).collect();
+        assert_eq!(rs, vec!["-1", "0", "1"]);
+    }
+
+    #[test]
+    fn solve_zero_polynomial_returns_empty() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let result = solve_univariate(&mut st, zero, "x").expect("zero poly");
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn solve_constant_nonzero_returns_empty() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let result = solve_univariate(&mut st, five, "x").expect("constant poly");
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn solve_cubic_no_rational_roots() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^3 + x + 1 = 0 (has no rational roots)
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let one = st.int(1);
+        let e = st.add(vec![x3, x, one]);
+        let result = solve_univariate(&mut st, e, "x");
+        // No rational roots, so should return None
+        assert!(result.is_none());
+    }
 }

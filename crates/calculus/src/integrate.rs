@@ -275,11 +275,8 @@ fn integrate_rational(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
                     num_factors.push(c);
                 }
                 let den_e = den_opt?;
-                let num_expr = if num_factors.is_empty() {
-                    None
-                } else {
-                    Some(st.mul(num_factors))
-                };
+                let num_expr =
+                    if num_factors.is_empty() { None } else { Some(st.mul(num_factors)) };
                 let num_poly = match num_expr {
                     Some(ne) => expr_to_unipoly(st, ne, var)?,
                     None => UniPoly::new(var, vec![Q(1, 1)]),
@@ -334,11 +331,7 @@ fn integrate_rational(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
     let x = st.sym(var);
     for (residue, root) in terms {
         let neg_a = (-root.0, root.1);
-        let c_neg = if neg_a.1 == 1 {
-            st.int(neg_a.0)
-        } else {
-            st.rat(neg_a.0, neg_a.1)
-        };
+        let c_neg = if neg_a.1 == 1 { st.int(neg_a.0) } else { st.rat(neg_a.0, neg_a.1) };
         let x_minus_a = st.add(vec![x, c_neg]);
         let ln = st.func("ln", vec![x_minus_a]);
         let term = if residue == Q(1, 1) {
