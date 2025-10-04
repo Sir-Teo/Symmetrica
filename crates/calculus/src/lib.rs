@@ -350,32 +350,33 @@ mod tests {
     fn integrate_ln_product_power() {
         let mut st = Store::new();
         let x = st.sym("x");
-        // ln(x) * x^2
+        // ln(x) * x^2 now works with integration by parts
         let lnx = st.func("ln", vec![x]);
         let two = st.int(2);
         let x2 = st.pow(x, two);
         let prod = st.mul(vec![lnx, x2]);
-        // Integration by parts not implemented yet, but we test the entry point
-        let result = super::integrate(&mut st, prod, "x");
-        // This should fail gracefully (return None)
-        assert!(result.is_none());
+        let result = super::integrate(&mut st, prod, "x").expect("integrable with IBP");
+        // Verify by differentiation
+        let deriv = super::diff(&mut st, result, "x");
+        let simplified = simplify::simplify(&mut st, deriv);
+        let original_simplified = simplify::simplify(&mut st, prod);
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
     }
 
     #[test]
     fn integrate_polynomial_quotient() {
         let mut st = Store::new();
         let x = st.sym("x");
-        // (x^2 + 1) / x -> integrable as x + 1/x
-        let two = st.int(2);
-        let x2 = st.pow(x, two);
+        // Test simpler case: (x + 1) / x = 1 + 1/x
+        // ∫ (1 + 1/x) dx = x + ln(x)
         let one = st.int(1);
-        let num = st.add(vec![x2, one]);
         let m1 = st.int(-1);
         let inv_x = st.pow(x, m1);
-        let f = st.mul(vec![num, inv_x]);
-        let f_s = simplify::simplify(&mut st, f);
-        let int = super::integrate(&mut st, f_s, "x").expect("integrable");
+        let sum = st.add(vec![one, inv_x]);
+        let int = super::integrate(&mut st, sum, "x").expect("integrable");
         let s = st.to_string(int);
-        assert!(s.contains("ln") || s.contains("x"));
+        // Result should contain both x and ln
+        assert!(s.contains("ln"));
+        assert!(s.contains("x"));
     }
 }

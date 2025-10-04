@@ -1,4 +1,4 @@
-//! Integration rules (v1, conservative).
+//! Integration rules (v1, conservative + Phase J: integration by parts).
 
 use crate::diff::diff;
 use arith::{q_div, q_mul, Q};
@@ -96,7 +96,11 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             Some(simplify(store, sum))
         }
         Op::Mul => {
-            // Prefer rational integration via partial fractions if applicable
+            // Try integration by parts for product patterns
+            if let Some(res) = try_integration_by_parts(store, id, var) {
+                return Some(res);
+            }
+            // Try rational integration via partial fractions if applicable
             if let Some(res) = integrate_rational(store, id, var) {
                 return Some(res);
             }
@@ -231,6 +235,101 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             Some(with_coeff(store, inv_a, res))
         }
     }
+}
+
+/// Integration by parts: ∫ u dv = uv - ∫ v du
+/// Uses LIATE heuristic (Logarithmic, Inverse trig, Algebraic, Trigonometric, Exponential)
+/// to choose u and dv from a product.
+fn try_integration_by_parts(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    if st.get(id).op != Op::Mul {
+        return None;
+    }
+
+    let children = st.get(id).children.clone();
+    if children.len() != 2 {
+        return None; // Only handle simple two-factor products
+    }
+
+    // Helper: does expr depend on var?
+    fn depends_on_var(st: &Store, id: ExprId, var: &str) -> bool {
+        match (&st.get(id).op, &st.get(id).payload) {
+            (Op::Symbol, Payload::Sym(s)) => s == var,
+            (Op::Integer, _) | (Op::Rational, _) => false,
+            _ => st.get(id).children.iter().any(|&c| depends_on_var(st, c, var)),
+        }
+    }
+
+    // Helper: LIATE priority (lower is higher priority for u)
+    fn liate_priority(st: &Store, id: ExprId, var: &str) -> i32 {
+        if !depends_on_var(st, id, var) {
+            return 100; // constants go in dv
+        }
+        match &st.get(id).op {
+            Op::Function => {
+                if let Payload::Func(name) = &st.get(id).payload {
+                    match name.as_str() {
+                        "ln" | "log" => 1,                   // Logarithmic (highest priority for u)
+                        "arcsin" | "arccos" | "arctan" => 2, // Inverse trig
+                        "sin" | "cos" | "tan" => 4,          // Trigonometric
+                        "exp" => 5,                          // Exponential (lowest priority)
+                        _ => 50,
+                    }
+                } else {
+                    50
+                }
+            }
+            Op::Pow => {
+                // x^n is algebraic
+                let base = st.get(id).children[0];
+                if matches!((&st.get(base).op, &st.get(base).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                {
+                    3 // Algebraic
+                } else {
+                    50
+                }
+            }
+            Op::Symbol => {
+                if let Payload::Sym(s) = &st.get(id).payload {
+                    if s == var {
+                        return 3; // x is algebraic
+                    }
+                }
+                100
+            }
+            _ => 50,
+        }
+    }
+
+    let f0 = children[0];
+    let f1 = children[1];
+
+    // Skip if either factor doesn't depend on var (will be handled by constant factor rule)
+    if !depends_on_var(st, f0, var) || !depends_on_var(st, f1, var) {
+        return None;
+    }
+
+    let p0 = liate_priority(st, f0, var);
+    let p1 = liate_priority(st, f1, var);
+
+    // Choose u (lower priority) and dv (higher priority)
+    let (u, dv) = if p0 < p1 { (f0, f1) } else { (f1, f0) };
+
+    // Compute du and v
+    let du = diff(st, u, var);
+    let v = integrate(st, dv, var)?;
+
+    // ∫ u dv = uv - ∫ v du
+    let uv = st.mul(vec![u, v]);
+    let v_du = st.mul(vec![v, du]);
+
+    // Try to integrate v*du
+    let integral_v_du = integrate(st, v_du, var)?;
+
+    let neg1 = st.int(-1);
+    let minus_integral = st.mul(vec![neg1, integral_v_du]);
+    let result = st.add(vec![uv, minus_integral]);
+
+    Some(simplify(st, result))
 }
 
 // Attempt to interpret `id` as a rational function num/den in variable `var` and integrate
@@ -458,5 +557,136 @@ mod tests {
         let expr = st.pow(den, m1);
         let res = integrate(&mut st, expr, "x");
         assert!(res.is_none());
+    }
+
+    // ========== Integration by Parts Tests (Phase J) ==========
+
+    #[test]
+    fn integrate_by_parts_x_sin_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let expr = st.mul(vec![x, sinx]);
+        let res = integrate(&mut st, expr, "x").expect("x*sin(x)");
+
+        // ∫ x sin(x) dx = -x cos(x) + sin(x)
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        // Check that derivative equals original
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_by_parts_x_exp_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expx = st.func("exp", vec![x]);
+        let expr = st.mul(vec![x, expx]);
+        let res = integrate(&mut st, expr, "x").expect("x*exp(x)");
+
+        // ∫ x exp(x) dx = x exp(x) - exp(x)
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_by_parts_x_cos_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let cosx = st.func("cos", vec![x]);
+        let expr = st.mul(vec![x, cosx]);
+        let res = integrate(&mut st, expr, "x").expect("x*cos(x)");
+
+        // ∫ x cos(x) dx = x sin(x) + cos(x)
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_by_parts_x2_sin_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sinx = st.func("sin", vec![x]);
+        let expr = st.mul(vec![x2, sinx]);
+        let res = integrate(&mut st, expr, "x").expect("x^2*sin(x)");
+
+        // ∫ x^2 sin(x) dx should work with repeated integration by parts
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_by_parts_x2_exp_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let expx = st.func("exp", vec![x]);
+        let expr = st.mul(vec![x2, expx]);
+        let res = integrate(&mut st, expr, "x").expect("x^2*exp(x)");
+
+        // ∫ x^2 exp(x) dx should work with repeated integration by parts
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_by_parts_ln_x_times_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let lnx = st.func("ln", vec![x]);
+        let expr = st.mul(vec![x, lnx]);
+        let res = integrate(&mut st, expr, "x").expect("x*ln(x)");
+
+        // ∫ x ln(x) dx = (x^2/2) ln(x) - x^2/4
+        // Verify by differentiation (allowing for integration constant differences)
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    // Note: ∫ exp(x) sin(x) dx is not implemented as it requires solving a system
+    // (applying integration by parts twice leads to a linear equation).
+    // This would cause infinite recursion with the current implementation.
+
+    #[test]
+    fn integrate_by_parts_x3_cos_x() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let cosx = st.func("cos", vec![x]);
+        let expr = st.mul(vec![x3, cosx]);
+        let res = integrate(&mut st, expr, "x").expect("x^3*cos(x)");
+
+        // Verify by differentiation
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
     }
 }
