@@ -13,8 +13,20 @@ use expr_core::{ExprId, Op, Payload, Store};
 /// - exp(0) -> 1
 /// - u^1 -> u
 /// - u^0 -> 1 (unless u == 0)
+/// - sin(u)^2 + cos(u)^2 -> 1 (Pythagorean identity, checked before recursion)
+/// - sin(u)^2 -> (1 - cos(2*u))/2 (power-reduction)
+/// - cos(u)^2 -> (1 + cos(2*u))/2 (power-reduction)
 pub fn rewrite_basic(store: &mut Store, id: ExprId) -> ExprId {
-    // First rewrite children
+    // For Add nodes, try top-level rules first (e.g., Pythagorean identity)
+    // before recursing, so that sin^2 + cos^2 is recognized before
+    // individual power-reduction formulas are applied.
+    if store.get(id).op == Op::Add {
+        if let Some(out) = apply_rules(store, id) {
+            return out;
+        }
+    }
+
+    // Rewrite children recursively
     let rewritten = match store.get(id).op {
         Op::Add | Op::Mul | Op::Function | Op::Pow => rewrite_children(store, id),
         _ => id,
@@ -142,6 +154,54 @@ fn apply_rules(store: &mut Store, id: ExprId) -> Option<ExprId> {
         }
     }
 
+    // sin(u)^2 -> (1 - cos(2*u))/2 (power-reduction formula)
+    {
+        let pat = Pat::Pow(
+            Box::new(Pat::Function("sin".into(), vec![Pat::Any("u".into())])),
+            Box::new(Pat::Integer(2)),
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            // Build 2*u
+            let two = store.int(2);
+            let two_u = store.mul(vec![two, u]);
+            // Build cos(2*u)
+            let cos_2u = store.func("cos", vec![two_u]);
+            // Build 1 - cos(2*u)
+            let one = store.int(1);
+            let neg_one = store.int(-1);
+            let neg_cos = store.mul(vec![neg_one, cos_2u]);
+            let numerator = store.add(vec![one, neg_cos]);
+            // Build (1 - cos(2*u))/2
+            let half = store.rat(1, 2);
+            let result = store.mul(vec![half, numerator]);
+            return Some(result);
+        }
+    }
+
+    // cos(u)^2 -> (1 + cos(2*u))/2 (power-reduction formula)
+    {
+        let pat = Pat::Pow(
+            Box::new(Pat::Function("cos".into(), vec![Pat::Any("u".into())])),
+            Box::new(Pat::Integer(2)),
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            // Build 2*u
+            let two = store.int(2);
+            let two_u = store.mul(vec![two, u]);
+            // Build cos(2*u)
+            let cos_2u = store.func("cos", vec![two_u]);
+            // Build 1 + cos(2*u)
+            let one = store.int(1);
+            let numerator = store.add(vec![one, cos_2u]);
+            // Build (1 + cos(2*u))/2
+            let half = store.rat(1, 2);
+            let result = store.mul(vec![half, numerator]);
+            return Some(result);
+        }
+    }
+
     None
 }
 
@@ -224,5 +284,72 @@ mod tests {
         let expr2 = st.add(vec![cos22, sin22]);
         let r2 = rewrite_basic(&mut st, expr2);
         assert_eq!(r2, st.int(1));
+    }
+
+    #[test]
+    fn rewrite_sin_squared_power_reduction() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let sin2 = st.pow(sinx, two);
+
+        let result = rewrite_basic(&mut st, sin2);
+
+        // Expected: (1 - cos(2*x))/2 = 1/2 * (1 + -1*cos(2*x))
+        let x2 = st.sym("x");
+        let two2 = st.int(2);
+        let two_x = st.mul(vec![two2, x2]);
+        let cos_2x = st.func("cos", vec![two_x]);
+        let neg_one = st.int(-1);
+        let neg_cos = st.mul(vec![neg_one, cos_2x]);
+        let one = st.int(1);
+        let numerator = st.add(vec![one, neg_cos]);
+        let half = st.rat(1, 2);
+        let expected = st.mul(vec![half, numerator]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_cos_squared_power_reduction() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let cosx = st.func("cos", vec![x]);
+        let cos2 = st.pow(cosx, two);
+
+        let result = rewrite_basic(&mut st, cos2);
+
+        // Expected: (1 + cos(2*x))/2 = 1/2 * (1 + cos(2*x))
+        let x2 = st.sym("x");
+        let two2 = st.int(2);
+        let two_x = st.mul(vec![two2, x2]);
+        let cos_2x = st.func("cos", vec![two_x]);
+        let one = st.int(1);
+        let numerator = st.add(vec![one, cos_2x]);
+        let half = st.rat(1, 2);
+        let expected = st.mul(vec![half, numerator]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_power_reduction_with_complex_arg() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let xp1 = st.add(vec![x, one]);
+        let sin_xp1 = st.func("sin", vec![xp1]);
+        let two = st.int(2);
+        let sin2 = st.pow(sin_xp1, two);
+
+        let result = rewrite_basic(&mut st, sin2);
+
+        // Should apply power reduction to sin(x+1)^2
+        // Result should contain cos(2*(x+1))
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert!(result_str.contains("1/2"));
     }
 }
