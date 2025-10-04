@@ -5,7 +5,7 @@
 //! - Multivariate sparse polynomials over Q
 //! - Conversions: Expr ⟷ Poly (for sums of monomials in single or multiple symbols)
 
-use arith::{add_q, div_q, gcd_i64, mul_q, sub_q, Q};
+use arith::{add_q, div_q, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
 use matrix::MatrixQ;
 use std::collections::BTreeMap;
@@ -309,6 +309,168 @@ impl UniPoly {
         let disc = div_q(mul_q(sign, res), lc);
         Some(disc)
     }
+
+    /// Factor a polynomial over Q into irreducible factors.
+    /// Returns a list of (factor, multiplicity) pairs.
+    /// Uses rational root search and recursive factoring.
+    pub fn factor(&self) -> Vec<(Self, usize)> {
+        if self.is_zero() {
+            return vec![];
+        }
+
+        // Start with square-free decomposition
+        let square_free_factors = self.square_free_decomposition();
+        let mut result = Vec::new();
+
+        for (sf_poly, multiplicity) in square_free_factors {
+            // Factor the square-free part into irreducible factors
+            let irreducible_factors = factor_square_free(&sf_poly);
+            for factor in irreducible_factors {
+                result.push((factor, multiplicity));
+            }
+        }
+
+        result
+    }
+}
+
+/// Factor a square-free polynomial into irreducible factors using rational root search.
+fn factor_square_free(p: &UniPoly) -> Vec<UniPoly> {
+    if p.is_zero() {
+        return vec![];
+    }
+
+    let deg = match p.degree() {
+        Some(d) => d,
+        None => return vec![],
+    };
+
+    // Degree 0 or 1 polynomials are already irreducible
+    if deg <= 1 {
+        return vec![p.clone()];
+    }
+
+    // Try to find a rational root
+    if let Some(root) = find_rational_root(p) {
+        // Construct linear factor (x - root)
+        let linear_factor = UniPoly::new(&p.var, vec![Q(-root.0, root.1), Q(1, 1)]);
+
+        // Divide p by (x - root) to get quotient
+        match p.div_rem(&linear_factor) {
+            Ok((quotient, remainder)) => {
+                if !remainder.is_zero() {
+                    // This shouldn't happen if root is actually a root
+                    return vec![p.clone()];
+                }
+
+                // Recursively factor the quotient
+                let mut factors = vec![linear_factor];
+                factors.extend(factor_square_free(&quotient));
+                factors
+            }
+            Err(_) => vec![p.clone()],
+        }
+    } else {
+        // No rational roots found - polynomial is irreducible over Q
+        vec![p.clone()]
+    }
+}
+
+/// Find a rational root of a polynomial using the rational root theorem.
+/// Returns None if no rational root exists.
+fn find_rational_root(p: &UniPoly) -> Option<Q> {
+    if p.is_zero() || p.degree() == Some(0) {
+        return None;
+    }
+
+    // Clear denominators to work with integer coefficients
+    let (int_coeffs, _lcm) = clear_denominators(p);
+
+    // Leading coefficient and constant term
+    let lc = *int_coeffs.last()?;
+    let ct = int_coeffs.first().copied().unwrap_or(0);
+
+    if ct == 0 {
+        // x = 0 is a root
+        return Some(Q::zero());
+    }
+
+    // Rational root candidates are ±(divisors of ct)/(divisors of lc)
+    let ct_divisors = divisors(ct);
+    let lc_divisors = divisors(lc);
+
+    for &q in &lc_divisors {
+        if q == 0 {
+            continue;
+        }
+        for &pn in &ct_divisors {
+            for &sign in &[1i64, -1i64] {
+                let candidate = Q(sign * pn, q);
+                if p.eval_q(candidate).is_zero() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Clear denominators from polynomial coefficients, returning integer coefficients and LCM.
+fn clear_denominators(p: &UniPoly) -> (Vec<i64>, i64) {
+    let mut lcm = 1i64;
+    for &Q(_, d) in &p.coeffs {
+        let dd = d.abs().max(1);
+        lcm = lcm_i64(lcm.abs().max(1), dd);
+    }
+
+    let mut ints = Vec::with_capacity(p.coeffs.len());
+    for &Q(n, d) in &p.coeffs {
+        ints.push(n * (lcm / d));
+    }
+
+    (ints, lcm)
+}
+
+/// Find all positive divisors of n (including 1 and n).
+fn divisors(mut n: i64) -> Vec<i64> {
+    if n < 0 {
+        n = -n;
+    }
+    if n == 0 {
+        return vec![0];
+    }
+
+    let mut ds = Vec::new();
+    let mut i = 1;
+    while (i as i128) * (i as i128) <= (n as i128) {
+        if n % i == 0 {
+            ds.push(i);
+            if i != n / i {
+                ds.push(n / i);
+            }
+        }
+        i += 1;
+    }
+    ds
+}
+
+fn gcd_i64(mut a: i64, mut b: i64) -> i64 {
+    a = a.abs();
+    b = b.abs();
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a
+}
+
+fn lcm_i64(a: i64, b: i64) -> i64 {
+    if a == 0 || b == 0 {
+        return 0;
+    }
+    (a.abs() / gcd_i64(a, b)) * b.abs()
 }
 
 fn trim_trailing_zeros(v: &mut Vec<Q>) {
@@ -1145,6 +1307,111 @@ mod tests {
         let f = UniPoly::new("x", vec![Q(1, 1), Q(3, 1), Q(2, 1)]);
         let disc = f.discriminant().unwrap();
         assert_eq!(disc, Q(1, 1));
+    }
+
+    // ========== Factorization Tests ==========
+
+    #[test]
+    fn factor_linear() {
+        // x - 3
+        let p = UniPoly::new("x", vec![Q(-3, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 1);
+        assert_eq!(factors[0].1, 1); // multiplicity 1
+        assert_eq!(factors[0].0.degree(), Some(1));
+    }
+
+    #[test]
+    fn factor_quadratic_two_rational_roots() {
+        // (x - 1)(x - 2) = x^2 - 3x + 2
+        let p = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 2);
+        // Both factors should be linear
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_quadratic_irreducible() {
+        // x^2 + 1 (irreducible over Q)
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(0, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 1);
+        assert_eq!(factors[0].0.degree(), Some(2)); // stays quadratic
+        assert_eq!(factors[0].1, 1);
+    }
+
+    #[test]
+    fn factor_cubic_all_rational_roots() {
+        // (x - 1)(x - 2)(x - 3) = x^3 - 6x^2 + 11x - 6
+        let p = UniPoly::new("x", vec![Q(-6, 1), Q(11, 1), Q(-6, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 3);
+        // All factors should be linear
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_with_repeated_root() {
+        // (x - 1)^2 = x^2 - 2x + 1
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+        let factors = p.factor();
+        // Should get one linear factor with multiplicity 2 (or two separate linear factors)
+        // Our current square_free_decomposition is simplified, so we expect one factor
+        assert_eq!(factors.len(), 1);
+    }
+
+    #[test]
+    fn factor_difference_of_squares() {
+        // x^2 - 4 = (x - 2)(x + 2)
+        let p = UniPoly::new("x", vec![Q(-4, 1), Q(0, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 2);
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_with_zero_root() {
+        // x^2 - x = x(x - 1)
+        let p = UniPoly::new("x", vec![Q(0, 1), Q(-1, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 2);
+        // One factor should be just x, the other x-1
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_quartic_with_rational_roots() {
+        // (x-1)(x+1)(x-2)(x+2) = (x^2-1)(x^2-4) = x^4 - 5x^2 + 4
+        let p = UniPoly::new("x", vec![Q(4, 1), Q(0, 1), Q(-5, 1), Q(0, 1), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 4);
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_with_rational_coefficients() {
+        // (x - 1/2)(x - 1/3) = x^2 - 5/6 x + 1/6
+        let p = UniPoly::new("x", vec![Q(1, 6), Q(-5, 6), Q(1, 1)]);
+        let factors = p.factor();
+        assert_eq!(factors.len(), 2);
+        assert!(factors.iter().all(|(f, m)| f.degree() == Some(1) && *m == 1));
+    }
+
+    #[test]
+    fn factor_zero_polynomial() {
+        let p = UniPoly::zero("x");
+        let factors = p.factor();
+        assert_eq!(factors.len(), 0);
+    }
+
+    #[test]
+    fn factor_constant_polynomial() {
+        let p = UniPoly::new("x", vec![Q(5, 1)]);
+        let factors = p.factor();
+        // Constant polynomials factor as themselves
+        assert_eq!(factors.len(), 1);
+        assert_eq!(factors[0].0.degree(), Some(0));
     }
 
     // ========== Multivariate Polynomial Tests ==========

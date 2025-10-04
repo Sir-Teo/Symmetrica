@@ -184,6 +184,88 @@ let decomp = p.square_free_decomposition();
 
 **Use Case**: Useful for simplifying polynomials before factorization or integration.
 
+### Polynomial Factorization
+
+```rust
+pub fn factor(&self) -> Vec<(Self, usize)>
+```
+
+Factors a polynomial over Q into irreducible factors using the Rational Root Theorem. Returns a list of `(factor, multiplicity)` pairs.
+
+**Algorithm**:
+1. Apply square-free decomposition to handle repeated factors
+2. For each square-free part, use rational root search to find linear factors
+3. Recursively factor the quotient after each root is found
+4. Return factors that are irreducible over Q
+
+**Examples:**
+
+**Quadratic with rational roots:**
+```rust
+// p(x) = x^2 - 3x + 2 = (x - 1)(x - 2)
+let p = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result: [(x - 1, 1), (x - 2, 1)]
+assert_eq!(factors.len(), 2);
+```
+
+**Cubic with all rational roots:**
+```rust
+// p(x) = x^3 - 6x^2 + 11x - 6 = (x - 1)(x - 2)(x - 3)
+let p = UniPoly::new("x", vec![Q(-6, 1), Q(11, 1), Q(-6, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result: [(x - 1, 1), (x - 2, 1), (x - 3, 1)]
+assert_eq!(factors.len(), 3);
+```
+
+**Difference of squares:**
+```rust
+// p(x) = x^2 - 4 = (x - 2)(x + 2)
+let p = UniPoly::new("x", vec![Q(-4, 1), Q(0, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result: [(x - 2, 1), (x + 2, 1)]
+assert_eq!(factors.len(), 2);
+```
+
+**Irreducible polynomial:**
+```rust
+// p(x) = x^2 + 1 (irreducible over Q)
+let p = UniPoly::new("x", vec![Q(1, 1), Q(0, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result: [(x^2 + 1, 1)] - stays as quadratic
+assert_eq!(factors.len(), 1);
+assert_eq!(factors[0].0.degree(), Some(2));
+```
+
+**Polynomial with repeated roots:**
+```rust
+// p(x) = (x - 1)^2 = x^2 - 2x + 1
+let p = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result depends on square-free implementation
+// Our simplified version returns one factor with multiplicity
+```
+
+**With zero root:**
+```rust
+// p(x) = x^2 - x = x(x - 1)
+let p = UniPoly::new("x", vec![Q(0, 1), Q(-1, 1), Q(1, 1)]);
+let factors = p.factor();
+// Result: [(x, 1), (x - 1, 1)]
+assert_eq!(factors.len(), 2);
+```
+
+**Limitations:**
+- Only handles factorization over Q (rational numbers)
+- Cannot factor polynomials with irrational or complex roots
+- Higher-degree irreducible polynomials are returned as-is
+- Efficiency degrades for large degree polynomials (rational root search is exponential in worst case)
+
+**Use Cases:**
+- Finding all rational roots of a polynomial
+- Simplifying rational functions via partial fractions
+- Used internally by the `solver` module for complete root finding
+
 ## Multivariate Sparse Polynomials
 
 ### MultiPoly

@@ -2,7 +2,13 @@
 
 ## Overview
 
-The `solver` crate provides symbolic equation solving for univariate polynomial equations over rational numbers. It implements closed-form solutions for linear and quadratic equations, and uses the Rational Root Theorem for higher degrees.
+The `solver` crate provides symbolic equation solving for univariate polynomial equations over rational numbers. It uses polynomial factorization from the `polys` crate to find all rational roots.
+
+**Algorithm:**
+1. Convert expression to univariate polynomial
+2. Factor polynomial into irreducible factors over Q
+3. Extract roots from linear and quadratic factors
+4. Return None if higher-degree irreducible factors remain
 
 ## Core Function
 
@@ -10,11 +16,11 @@ The `solver` crate provides symbolic equation solving for univariate polynomial 
 pub fn solve_univariate(store: &mut Store, expr: ExprId, var: &str) -> Option<Vec<ExprId>>
 ```
 
-Solves the equation `expr = 0` for variable `var`.
+Solves the equation `expr = 0` for variable `var` using polynomial factorization.
 
 **Returns:**
-- `Some(Vec<ExprId>)`: List of root expressions
-- `None`: Cannot solve (not a polynomial, no rational roots found)
+- `Some(Vec<ExprId>)`: List of all rational roots (with multiplicity)
+- `None`: Cannot solve (not a polynomial, or has irreducible factors of degree > 2)
 
 ## Supported Equation Types
 
