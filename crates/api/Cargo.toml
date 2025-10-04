@@ -21,7 +21,7 @@ pattern = { path = "../pattern" }
 io = { path = "../io" }
 evalf = { path = "../evalf" }
 plot = { path = "../plot" }
-pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
 
 [features]
 default = []
