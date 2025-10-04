@@ -142,6 +142,123 @@ let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
 assert_eq!(m.det_bareiss().unwrap(), Q(0, 1));
 ```
 
+## Matrix Arithmetic
+
+### Addition
+
+```rust
+pub fn add(&self, other: &MatrixQ) -> Result<MatrixQ, &'static str>
+```
+
+Adds two matrices element-wise.
+
+**Returns:**
+- `Ok(MatrixQ)`: Sum matrix
+- `Err`: If dimensions don't match
+
+**Example:**
+```rust
+let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let b = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+let c = a.add(&b).unwrap();
+// Result: [[6, 8], [10, 12]]
+```
+
+### Subtraction
+
+```rust
+pub fn sub(&self, other: &MatrixQ) -> Result<MatrixQ, &'static str>
+```
+
+Subtracts two matrices element-wise.
+
+**Returns:**
+- `Ok(MatrixQ)`: Difference matrix
+- `Err`: If dimensions don't match
+
+**Example:**
+```rust
+let a = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+let b = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let c = a.sub(&b).unwrap();
+// Result: [[4, 4], [4, 4]]
+```
+
+### Multiplication
+
+```rust
+pub fn mul(&self, other: &MatrixQ) -> Result<MatrixQ, &'static str>
+```
+
+Multiplies two matrices using standard matrix multiplication.
+
+**Returns:**
+- `Ok(MatrixQ)`: Product matrix (m×p) × (p×n) = (m×n)
+- `Err`: If dimensions are incompatible (self.cols ≠ other.rows)
+
+**Example:**
+```rust
+let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let b = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+let c = a.mul(&b).unwrap();
+// [[1,2],[3,4]] * [[5,6],[7,8]] = [[19,22],[43,50]]
+assert_eq!(c.get(0, 0), Q(19, 1));
+assert_eq!(c.get(0, 1), Q(22, 1));
+```
+
+**Rectangular matrices:**
+```rust
+// (2×3) * (3×2) = (2×2)
+let a = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let b = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+let c = a.mul(&b).unwrap();
+assert_eq!(c.rows, 2);
+assert_eq!(c.cols, 2);
+```
+
+## Matrix Inversion
+
+```rust
+pub fn inverse(&self) -> Result<Option<MatrixQ>, &'static str>
+```
+
+Computes the inverse of a square matrix using **Gauss-Jordan elimination**.
+
+**Algorithm:**
+1. Check if matrix is singular (det = 0)
+2. Create augmented matrix [A | I]
+3. Row reduce to [I | A⁻¹]
+4. Extract inverse from right half
+
+**Returns:**
+- `Ok(Some(A⁻¹))`: Inverse matrix
+- `Ok(None)`: Singular matrix (not invertible)
+- `Err`: If matrix is not square
+
+**Example (2×2):**
+```rust
+// [[1,2],[3,4]] has inverse [[-2,1],[3/2,-1/2]]
+let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let inv = a.inverse().unwrap().expect("invertible");
+
+assert_eq!(inv.get(0, 0), Q(-2, 1));
+assert_eq!(inv.get(0, 1), Q(1, 1));
+assert_eq!(inv.get(1, 0), Q(3, 2));
+assert_eq!(inv.get(1, 1), Q(-1, 2));
+
+// Verify A * A⁻¹ = I
+let product = a.mul(&inv).unwrap();
+let identity = MatrixQ::identity(2);
+assert_eq!(product, identity);
+```
+
+**Singular matrix:**
+```rust
+let a = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+let result = a.inverse().unwrap();
+assert!(result.is_none());  // Not invertible
+```
+
 ## Linear System Solving
 
 ```rust
@@ -241,16 +358,23 @@ assert!(A.solve_bareiss(&b).is_err());
 ## Performance
 
 ### Time Complexity
+- **add/sub**: O(n²) for n×n matrix (element-wise operations)
+- **mul**: O(n³) for n×n matrices (standard algorithm)
 - **det_bareiss**: O(n³) for n×n matrix (Gaussian elimination)
+- **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
 - **solve_bareiss**: O(n⁴) due to Cramer's rule (n determinants of size n)
 
 ### Space Complexity
+- **add/sub**: O(n²) for result matrix
+- **mul**: O(n²) for result matrix
 - **det_bareiss**: O(n²) for matrix copy during elimination
+- **inverse**: O(2n²) for augmented matrix
 - **solve_bareiss**: O(n²) for temporary matrices
 
 ### Practical Limits
-- Efficient for n ≤ 10
-- Usable for n ≤ 50 (with patience)
+- **add/sub/mul**: Efficient for any reasonable size
+- **det/inverse**: Efficient for n ≤ 100
+- **solve**: Usable for n ≤ 20 (Cramer's rule is slow)
 - For larger systems, use iterative methods or factorizations (not implemented)
 
 ## Numerical Stability
@@ -267,11 +391,14 @@ assert!(A.solve_bareiss(&b).is_err());
 ## Testing
 
 Comprehensive test suite:
-- 2×2 and 3×3 determinants
-- Identity and singular matrices
-- Linear system solving (unique, singular, empty)
-- Error conditions (non-square, wrong size)
-- Edge cases (zero-size matrices)
+- **Determinant**: 2×2, 3×3, identity, singular matrices
+- **Solving**: Unique solutions, singular systems, empty systems
+- **Addition**: Element-wise, dimension mismatch, fractions
+- **Subtraction**: Element-wise, self-subtraction to zero
+- **Multiplication**: 2×2, identity, rectangular matrices, dimension errors
+- **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
+- **Error conditions**: Non-square matrices, dimension mismatches
+- **Edge cases**: Zero-size matrices
 
 Run tests:
 ```bash
@@ -294,20 +421,20 @@ Could implement resultants and Sylvester matrices.
 ### No Floating Point
 Only exact rational arithmetic. For numerical work, use external libraries like `nalgebra`.
 
-### No Matrix Operations
-Missing:
-- Addition/subtraction
-- Multiplication
-- Inversion
+### Missing Advanced Operations
+Still not implemented:
 - Rank computation
-- LU/QR decomposition
+- LU/QR/Cholesky decomposition
 - Eigenvalues/eigenvectors
+- Singular Value Decomposition (SVD)
 
 ### Inefficient for Large Systems
-Cramer's rule is O(n⁴). Future versions should implement:
-- Gaussian elimination with back-substitution
-- LU decomposition
-- Sparse matrix support
+- Cramer's rule for solving is O(n⁴)
+- Gauss-Jordan for inverse is O(n³)
+- Future versions should implement:
+  - Gaussian elimination with back-substitution
+  - LU decomposition (more efficient for repeated solves)
+  - Sparse matrix support
 
 ### No Overdetermined/Underdetermined Systems
 Only handles square systems. No least-squares or nullspace computation.
@@ -348,13 +475,15 @@ if !det.is_zero() {
 
 ## Future Enhancements
 
-- **Matrix arithmetic**: Add, subtract, multiply
-- **Inversion**: Compute A⁻¹ via Gauss-Jordan
+- ✅ ~~Matrix arithmetic: Add, subtract, multiply~~ (Implemented)
+- ✅ ~~Inversion: Compute A⁻¹ via Gauss-Jordan~~ (Implemented)
 - **Factorizations**: LU, QR, Cholesky
 - **Better solving**: Gaussian elimination instead of Cramer's rule
+- **Rank computation**: Row reduction to determine rank
 - **Eigenvalues**: Characteristic polynomial, power iteration
 - **Sparse matrices**: CSR/CSC formats for large sparse systems
 - **Expression integration**: Matrix elements as symbolic expressions
+- **Nullspace and column space**: Basis computation
 
 ## References
 
