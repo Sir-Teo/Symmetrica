@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 19265e90f3a32198737cf7336f7f3d25d71a79d26235ef4432c11892b5842212 # shrinks to a = UniPoly { var: "x", coeffs: [] }, b = UniPoly { var: "x", coeffs: [] }
+cc 7bf037637ff37bf5dfb2b6f91cbed3d0966c45681ad3ab77238409b55cd2a2bb # shrinks to a = UniPoly { var: "x", coeffs: [Q(0, 1), Q(-3, 2), Q(2, 1), Q(-1, 3)] }, b = UniPoly { var: "x", coeffs: [Q(2, 1), Q(1, 3), Q(3, 1), Q(-3, 2)] }

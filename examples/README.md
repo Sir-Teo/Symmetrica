@@ -1,6 +1,6 @@
-# Plot Examples
+# Symmetrica Examples
 
-This directory contains comprehensive examples demonstrating the capabilities of the `plot` crate for Symmetrica.
+This directory contains comprehensive examples demonstrating the capabilities of Symmetrica's core modules.
 
 ## Quick Start
 
