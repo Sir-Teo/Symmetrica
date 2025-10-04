@@ -14,3 +14,4 @@ arith = { path = "../arith" }
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
 simplify = { path = "../simplify" }
+proptest = "1.5"

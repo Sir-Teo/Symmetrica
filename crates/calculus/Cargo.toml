@@ -13,3 +13,6 @@ expr_core = { path = "../expr_core" }
 simplify  = { path = "../simplify" }
 arith = { path = "../arith" }
 polys = { path = "../polys" }
+
+[dev-dependencies]
+proptest = "1.5"
