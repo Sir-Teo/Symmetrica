@@ -3,7 +3,9 @@
 //! - Substitute a symbol with an expression throughout a tree.
 
 pub mod ac;
+pub mod domain;
 pub mod rewrite;
+pub mod scheduler;
 
 use expr_core::{ExprId, Op, Payload, Store};
 
