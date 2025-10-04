@@ -162,7 +162,20 @@ impl MatrixQ {
         Ok(MatrixQ::new(m, n, data))
     }
 
-    /// Compute the inverse of a square matrix using Gauss-Jordan elimination.
+    /// Transpose the matrix (swap rows and columns).
+    /// Returns a new matrix where `result[i,j] = self[j,i]`.
+    pub fn transpose(&self) -> MatrixQ {
+        let mut data = vec![Q::zero(); self.rows * self.cols];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                // In transpose: row i, col j becomes row j, col i
+                data[j * self.rows + i] = self.get(i, j);
+            }
+        }
+        MatrixQ::new(self.cols, self.rows, data)
+    }
+
+    /// Compute the determinant using the Bareiss fraction-free algorithm.
     /// Returns Ok(Some(A^-1)) if invertible; Ok(None) if singular; Err if not square.
     pub fn inverse(&self) -> Result<Option<MatrixQ>, &'static str> {
         if self.rows != self.cols {
@@ -811,6 +824,130 @@ mod tests {
         let det2 = m2.det_bareiss().unwrap();
         assert!(rank2 < 3);
         assert!(det2.is_zero());
+    }
+
+    // ========== Transpose Tests ==========
+
+    #[test]
+    fn transpose_square_matrix() {
+        // [[1, 2], [3, 4]]^T = [[1, 3], [2, 4]]
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let mt = m.transpose();
+        assert_eq!(mt.rows, 2);
+        assert_eq!(mt.cols, 2);
+        assert_eq!(mt.get(0, 0), Q(1, 1));
+        assert_eq!(mt.get(0, 1), Q(3, 1));
+        assert_eq!(mt.get(1, 0), Q(2, 1));
+        assert_eq!(mt.get(1, 1), Q(4, 1));
+    }
+
+    #[test]
+    fn transpose_rectangular_matrix() {
+        // [[1, 2, 3], [4, 5, 6]]^T = [[1, 4], [2, 5], [3, 6]]
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let mt = m.transpose();
+        assert_eq!(mt.rows, 3);
+        assert_eq!(mt.cols, 2);
+        assert_eq!(mt.get(0, 0), Q(1, 1));
+        assert_eq!(mt.get(0, 1), Q(4, 1));
+        assert_eq!(mt.get(1, 0), Q(2, 1));
+        assert_eq!(mt.get(1, 1), Q(5, 1));
+        assert_eq!(mt.get(2, 0), Q(3, 1));
+        assert_eq!(mt.get(2, 1), Q(6, 1));
+    }
+
+    #[test]
+    fn transpose_identity() {
+        let m = MatrixQ::identity(3);
+        let mt = m.transpose();
+        assert_eq!(mt, m); // Identity is symmetric
+    }
+
+    #[test]
+    fn transpose_twice_is_identity() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let mtt = m.transpose().transpose();
+        assert_eq!(mtt, m);
+    }
+
+    #[test]
+    fn transpose_single_row() {
+        // [1, 2, 3]^T = [[1], [2], [3]]
+        let m = MatrixQ::from_i64(1, 3, &[1, 2, 3]);
+        let mt = m.transpose();
+        assert_eq!(mt.rows, 3);
+        assert_eq!(mt.cols, 1);
+        assert_eq!(mt.get(0, 0), Q(1, 1));
+        assert_eq!(mt.get(1, 0), Q(2, 1));
+        assert_eq!(mt.get(2, 0), Q(3, 1));
+    }
+
+    #[test]
+    fn transpose_single_column() {
+        // [[1], [2], [3]]^T = [1, 2, 3]
+        let m = MatrixQ::from_i64(3, 1, &[1, 2, 3]);
+        let mt = m.transpose();
+        assert_eq!(mt.rows, 1);
+        assert_eq!(mt.cols, 3);
+        assert_eq!(mt.get(0, 0), Q(1, 1));
+        assert_eq!(mt.get(0, 1), Q(2, 1));
+        assert_eq!(mt.get(0, 2), Q(3, 1));
+    }
+
+    #[test]
+    fn transpose_symmetric_matrix() {
+        // [[1, 2], [2, 3]] is symmetric
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 3]);
+        let mt = m.transpose();
+        assert_eq!(mt, m);
+    }
+
+    #[test]
+    fn transpose_with_rational_entries() {
+        let m = MatrixQ::new(2, 2, vec![Q(1, 2), Q(1, 3), Q(1, 4), Q(1, 5)]);
+        let mt = m.transpose();
+        assert_eq!(mt.get(0, 0), Q(1, 2));
+        assert_eq!(mt.get(0, 1), Q(1, 4));
+        assert_eq!(mt.get(1, 0), Q(1, 3));
+        assert_eq!(mt.get(1, 1), Q(1, 5));
+    }
+
+    #[test]
+    fn transpose_preserves_determinant_sign() {
+        // For square matrices: det(A^T) = det(A)
+        let m = MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]);
+        let det_m = m.det_bareiss().unwrap();
+        let det_mt = m.transpose().det_bareiss().unwrap();
+        assert_eq!(det_m, det_mt);
+    }
+
+    #[test]
+    fn transpose_distributes_over_addition() {
+        // (A + B)^T = A^T + B^T
+        let a = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        let b = MatrixQ::from_i64(2, 2, &[5, 6, 7, 8]);
+        let sum_t = a.add(&b).unwrap().transpose();
+        let t_sum = a.transpose().add(&b.transpose()).unwrap();
+        assert_eq!(sum_t, t_sum);
+    }
+
+    #[test]
+    fn transpose_empty_matrix() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        let mt = m.transpose();
+        assert_eq!(mt.rows, 0);
+        assert_eq!(mt.cols, 0);
+    }
+
+    #[test]
+    fn transpose_multiplication_property() {
+        // (AB)^T = B^T A^T
+        let a = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let b = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+        let ab = a.mul(&b).unwrap();
+        let ab_t = ab.transpose();
+        let bt_at = b.transpose().mul(&a.transpose()).unwrap();
+        assert_eq!(ab_t, bt_at);
     }
 
     // ========== Nullspace Tests ==========

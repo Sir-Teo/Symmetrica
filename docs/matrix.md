@@ -216,6 +216,77 @@ assert_eq!(c.rows, 2);
 assert_eq!(c.cols, 2);
 ```
 
+### Transpose
+
+```rust
+pub fn transpose(&self) -> MatrixQ
+```
+
+Transposes the matrix by swapping rows and columns. Returns a new matrix where `result[i,j] = self[j,i]`.
+
+**Properties:**
+- For an m×n matrix: transpose is n×m
+- (A^T)^T = A (double transpose is identity)
+- (A + B)^T = A^T + B^T (distributes over addition)
+- (AB)^T = B^T A^T (reverses multiplication order)
+- det(A^T) = det(A) for square matrices
+
+**Examples:**
+
+**Square matrix:**
+```rust
+// [[1, 2], [3, 4]]^T = [[1, 3], [2, 4]]
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+let mt = m.transpose();
+assert_eq!(mt.get(0, 0), Q(1, 1));
+assert_eq!(mt.get(0, 1), Q(3, 1));
+assert_eq!(mt.get(1, 0), Q(2, 1));
+assert_eq!(mt.get(1, 1), Q(4, 1));
+```
+
+**Rectangular matrix:**
+```rust
+// [[1, 2, 3], [4, 5, 6]]^T = [[1, 4], [2, 5], [3, 6]]
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let mt = m.transpose();
+assert_eq!(mt.rows, 3);
+assert_eq!(mt.cols, 2);
+```
+
+**Row vector → Column vector:**
+```rust
+// [1, 2, 3]^T = [[1], [2], [3]]
+let row = MatrixQ::from_i64(1, 3, &[1, 2, 3]);
+let col = row.transpose();
+assert_eq!(col.rows, 3);
+assert_eq!(col.cols, 1);
+```
+
+**Symmetric matrix:**
+```rust
+// Symmetric matrices satisfy A = A^T
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 3]);
+assert_eq!(m, m.transpose());
+```
+
+**Properties verification:**
+```rust
+// (A^T)^T = A
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+assert_eq!(m, m.transpose().transpose());
+
+// det(A^T) = det(A)
+let m = MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]);
+assert_eq!(m.det_bareiss().unwrap(), m.transpose().det_bareiss().unwrap());
+
+// (AB)^T = B^T A^T
+let a = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let b = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+let ab_t = a.mul(&b).unwrap().transpose();
+let bt_at = b.transpose().mul(&a.transpose()).unwrap();
+assert_eq!(ab_t, bt_at);
+```
+
 ## Matrix Inversion
 
 ```rust
@@ -515,6 +586,7 @@ assert!(A.solve_bareiss(&b).is_err());
 ### Time Complexity
 - **add/sub**: O(n²) for n×n matrix (element-wise operations)
 - **mul**: O(n³) for n×n matrices (standard algorithm)
+- **transpose**: O(n²) for n×n matrix (element copying)
 - **det_bareiss**: O(n³) for n×n matrix (Gaussian elimination)
 - **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
 - **rank**: O(min(m,n)²·max(m,n)) for m×n matrix (row reduction)
@@ -524,6 +596,7 @@ assert!(A.solve_bareiss(&b).is_err());
 ### Space Complexity
 - **add/sub**: O(n²) for result matrix
 - **mul**: O(n²) for result matrix
+- **transpose**: O(n²) for transposed matrix
 - **det_bareiss**: O(n²) for matrix copy during elimination
 - **inverse**: O(2n²) for augmented matrix
 - **rank**: O(mn) for matrix copy during row reduction
@@ -549,12 +622,13 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite (56 unit tests + 2 property tests):
+Comprehensive test suite (68 unit tests + 2 property tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
 - **Subtraction**: Element-wise, self-subtraction to zero
 - **Multiplication**: 2×2, identity, rectangular matrices, dimension errors
+- **Transpose**: Square, rectangular, symmetric, involution property, algebraic properties
 - **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
 - **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, rank-nullity theorem
 - **Nullspace**: Trivial/non-trivial cases, rank-nullity theorem, verification via Ax=0
