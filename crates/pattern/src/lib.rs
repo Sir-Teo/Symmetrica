@@ -4,6 +4,7 @@
 
 pub mod ac;
 pub mod domain;
+pub mod registry;
 pub mod rewrite;
 pub mod scheduler;
 

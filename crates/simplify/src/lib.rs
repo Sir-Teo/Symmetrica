@@ -28,7 +28,7 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
             };
             let b = simplify_rec(store, b_id, _ctx);
             let e = simplify_rec(store, e_id, _ctx);
-            // Guarded: (x^2)^(1/2) -> x if x is a positive symbol
+            // Guarded and default: (x^2)^(1/2) -> x if x is a positive symbol, otherwise |x|
             if let (Op::Rational, Payload::Rat(n, d)) = (&store.get(e).op, &store.get(e).payload) {
                 if *n == 1 && *d == 2 {
                     if let Op::Pow = store.get(b).op {
@@ -37,9 +37,13 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
                         if matches!(
                             (&store.get(ee).op, &store.get(ee).payload),
                             (Op::Integer, Payload::Int(2))
-                        ) && is_positive_symbol(_ctx, store, bb)
-                        {
-                            return bb;
+                        ) {
+                            if is_positive_symbol(_ctx, store, bb) {
+                                return bb;
+                            } else {
+                                // Unknown sign: return abs(x)
+                                return store.func("abs", vec![bb]);
+                            }
                         }
                     }
                 }
@@ -447,6 +451,20 @@ mod tests {
         ctx.assume("x", Prop::Positive);
         let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
         assert_eq!(s, x);
+    }
+
+    #[test]
+    fn sqrt_x_sq_to_abs_without_assumption() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+        // Without assumptions, sqrt(x^2) should become |x|
+        let s = super::simplify(&mut st, sqrt_x2);
+        let absx = st.func("abs", vec![x]);
+        assert_eq!(s, absx);
     }
 
     #[test]
