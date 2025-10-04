@@ -28,7 +28,7 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
             };
             let b = simplify_rec(store, b_id, _ctx);
             let e = simplify_rec(store, e_id, _ctx);
-            // Guarded and default: (x^2)^(1/2) -> x if x is a positive symbol, otherwise |x|
+            // Domain-aware: (x^2)^(1/2) -> x if x>=0, |x| if real, sqrt(x^2) otherwise
             if let (Op::Rational, Payload::Rat(n, d)) = (&store.get(e).op, &store.get(e).payload) {
                 if *n == 1 && *d == 2 {
                     if let Op::Pow = store.get(b).op {
@@ -38,12 +38,14 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
                             (&store.get(ee).op, &store.get(ee).payload),
                             (Op::Integer, Payload::Int(2))
                         ) {
-                            if is_positive_symbol(_ctx, store, bb) {
+                            // If nonnegative (includes positive), sqrt(x^2) = x
+                            if is_nonnegative_symbol(_ctx, store, bb) {
                                 return bb;
-                            } else {
-                                // Unknown sign: return abs(x)
+                            } else if is_real_symbol(_ctx, store, bb) {
+                                // If real but sign unknown, sqrt(x^2) = |x|
                                 return store.func("abs", vec![bb]);
                             }
+                            // Complex or unknown domain: leave as sqrt(x^2)
                         }
                     }
                 }
@@ -152,6 +154,20 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
 fn is_positive_symbol(ctx: &Context, store: &Store, id: ExprId) -> bool {
     if let (Op::Symbol, Payload::Sym(s)) = (&store.get(id).op, &store.get(id).payload) {
         return matches!(ctx.has(s, Prop::Positive), Truth::True);
+    }
+    false
+}
+
+fn is_nonnegative_symbol(ctx: &Context, store: &Store, id: ExprId) -> bool {
+    if let (Op::Symbol, Payload::Sym(s)) = (&store.get(id).op, &store.get(id).payload) {
+        return matches!(ctx.has(s, Prop::Nonnegative), Truth::True);
+    }
+    false
+}
+
+fn is_real_symbol(ctx: &Context, store: &Store, id: ExprId) -> bool {
+    if let (Op::Symbol, Payload::Sym(s)) = (&store.get(id).op, &store.get(id).payload) {
+        return matches!(ctx.has(s, Prop::Real), Truth::True);
     }
     false
 }
@@ -461,10 +477,10 @@ mod tests {
         let x2 = st.pow(x, two);
         let half = st.rat(1, 2);
         let sqrt_x2 = st.pow(x2, half);
-        // Without assumptions, sqrt(x^2) should become |x|
+        // Phase I: Without domain assumptions, sqrt(x^2) stays unchanged
+        // (could be complex domain, so unsafe to simplify)
         let s = super::simplify(&mut st, sqrt_x2);
-        let absx = st.func("abs", vec![x]);
-        assert_eq!(s, absx);
+        assert_eq!(s, sqrt_x2);
     }
 
     #[test]
@@ -540,5 +556,123 @@ mod tests {
         let fx = st.func("unknown", vec![x]);
         let s = super::simplify(&mut st, fx);
         assert_eq!(s, fx);
+    }
+
+    // ========== Phase I: Domain-Aware Simplification Tests ==========
+
+    #[test]
+    fn sqrt_x_sq_to_x_with_nonnegative() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Nonnegative);
+        let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
+
+        // Should simplify to x (not |x|) when nonnegative
+        assert_eq!(s, x);
+    }
+
+    #[test]
+    fn sqrt_x_sq_to_abs_with_real() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Real);
+        let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
+
+        // Should simplify to |x| when real but sign unknown
+        let abs_x = st.func("abs", vec![x]);
+        assert_eq!(s, abs_x);
+    }
+
+    #[test]
+    fn sqrt_x_sq_unchanged_without_assumptions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let ctx = assumptions::Context::new();
+        let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
+
+        // Should leave as sqrt(x^2) when domain unknown (could be complex)
+        assert_eq!(s, sqrt_x2);
+    }
+
+    #[test]
+    fn negative_implies_real_and_nonzero() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Negative);
+        let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
+
+        // Negative implies Real, so should get |x|
+        let abs_x = st.func("abs", vec![x]);
+        assert_eq!(s, abs_x);
+    }
+
+    #[test]
+    fn positive_implies_nonnegative() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Positive);
+        let s = super::simplify_with(&mut st, sqrt_x2, &ctx);
+
+        // Positive implies Nonnegative, so should simplify to x
+        assert_eq!(s, x);
+    }
+
+    #[test]
+    fn nonnegative_nonzero_implies_positive() {
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Nonnegative);
+        ctx.assume("x", Prop::Nonzero);
+
+        // Should derive Positive from Nonnegative + Nonzero
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::True));
+    }
+
+    #[test]
+    fn domain_aware_ln_still_works() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let prod = st.mul(vec![x, y]);
+        let ln_expr = st.func("ln", vec![prod]);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Nonnegative);
+        ctx.assume("x", Prop::Nonzero); // Nonnegative + Nonzero = Positive
+        ctx.assume("y", Prop::Positive);
+
+        let s = super::simplify_with(&mut st, ln_expr, &ctx);
+        let ln_x = st.func("ln", vec![x]);
+        let ln_y = st.func("ln", vec![y]);
+        let expected = st.add(vec![ln_x, ln_y]);
+        assert_eq!(st.to_string(s), st.to_string(expected));
     }
 }

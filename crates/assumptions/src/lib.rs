@@ -1,4 +1,5 @@
-//! Assumptions module v1.5: tri-valued logic and basic property lattice per symbol.
+//! Assumptions module v2: tri-valued logic and enhanced property lattice per symbol.
+//! Phase I implementation: domain-aware assumptions with negative properties.
 #![deny(warnings)]
 
 use std::collections::{HashMap, HashSet};
@@ -14,8 +15,10 @@ pub enum Truth {
 pub enum Prop {
     Real,
     Positive,
+    Negative,
     Integer,
     Nonzero,
+    Nonnegative, // Positive or zero
 }
 
 #[derive(Default, Clone, Debug)]
@@ -77,13 +80,38 @@ impl Context {
 
 fn derive_props(base: &HashSet<Prop>) -> HashSet<Prop> {
     let mut out = base.clone();
-    if base.contains(&Prop::Positive) {
-        out.insert(Prop::Real);
-        out.insert(Prop::Nonzero);
+    let mut changed = true;
+
+    // Iterate until fixpoint to handle transitive implications
+    while changed {
+        let old_size = out.len();
+
+        // Positive implies Real, Nonzero, and Nonnegative
+        if out.contains(&Prop::Positive) {
+            out.insert(Prop::Real);
+            out.insert(Prop::Nonzero);
+            out.insert(Prop::Nonnegative);
+        }
+
+        // Negative implies Real and Nonzero
+        if out.contains(&Prop::Negative) {
+            out.insert(Prop::Real);
+            out.insert(Prop::Nonzero);
+        }
+
+        // Integer implies Real
+        if out.contains(&Prop::Integer) {
+            out.insert(Prop::Real);
+        }
+
+        // Nonnegative + Nonzero implies Positive
+        if out.contains(&Prop::Nonnegative) && out.contains(&Prop::Nonzero) {
+            out.insert(Prop::Positive);
+        }
+
+        changed = out.len() > old_size;
     }
-    if base.contains(&Prop::Integer) {
-        out.insert(Prop::Real);
-    }
+
     out
 }
 
@@ -130,5 +158,44 @@ mod tests {
         // back to base: Positive gone
         assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
         assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
+    }
+
+    #[test]
+    fn negative_property() {
+        let mut ctx = Context::new();
+        ctx.assume("x", Prop::Negative);
+        // Negative implies Real and Nonzero
+        assert!(matches!(ctx.has("x", Prop::Negative), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Real), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
+        // But not Positive or Nonnegative
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+        assert!(matches!(ctx.has("x", Prop::Nonnegative), Truth::Unknown));
+    }
+
+    #[test]
+    fn nonnegative_property() {
+        let mut ctx = Context::new();
+        ctx.assume("x", Prop::Nonnegative);
+        // Nonnegative alone doesn't imply anything else (could be zero)
+        assert!(matches!(ctx.has("x", Prop::Nonnegative), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::Unknown));
+
+        // But Nonnegative + Nonzero implies Positive (and Positive implies Real)
+        ctx.assume("x", Prop::Nonzero);
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::True));
+        // Note: Since Positive implies Real, this should now be True
+        assert!(matches!(ctx.has("x", Prop::Real), Truth::True));
+    }
+
+    #[test]
+    fn positive_implies_nonnegative() {
+        let mut ctx = Context::new();
+        ctx.assume("x", Prop::Positive);
+        // Positive implies Nonnegative
+        assert!(matches!(ctx.has("x", Prop::Nonnegative), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Real), Truth::True));
     }
 }
