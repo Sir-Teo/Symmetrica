@@ -331,6 +331,89 @@ assert_eq!(m.rank(), 3);
 assert_ne!(m.det_bareiss().unwrap(), Q(0, 1));
 ```
 
+## Nullspace (Kernel)
+
+```rust
+pub fn nullspace(&self) -> Vec<Vec<Q>>
+```
+
+Computes a basis for the nullspace (kernel) of the matrix. The nullspace is the set of all vectors **x** such that **Ax = 0**.
+
+**Algorithm:**
+1. Reduce matrix to reduced row echelon form (RREF)
+2. Identify free variables (columns without pivots)
+3. For each free variable, construct a basis vector by setting it to 1 and back-substituting
+4. Return the collection of basis vectors
+
+**Properties:**
+- For an m×n matrix: nullspace dimension = n - rank (**Rank-Nullity Theorem**)
+- Full rank matrix (rank = n): trivial nullspace (empty basis)
+- Zero matrix: nullspace is entire ℚⁿ (n basis vectors)
+- All returned vectors satisfy Ax = 0
+
+**Examples:**
+
+**Trivial nullspace (full rank):**
+```rust
+let m = MatrixQ::identity(3);
+let null = m.nullspace();
+assert_eq!(null.len(), 0);  // No non-zero vectors in nullspace
+```
+
+**Rank-deficient matrix:**
+```rust
+// [[1, 2], [2, 4]] - second row = 2 × first row
+// Nullspace is span{[-2, 1]^T}
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+let null = m.nullspace();
+assert_eq!(null.len(), 1);  // 1-dimensional nullspace
+
+// Verify: Ax = 0
+// [1, 2] · [-2, 1] = 0 ✓
+// [2, 4] · [-2, 1] = 0 ✓
+```
+
+**Wide matrix (more columns than rows):**
+```rust
+// 2×3 matrix [[1, 2, 3], [4, 5, 6]]
+// rank = 2, so nullspace dimension = 3 - 2 = 1
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let null = m.nullspace();
+assert_eq!(null.len(), 1);
+```
+
+**Zero matrix:**
+```rust
+// Entire space is the nullspace
+let m = MatrixQ::from_i64(2, 3, &[0, 0, 0, 0, 0, 0]);
+let null = m.nullspace();
+assert_eq!(null.len(), 3);  // Full dimensional nullspace
+```
+
+**Rank-Nullity Theorem verification:**
+```rust
+let m = MatrixQ::from_i64(3, 5, &[1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 0, 0, 1, 2, 3]);
+let rank = m.rank();
+let nullity = m.nullspace().len();
+assert_eq!(rank + nullity, 5);  // rank + nullity = # columns
+```
+
+**Homogeneous system solving:**
+```rust
+// Find all solutions to Ax = 0
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 1, 2, 4, 2]);
+let null_basis = m.nullspace();
+
+// Any linear combination of basis vectors is a solution
+// x = c₁·v₁ + c₂·v₂ for any c₁, c₂ ∈ ℚ
+```
+
+**Properties of basis vectors:**
+- All vectors are non-zero
+- Vectors are linearly independent
+- Every vector in nullspace is a linear combination of basis vectors
+- Number of basis vectors = nullity = n - rank
+
 ## Linear System Solving
 
 ```rust
@@ -435,6 +518,7 @@ assert!(A.solve_bareiss(&b).is_err());
 - **det_bareiss**: O(n³) for n×n matrix (Gaussian elimination)
 - **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
 - **rank**: O(min(m,n)²·max(m,n)) for m×n matrix (row reduction)
+- **nullspace**: O(min(m,n)²·max(m,n)) for m×n matrix (RREF)
 - **solve_bareiss**: O(n⁴) due to Cramer's rule (n determinants of size n)
 
 ### Space Complexity
@@ -443,6 +527,7 @@ assert!(A.solve_bareiss(&b).is_err());
 - **det_bareiss**: O(n²) for matrix copy during elimination
 - **inverse**: O(2n²) for augmented matrix
 - **rank**: O(mn) for matrix copy during row reduction
+- **nullspace**: O(mn) for RREF computation + O(n·nullity) for basis vectors
 - **solve_bareiss**: O(n²) for temporary matrices
 
 ### Practical Limits
@@ -464,14 +549,15 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite (44 unit tests + 2 property tests):
+Comprehensive test suite (56 unit tests + 2 property tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
 - **Subtraction**: Element-wise, self-subtraction to zero
 - **Multiplication**: 2×2, identity, rectangular matrices, dimension errors
 - **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
-- **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, relationship with determinant
+- **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, rank-nullity theorem
+- **Nullspace**: Trivial/non-trivial cases, rank-nullity theorem, verification via Ax=0
 - **Error conditions**: Non-square matrices, dimension mismatches
 - **Edge cases**: Zero-size matrices
 
@@ -501,7 +587,7 @@ Still not implemented:
 - LU/QR/Cholesky decomposition
 - Eigenvalues/eigenvectors
 - Singular Value Decomposition (SVD)
-- Nullspace and column space basis computation
+- Column space basis computation
 
 ### Inefficient for Large Systems
 - Cramer's rule for solving is O(n⁴)

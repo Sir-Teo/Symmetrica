@@ -307,6 +307,126 @@ impl MatrixQ {
 
         rank
     }
+
+    /// Compute a basis for the nullspace (kernel) of the matrix.
+    /// Returns a list of column vectors that span the nullspace.
+    /// For an m×n matrix A, the nullspace is {x ∈ ℚⁿ | Ax = 0}.
+    pub fn nullspace(&self) -> Vec<Vec<Q>> {
+        if self.rows == 0 || self.cols == 0 {
+            return vec![];
+        }
+
+        // Reduce to row echelon form and track pivot columns
+        let mut a = self.clone();
+        let mut pivot_cols = Vec::new();
+        let mut pivot_row = 0;
+
+        // Forward elimination with pivot tracking
+        for col in 0..self.cols {
+            if pivot_row >= self.rows {
+                break;
+            }
+
+            // Find pivot in current column
+            let mut found_pivot = false;
+            for search_row in pivot_row..self.rows {
+                if !a.get(search_row, col).is_zero() {
+                    // Swap rows if needed
+                    if search_row != pivot_row {
+                        for c in 0..self.cols {
+                            let temp = a.get(pivot_row, c);
+                            a.set(pivot_row, c, a.get(search_row, c));
+                            a.set(search_row, c, temp);
+                        }
+                    }
+                    found_pivot = true;
+                    break;
+                }
+            }
+
+            if !found_pivot {
+                // No pivot in this column - it's a free variable
+                continue;
+            }
+
+            // Record this pivot column
+            pivot_cols.push(col);
+            let pivot_val = a.get(pivot_row, col);
+
+            // Eliminate below the pivot
+            for row in (pivot_row + 1)..self.rows {
+                let factor = div_q(a.get(row, col), pivot_val);
+                if factor.is_zero() {
+                    continue;
+                }
+                for c in col..self.cols {
+                    let val = sub_q(a.get(row, c), mul_q(factor, a.get(pivot_row, c)));
+                    a.set(row, c, val);
+                }
+            }
+
+            pivot_row += 1;
+        }
+
+        // Back-substitution to get reduced row echelon form
+        for i in (0..pivot_cols.len()).rev() {
+            let piv_row = i;
+            let piv_col = pivot_cols[i];
+            let piv_val = a.get(piv_row, piv_col);
+
+            // Scale pivot row to make pivot = 1
+            for c in 0..self.cols {
+                let val = div_q(a.get(piv_row, c), piv_val);
+                a.set(piv_row, c, val);
+            }
+
+            // Eliminate above the pivot
+            for row in 0..piv_row {
+                let factor = a.get(row, piv_col);
+                if factor.is_zero() {
+                    continue;
+                }
+                for c in 0..self.cols {
+                    let val = sub_q(a.get(row, c), mul_q(factor, a.get(piv_row, c)));
+                    a.set(row, c, val);
+                }
+            }
+        }
+
+        // Identify free variables (non-pivot columns)
+        let mut free_vars = Vec::new();
+        for col in 0..self.cols {
+            if !pivot_cols.contains(&col) {
+                free_vars.push(col);
+            }
+        }
+
+        // Construct basis vectors for nullspace
+        let mut basis = Vec::new();
+        for &free_col in &free_vars {
+            let mut vec = vec![Q::zero(); self.cols];
+            vec[free_col] = Q::one(); // Set free variable to 1
+
+            // Back-substitute to find values of pivot variables
+            for (i, &piv_col) in pivot_cols.iter().enumerate().rev() {
+                let piv_row = i;
+                let mut sum = Q::zero();
+
+                // Sum contributions from columns to the right
+                #[allow(clippy::needless_range_loop)]
+                for c in (piv_col + 1)..self.cols {
+                    sum = add_q(sum, mul_q(a.get(piv_row, c), vec[c]));
+                }
+
+                // Pivot variable = -sum (since pivot is normalized to 1)
+                vec[piv_col] = Q(-sum.0, sum.1);
+            }
+
+            basis.push(vec);
+        }
+
+        basis
+    }
 }
 
 #[cfg(test)]
@@ -691,5 +811,165 @@ mod tests {
         let det2 = m2.det_bareiss().unwrap();
         assert!(rank2 < 3);
         assert!(det2.is_zero());
+    }
+
+    // ========== Nullspace Tests ==========
+
+    #[test]
+    fn nullspace_full_rank() {
+        // Full rank square matrix has trivial nullspace
+        let m = MatrixQ::identity(3);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 0);
+    }
+
+    #[test]
+    fn nullspace_zero_matrix() {
+        // Zero matrix: entire space is nullspace
+        let m = MatrixQ::from_i64(2, 3, &[0, 0, 0, 0, 0, 0]);
+        let null = m.nullspace();
+        // Nullspace dimension should be 3 (number of columns)
+        assert_eq!(null.len(), 3);
+    }
+
+    #[test]
+    fn nullspace_rank_deficient() {
+        // [[1, 2], [2, 4]] - second row is 2x first
+        // Nullspace should be span{[-2, 1]^T}
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 1);
+
+        // Verify it's actually in the nullspace: Ax = 0
+        let result = matrix_vector_mul(&m, &null[0]);
+        assert!(result.iter().all(|&q| q.is_zero()));
+    }
+
+    #[test]
+    fn nullspace_wide_matrix() {
+        // 2x3 matrix [[1, 2, 3], [4, 5, 6]]
+        // rank = 2, so nullspace has dimension 1
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 1);
+
+        // Verify Ax = 0
+        let result = matrix_vector_mul(&m, &null[0]);
+        assert!(result.iter().all(|&q| q.is_zero()));
+    }
+
+    #[test]
+    fn nullspace_simple_example() {
+        // [[1, 2, 1], [2, 4, 2]] - rows are identical
+        // rank = 1, nullspace dimension = 2
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 1, 2, 4, 2]);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 2);
+
+        // Verify all basis vectors are in nullspace
+        for vec in &null {
+            let result = matrix_vector_mul(&m, vec);
+            assert!(result.iter().all(|&q| q.is_zero()));
+        }
+    }
+
+    #[test]
+    fn nullspace_tall_matrix() {
+        // 3x2 matrix with full column rank
+        let m = MatrixQ::from_i64(3, 2, &[1, 0, 0, 1, 0, 0]);
+        let null = m.nullspace();
+        // Full column rank means trivial nullspace
+        assert_eq!(null.len(), 0);
+    }
+
+    #[test]
+    fn nullspace_rank_nullity_theorem() {
+        // Rank-Nullity theorem: rank + nullity = n (number of columns)
+        let m = MatrixQ::from_i64(3, 5, &[1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 0, 0, 1, 2, 3]);
+        let rank = m.rank();
+        let nullity = m.nullspace().len();
+        assert_eq!(rank + nullity, 5);
+    }
+
+    #[test]
+    fn nullspace_with_rational_entries() {
+        // Matrix with rational entries
+        let m = MatrixQ::new(
+            2,
+            3,
+            vec![
+                Q(1, 2),
+                Q(1, 3),
+                Q(1, 6), // First row
+                Q(1, 4),
+                Q(1, 6),
+                Q(1, 12), // Second row (= 1/2 of first)
+            ],
+        );
+        let null = m.nullspace();
+        // Rows are dependent, so nullspace dimension >= 1
+        assert!(!null.is_empty());
+
+        // Verify all basis vectors satisfy Ax = 0
+        for vec in &null {
+            let result = matrix_vector_mul(&m, vec);
+            assert!(result.iter().all(|&q| q.is_zero()));
+        }
+    }
+
+    #[test]
+    fn nullspace_identity_matrix() {
+        let m = MatrixQ::identity(4);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 0);
+    }
+
+    #[test]
+    fn nullspace_single_row() {
+        // [1, 2, 3] - rank 1, nullspace dimension 2
+        let m = MatrixQ::from_i64(1, 3, &[1, 2, 3]);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 2);
+
+        // Verify orthogonality: all nullspace vectors are orthogonal to the row
+        for vec in &null {
+            let result = matrix_vector_mul(&m, vec);
+            assert!(result[0].is_zero());
+        }
+    }
+
+    #[test]
+    fn nullspace_empty_matrix() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        let null = m.nullspace();
+        assert_eq!(null.len(), 0);
+    }
+
+    #[test]
+    fn nullspace_basis_vectors_are_independent() {
+        // For a rank-1 matrix, nullspace should have dimension n-1
+        let m = MatrixQ::from_i64(2, 4, &[1, 2, 3, 4, 2, 4, 6, 8]);
+        let null = m.nullspace();
+        // rank = 1, so nullspace dimension = 4 - 1 = 3
+        assert_eq!(null.len(), 3);
+
+        // Each basis vector should be in the nullspace
+        for vec in &null {
+            let result = matrix_vector_mul(&m, vec);
+            assert!(result.iter().all(|&q| q.is_zero()));
+        }
+    }
+
+    // Helper function to compute matrix-vector product
+    fn matrix_vector_mul(m: &MatrixQ, v: &[Q]) -> Vec<Q> {
+        assert_eq!(m.cols, v.len());
+        let mut result = vec![Q::zero(); m.rows];
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..m.rows {
+            for (j, &v_j) in v.iter().enumerate() {
+                result[i] = add_q(result[i], mul_q(m.get(i, j), v_j));
+            }
+        }
+        result
     }
 }
