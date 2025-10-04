@@ -44,7 +44,8 @@ A lightweight, embeddable symbolic computation engine (CAS) in Rust for symbolic
 - **`evalf`**: Numeric evaluation with f64 (arbitrary precision planned)
 - **`plot`**: SVG plotting with numerical evaluation
 - **`cli`**: Command-line interface (matika_cli)
-- **`api`**: FFI/bindings stub (future WASM/Python bindings)
+- **`api`**: Python bindings via PyO3 with feature flag
+- **`wasm`**: WebAssembly bindings via wasm-bindgen for browser/Node.js
 - **`tests_e2e`**: End-to-end integration tests
 
 ## Quickstart
@@ -258,6 +259,8 @@ Comprehensive guides for each crate in `docs/`:
 - **[evalf.md](docs/evalf.md)**: Numeric evaluation
 - **[plot.md](docs/plot.md)**: SVG plotting
 - **[cli.md](docs/cli.md)**: Command-line interface
+- **[api.md](docs/api.md)**: Python bindings (PyO3)
+- **[wasm.md](docs/wasm.md)**: WebAssembly bindings
 
 ### Design Documentation
 

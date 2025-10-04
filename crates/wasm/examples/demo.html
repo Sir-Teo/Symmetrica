@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symmetrica WASM Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #4CAF50;
+            margin-top: 0;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-left: 4px solid #4CAF50;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+        .result {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧮 Symmetrica WASM Demo</h1>
+    
+    <div class="section">
+        <h2>Basic Arithmetic</h2>
+        <div id="arithmetic-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>Symbolic Calculus</h2>
+        <div id="calculus-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>Equation Solving</h2>
+        <div id="solver-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>Numerical Evaluation</h2>
+        <div id="eval-output"></div>
+    </div>
+
+    <div class="section">
+        <h2>LaTeX Export</h2>
+        <div id="latex-output"></div>
+    </div>
+
+    <script type="module">
+        // Import WASM module (adjust path as needed)
+        // For local development: build with `wasm-pack build --target web`
+        import init, { Expr, sin, cos, tan, exp, ln, sqrt } from '../pkg/symmetrica_wasm.js';
+
+        function display(elementId, content) {
+            document.getElementById(elementId).innerHTML += content;
+        }
+
+        function result(text) {
+            return `<div class="result">${text}</div>`;
+        }
+
+        function code(text) {
+            return `<pre>${text}</pre>`;
+        }
+
+        async function runDemo() {
+            try {
+                await init();
+                
+                // Basic Arithmetic
+                display('arithmetic-output', '<h3>Expression Building</h3>');
+                const x = Expr.symbol('x');
+                const y = Expr.symbol('y');
+                const two = new Expr(2);
+                const three = new Expr(3);
+                
+                const expr = x.pow(two).add(three.mul(x)).add(new Expr(1));
+                display('arithmetic-output', result('Expression: ' + expr.toString()));
+                
+                const simplified = expr.simplify();
+                display('arithmetic-output', result('Simplified: ' + simplified.toString()));
+                
+                // Calculus
+                display('calculus-output', '<h3>Differentiation</h3>');
+                const f = x.pow(three).add(two.mul(x.pow(two))).add(x);
+                display('calculus-output', result('f(x) = ' + f.toString()));
+                
+                const df = f.diff('x');
+                display('calculus-output', result("f'(x) = " + df.toString()));
+                
+                display('calculus-output', '<h3>Integration</h3>');
+                const g = x.pow(two);
+                display('calculus-output', result('g(x) = ' + g.toString()));
+                
+                const integral = g.integrate('x');
+                display('calculus-output', result('∫g(x)dx = ' + integral.toString()));
+                
+                // Trigonometric functions
+                display('calculus-output', '<h3>Trig Functions</h3>');
+                const sinX = sin(x);
+                const cosX = cos(x);
+                display('calculus-output', result('sin(x) = ' + sinX.toString()));
+                display('calculus-output', result('d/dx[sin(x)] = ' + sinX.diff('x').toString()));
+                
+                // Equation Solving
+                display('solver-output', '<h3>Quadratic Equation</h3>');
+                const five = new Expr(5);
+                const six = new Expr(6);
+                const equation = x.pow(two).sub(five.mul(x)).add(six);
+                display('solver-output', result('Equation: ' + equation.toString() + ' = 0'));
+                
+                const roots = equation.solve('x');
+                display('solver-output', result('Roots: ' + JSON.stringify(roots)));
+                
+                // Numerical Evaluation
+                display('eval-output', '<h3>Evaluate at x=5</h3>');
+                const evalExpr = x.pow(two).add(three.mul(x));
+                display('eval-output', result('Expression: ' + evalExpr.toString()));
+                
+                const atFive = evalExpr.subs('x', new Expr(5));
+                const numValue = atFive.eval({});
+                display('eval-output', result('f(5) = ' + numValue));
+                
+                // LaTeX
+                display('latex-output', '<h3>LaTeX Rendering</h3>');
+                const complexExpr = x.add(new Expr(1)).pow(two);
+                display('latex-output', result('Expression: ' + complexExpr.toString()));
+                display('latex-output', result('LaTeX: ' + complexExpr.toLatex()));
+                display('latex-output', '<p><em>Render with MathJax or KaTeX for display</em></p>');
+                
+            } catch (error) {
+                document.body.innerHTML += `<div class="error">Error: ${error}</div>`;
+                console.error(error);
+            }
+        }
+
+        runDemo();
+    </script>
+</body>
+</html>

@@ -15,7 +15,7 @@ members = [
   "crates/io",
   "crates/tests_e2e",
   "crates/plot",
-  "crates/evalf",
+  "crates/evalf", "crates/wasm",
 ]
 
 [workspace.package]
