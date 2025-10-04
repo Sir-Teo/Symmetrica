@@ -16,6 +16,8 @@ use expr_core::{ExprId, Op, Payload, Store};
 /// - sin(u)^2 + cos(u)^2 -> 1 (Pythagorean identity, checked before recursion)
 /// - sin(u)^2 -> (1 - cos(2*u))/2 (power-reduction)
 /// - cos(u)^2 -> (1 + cos(2*u))/2 (power-reduction)
+/// - sin(2*u) -> 2*sin(u)*cos(u) (double-angle)
+/// - cos(2*u) -> cos(u)^2 - sin(u)^2 (double-angle)
 pub fn rewrite_basic(store: &mut Store, id: ExprId) -> ExprId {
     // For Add nodes, try top-level rules first (e.g., Pythagorean identity)
     // before recursing, so that sin^2 + cos^2 is recognized before
@@ -202,6 +204,49 @@ fn apply_rules(store: &mut Store, id: ExprId) -> Option<ExprId> {
         }
     }
 
+    // sin(2*u) -> 2*sin(u)*cos(u) (double-angle formula)
+    {
+        let pat = Pat::Function(
+            "sin".into(),
+            vec![Pat::Mul(vec![Pat::Integer(2), Pat::Any("u".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            // Build sin(u)
+            let sin_u = store.func("sin", vec![u]);
+            // Build cos(u)
+            let cos_u = store.func("cos", vec![u]);
+            // Build 2*sin(u)*cos(u)
+            let two = store.int(2);
+            let result = store.mul(vec![two, sin_u, cos_u]);
+            return Some(result);
+        }
+    }
+
+    // cos(2*u) -> cos(u)^2 - sin(u)^2 (double-angle formula)
+    {
+        let pat = Pat::Function(
+            "cos".into(),
+            vec![Pat::Mul(vec![Pat::Integer(2), Pat::Any("u".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            // Build cos(u)^2
+            let cos_u = store.func("cos", vec![u]);
+            let two = store.int(2);
+            let cos_sq = store.pow(cos_u, two);
+            // Build sin(u)^2
+            let sin_u = store.func("sin", vec![u]);
+            let two2 = store.int(2);
+            let sin_sq = store.pow(sin_u, two2);
+            // Build cos(u)^2 - sin(u)^2
+            let neg_one = store.int(-1);
+            let neg_sin_sq = store.mul(vec![neg_one, sin_sq]);
+            let result = store.add(vec![cos_sq, neg_sin_sq]);
+            return Some(result);
+        }
+    }
+
     None
 }
 
@@ -351,5 +396,69 @@ mod tests {
         let result_str = st.to_string(result);
         assert!(result_str.contains("cos"));
         assert!(result_str.contains("1/2"));
+    }
+
+    #[test]
+    fn rewrite_sin_double_angle() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let sin_2x = st.func("sin", vec![two_x]);
+
+        let result = rewrite_basic(&mut st, sin_2x);
+
+        // Expected: 2*sin(x)*cos(x)
+        let x2 = st.sym("x");
+        let sinx = st.func("sin", vec![x2]);
+        let cosx = st.func("cos", vec![x2]);
+        let two2 = st.int(2);
+        let expected = st.mul(vec![two2, sinx, cosx]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_cos_double_angle() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let cos_2x = st.func("cos", vec![two_x]);
+
+        let result = rewrite_basic(&mut st, cos_2x);
+
+        // Expected: cos(x)^2 - sin(x)^2 = cos(x)^2 + -1*sin(x)^2
+        let x2 = st.sym("x");
+        let cosx = st.func("cos", vec![x2]);
+        let two2 = st.int(2);
+        let cos_sq = st.pow(cosx, two2);
+        let sinx = st.func("sin", vec![x2]);
+        let two3 = st.int(2);
+        let sin_sq = st.pow(sinx, two3);
+        let neg_one = st.int(-1);
+        let neg_sin_sq = st.mul(vec![neg_one, sin_sq]);
+        let expected = st.add(vec![cos_sq, neg_sin_sq]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_double_angle_with_complex_arg() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sum = st.add(vec![x, y]);
+        let two = st.int(2);
+        let two_sum = st.mul(vec![two, sum]);
+        let sin_2sum = st.func("sin", vec![two_sum]);
+
+        let result = rewrite_basic(&mut st, sin_2sum);
+
+        // Should expand sin(2*(x+y)) -> 2*sin(x+y)*cos(x+y)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+        assert!(result_str.contains("cos"));
+        assert!(result_str.contains("2"));
     }
 }
