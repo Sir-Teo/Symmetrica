@@ -41,6 +41,7 @@ A lightweight, embeddable symbolic computation engine (CAS) in Rust for symbolic
 ### I/O and Applications
 
 - **`io`**: LaTeX, JSON, and S-expression serialization/parsing
+- **`evalf`**: Numeric evaluation with f64 (arbitrary precision planned)
 - **`plot`**: SVG plotting with numerical evaluation
 - **`cli`**: Command-line interface (matika_cli)
 - **`api`**: FFI/bindings stub (future WASM/Python bindings)
@@ -254,6 +255,7 @@ Comprehensive guides for each crate in `docs/`:
 - **[pattern.md](docs/pattern.md)**: Pattern matching and substitution
 - **[assumptions.md](docs/assumptions.md)**: Assumption system
 - **[io.md](docs/io.md)**: Serialization formats (LaTeX, JSON, S-expr)
+- **[evalf.md](docs/evalf.md)**: Numeric evaluation
 - **[plot.md](docs/plot.md)**: SVG plotting
 - **[cli.md](docs/cli.md)**: Command-line interface
 
