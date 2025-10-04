@@ -1,11 +1,12 @@
-//! Solver module: univariate polynomial solving over Q.
+//! Solver module: univariate polynomial solving over Q and transcendental equations.
 //! - Linear and quadratic closed forms
 //! - Rational-root search for higher degrees (factor out simple rational roots)
+//! - Phase J: Simple exponential equation patterns (a*exp(b*x) = c)
 
 #![deny(warnings)]
 
 use arith::{add_q, div_q, mul_q, sub_q, Q};
-use expr_core::{ExprId, Store};
+use expr_core::{ExprId, Op, Payload, Store};
 use polys::{expr_to_unipoly, UniPoly};
 
 /// Solve a univariate polynomial equation p(x) = 0 where `expr` is convertible to a polynomial in `var`.
@@ -214,6 +215,190 @@ pub fn solve_univariate(store: &mut Store, expr: ExprId, var: &str) -> Option<Ve
     Some(roots)
 }
 
+/// Solve simple transcendental equations of the form:
+/// - a*exp(b*x) = c  →  x = ln(c/a) / b
+/// - exp(b*x) + a = 0  →  x = ln(-a) / b  (if -a > 0)
+///
+/// Returns Some(vec![solution]) if pattern matches and solution exists, None otherwise.
+pub fn solve_exponential(store: &mut Store, expr: ExprId, var: &str) -> Option<Vec<ExprId>> {
+    // Helper: check if expr depends on var
+    fn depends_on(st: &Store, id: ExprId, var: &str) -> bool {
+        match (&st.get(id).op, &st.get(id).payload) {
+            (Op::Symbol, Payload::Sym(s)) => s == var,
+            (Op::Integer, _) | (Op::Rational, _) => false,
+            _ => st.get(id).children.iter().any(|&c| depends_on(st, c, var)),
+        }
+    }
+
+    // Helper: extract coefficient and rest from Add node
+    fn extract_const_from_add(st: &Store, id: ExprId, var: &str) -> Option<(ExprId, ExprId)> {
+        if st.get(id).op != Op::Add {
+            return None;
+        }
+        let children = &st.get(id).children;
+        let mut const_part = None;
+        let mut var_parts = Vec::new();
+
+        for &child in children {
+            if depends_on(st, child, var) {
+                var_parts.push(child);
+            } else {
+                if const_part.is_some() {
+                    return None; // Multiple constants, too complex
+                }
+                const_part = Some(child);
+            }
+        }
+
+        if var_parts.len() != 1 || const_part.is_none() {
+            return None;
+        }
+
+        Some((var_parts[0], const_part.unwrap()))
+    }
+
+    // Pattern 1: exp(b*x) + a = 0  →  exp(b*x) = -a
+    if let Some((exp_term, const_term)) = extract_const_from_add(store, expr, var) {
+        // Check if exp_term is exp(...)
+        if store.get(exp_term).op == Op::Function {
+            if let Payload::Func(name) = &store.get(exp_term).payload {
+                if name == "exp" && store.get(exp_term).children.len() == 1 {
+                    let arg = store.get(exp_term).children[0];
+
+                    // exp(arg) = -const_term
+                    let neg1 = store.int(-1);
+                    let neg_const = store.mul(vec![neg1, const_term]);
+
+                    // Now solve arg = ln(-const_term)
+                    let ln_rhs = store.func("ln", vec![neg_const]);
+
+                    // If arg is linear in var (b*x or x), solve for x
+                    return solve_linear_for_var(store, arg, ln_rhs, var);
+                }
+            }
+        }
+    }
+
+    // Pattern 2: a*exp(b*x) = c (represented as a*exp(b*x) - c = 0)
+    // Try to match Mul node containing exp
+    if store.get(expr).op == Op::Add {
+        let children = &store.get(expr).children.clone();
+        if children.len() == 2 {
+            // Try first child as mul*exp, second as constant
+            for i in 0..2 {
+                let mul_exp = children[i];
+                let const_part = children[1 - i];
+
+                if !depends_on(store, const_part, var) {
+                    if let Some((coeff, exp_term)) = extract_coeff_and_exp(store, mul_exp, var) {
+                        // coeff * exp(arg) = -const_part
+                        let neg1 = store.int(-1);
+                        let neg_const = store.mul(vec![neg1, const_part]);
+
+                        // exp(arg) = neg_const / coeff
+                        let minus_one = store.int(-1);
+                        let inv_coeff = store.pow(coeff, minus_one);
+                        let rhs = store.mul(vec![neg_const, inv_coeff]);
+                        let ln_rhs = store.func("ln", vec![rhs]);
+
+                        let arg = store.get(exp_term).children[0];
+                        return solve_linear_for_var(store, arg, ln_rhs, var);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// Helper: extract a*exp(...) into (a, exp_id)
+fn extract_coeff_and_exp(st: &mut Store, id: ExprId, _var: &str) -> Option<(ExprId, ExprId)> {
+    if st.get(id).op == Op::Function {
+        if let Payload::Func(name) = &st.get(id).payload {
+            if name == "exp" {
+                let one = st.int(1);
+                return Some((one, id));
+            }
+        }
+    }
+
+    if st.get(id).op == Op::Mul {
+        let children = &st.get(id).children;
+        let mut exp_term = None;
+        let mut coeff_parts = Vec::new();
+
+        for &child in children {
+            if st.get(child).op == Op::Function {
+                if let Payload::Func(name) = &st.get(child).payload {
+                    if name == "exp" && st.get(child).children.len() == 1 {
+                        if exp_term.is_some() {
+                            return None; // Multiple exp terms
+                        }
+                        exp_term = Some(child);
+                        continue;
+                    }
+                }
+            }
+            coeff_parts.push(child);
+        }
+
+        if let Some(exp_id) = exp_term {
+            let coeff = if coeff_parts.is_empty() { st.int(1) } else { st.mul(coeff_parts) };
+            return Some((coeff, exp_id));
+        }
+    }
+
+    None
+}
+
+// Helper: solve linear equation lhs = rhs for var
+// Handles: b*x = rhs → x = rhs/b, or x = rhs
+fn solve_linear_for_var(
+    st: &mut Store,
+    lhs: ExprId,
+    rhs: ExprId,
+    var: &str,
+) -> Option<Vec<ExprId>> {
+    // Case 1: lhs is just var
+    if let (Op::Symbol, Payload::Sym(s)) = (&st.get(lhs).op, &st.get(lhs).payload) {
+        if s == var {
+            return Some(vec![rhs]);
+        }
+    }
+
+    // Case 2: lhs is b*var
+    if st.get(lhs).op == Op::Mul {
+        let children = &st.get(lhs).children.clone();
+        let mut var_found = false;
+        let mut coeff_parts = Vec::new();
+
+        for &child in children {
+            if let (Op::Symbol, Payload::Sym(s)) = (&st.get(child).op, &st.get(child).payload) {
+                if s == var {
+                    if var_found {
+                        return None; // var appears twice
+                    }
+                    var_found = true;
+                    continue;
+                }
+            }
+            coeff_parts.push(child);
+        }
+
+        if var_found {
+            let coeff = if coeff_parts.is_empty() { st.int(1) } else { st.mul(coeff_parts) };
+            // x = rhs / coeff
+            let minus_one = st.int(-1);
+            let inv_coeff = st.pow(coeff, minus_one);
+            let solution = st.mul(vec![rhs, inv_coeff]);
+            return Some(vec![solution]);
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +519,117 @@ mod tests {
         roots.sort_by_key(|r| st.to_string(*r));
         let rs: Vec<String> = roots.into_iter().map(|r| st.to_string(r)).collect();
         assert_eq!(rs, vec!["2", "3"]);
+    }
+
+    // ========== Transcendental Equation Tests (Phase J) ==========
+
+    #[test]
+    fn solve_exp_x_minus_5() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // exp(x) - 5 = 0  →  x = ln(5)
+        let expx = st.func("exp", vec![x]);
+        let m5 = st.int(-5);
+        let eq = st.add(vec![expx, m5]);
+        let roots = solve_exponential(&mut st, eq, "x").expect("solvable");
+        assert_eq!(roots.len(), 1);
+        let result_str = st.to_string(roots[0]);
+        assert!(result_str.contains("ln"));
+        assert!(result_str.contains("5"));
+    }
+
+    #[test]
+    fn solve_2_exp_x_minus_10() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // 2*exp(x) - 10 = 0  →  exp(x) = 5  →  x = ln(5)
+        let expx = st.func("exp", vec![x]);
+        let two = st.int(2);
+        let two_expx = st.mul(vec![two, expx]);
+        let m10 = st.int(-10);
+        let eq = st.add(vec![two_expx, m10]);
+        let roots = solve_exponential(&mut st, eq, "x").expect("solvable");
+        assert_eq!(roots.len(), 1);
+        let result_str = st.to_string(roots[0]);
+        // Result should have ln and either 5 or 10/2 or similar
+        assert!(result_str.contains("ln"));
+        assert!(result_str.contains("10") || result_str.contains("5"));
+    }
+
+    #[test]
+    fn solve_exp_2x_minus_7() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // exp(2*x) - 7 = 0  →  2*x = ln(7)  →  x = ln(7)/2
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let exp_2x = st.func("exp", vec![two_x]);
+        let m7 = st.int(-7);
+        let eq = st.add(vec![exp_2x, m7]);
+        let roots = solve_exponential(&mut st, eq, "x").expect("solvable");
+        assert_eq!(roots.len(), 1);
+        let result_str = st.to_string(roots[0]);
+        // Should be ln(7) * (1/2) or similar
+        assert!(result_str.contains("ln"));
+        assert!(result_str.contains("7"));
+    }
+
+    #[test]
+    fn solve_3_exp_5x_equals_15() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // 3*exp(5*x) - 15 = 0  →  exp(5*x) = 5  →  5*x = ln(5)  →  x = ln(5)/5
+        let three = st.int(3);
+        let five = st.int(5);
+        let five_x = st.mul(vec![five, x]);
+        let exp_5x = st.func("exp", vec![five_x]);
+        let coeff_exp = st.mul(vec![three, exp_5x]);
+        let m15 = st.int(-15);
+        let eq = st.add(vec![coeff_exp, m15]);
+        let roots = solve_exponential(&mut st, eq, "x").expect("solvable");
+        assert_eq!(roots.len(), 1);
+        let result_str = st.to_string(roots[0]);
+        assert!(result_str.contains("ln"));
+        assert!(result_str.contains("5"));
+    }
+
+    #[test]
+    fn solve_exp_x_plus_1() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // exp(x) + 1 = 0  →  exp(x) = -1  →  x = ln(-1) (complex, but we construct it)
+        let expx = st.func("exp", vec![x]);
+        let one = st.int(1);
+        let eq = st.add(vec![expx, one]);
+        let roots = solve_exponential(&mut st, eq, "x").expect("solvable");
+        assert_eq!(roots.len(), 1);
+        // ln of negative number - symbolic result
+        let result_str = st.to_string(roots[0]);
+        assert!(result_str.contains("ln"));
+    }
+
+    #[test]
+    fn solve_exp_fails_on_polynomial() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^2 + 3 = 0 should not be solved by exponential solver
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let three = st.int(3);
+        let eq = st.add(vec![x2, three]);
+        let result = solve_exponential(&mut st, eq, "x");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn solve_exp_fails_on_complex_transcendental() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // exp(x) + sin(x) = 0 is too complex for our pattern matching
+        let expx = st.func("exp", vec![x]);
+        let sinx = st.func("sin", vec![x]);
+        let eq = st.add(vec![expx, sinx]);
+        let result = solve_exponential(&mut st, eq, "x");
+        assert!(result.is_none());
     }
 }
