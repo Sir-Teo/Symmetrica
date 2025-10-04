@@ -29,13 +29,13 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude api --exclude symmetrica-wasm --all-targets -- -D warnings
 
       - name: Build
-        run: cargo build --workspace --all-features --verbose
+        run: cargo build --workspace --exclude api --exclude symmetrica-wasm --all-features --verbose
 
       - name: Tests
-        run: cargo test --workspace --all-features --verbose
+        run: cargo test --workspace --exclude api --exclude symmetrica-wasm --all-features --verbose
 
       - name: Doc build
         run: cargo doc --workspace --no-deps

@@ -254,7 +254,7 @@ mod python_bindings {
 
     /// Helper functions module
     #[pymodule]
-    fn symmetrica(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn symmetrica(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<Expr>()?;
 
         /// Create common mathematical functions
