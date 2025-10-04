@@ -125,6 +125,23 @@ fn apply_rules(store: &mut Store, id: ExprId) -> Option<ExprId> {
         }
     }
 
+    // sin(u)^2 + cos(u)^2 -> 1 (Pythagorean identity)
+    {
+        let pat = Pat::Add(vec![
+            Pat::Pow(
+                Box::new(Pat::Function("sin".into(), vec![Pat::Any("u".into())])),
+                Box::new(Pat::Integer(2)),
+            ),
+            Pat::Pow(
+                Box::new(Pat::Function("cos".into(), vec![Pat::Any("u".into())])),
+                Box::new(Pat::Integer(2)),
+            ),
+        ]);
+        if match_expr(store, &pat, id).is_some() {
+            return Some(store.int(1));
+        }
+    }
+
     None
 }
 
@@ -179,5 +196,33 @@ mod tests {
         let r = rewrite_basic(&mut st, expr);
         // Result should simplify to x (since add canonicalization keeps non-zero)
         assert_eq!(r, x);
+    }
+
+    #[test]
+    fn rewrite_pythagorean_identity_any_order() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+
+        // Order 1: sin^2 + cos^2
+        let expr1 = st.add(vec![sin2, cos2]);
+        let r1 = rewrite_basic(&mut st, expr1);
+        assert_eq!(r1, st.int(1));
+
+        // Order 2: cos^2 + sin^2 (ensure AC matching)
+        let x2 = st.sym("x");
+        let two2 = st.int(2);
+        let cosx2 = st.func("cos", vec![x2]);
+        let sinx2 = st.func("sin", vec![x2]);
+        let cos22 = st.pow(cosx2, two2);
+        let two3 = st.int(2);
+        let sin22 = st.pow(sinx2, two3);
+        let expr2 = st.add(vec![cos22, sin22]);
+        let r2 = rewrite_basic(&mut st, expr2);
+        assert_eq!(r2, st.int(1));
     }
 }

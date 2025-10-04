@@ -20,35 +20,72 @@ pub enum Prop {
 
 #[derive(Default, Clone, Debug)]
 pub struct Context {
-    map: HashMap<String, HashSet<Prop>>,
+    // Stack of frames to support scoping. New assumptions go into the top frame.
+    stack: Vec<HashMap<String, HashSet<Prop>>>,
 }
 
 impl Context {
     pub fn new() -> Self {
-        Self { map: HashMap::new() }
+        Self { stack: vec![HashMap::new()] }
+    }
+
+    /// Enter a new scope frame.
+    pub fn push(&mut self) {
+        self.stack.push(HashMap::new());
+    }
+
+    /// Exit the top scope frame. Returns false if at base scope.
+    pub fn pop(&mut self) -> bool {
+        if self.stack.len() <= 1 {
+            return false;
+        }
+        self.stack.pop();
+        true
     }
 
     /// Assume a property for a symbol name.
     pub fn assume<S: Into<String>>(&mut self, sym: S, prop: Prop) {
-        self.map.entry(sym.into()).or_default().insert(prop);
+        if let Some(top) = self.stack.last_mut() {
+            top.entry(sym.into()).or_default().insert(prop);
+        }
     }
 
     /// Query if a symbol is known to have a property.
     pub fn has(&self, sym: &str, prop: Prop) -> Truth {
-        match self.map.get(sym) {
-            Some(set) => {
-                if set.contains(&prop) {
-                    Truth::True
-                } else {
-                    Truth::Unknown
+        // Union all properties for the symbol from all frames (top overrides by union here).
+        let mut props: HashSet<Prop> = HashSet::new();
+        for frame in self.stack.iter().rev() {
+            if let Some(set) = frame.get(sym) {
+                for &p in set {
+                    props.insert(p);
                 }
             }
-            None => Truth::Unknown,
+        }
+        if props.is_empty() {
+            return Truth::Unknown;
+        }
+        let closure = derive_props(&props);
+        if closure.contains(&prop) {
+            Truth::True
+        } else {
+            Truth::Unknown
         }
     }
 }
 
 // Default is derived; `new()` is provided for explicit construction convenience.
+
+fn derive_props(base: &HashSet<Prop>) -> HashSet<Prop> {
+    let mut out = base.clone();
+    if base.contains(&Prop::Positive) {
+        out.insert(Prop::Real);
+        out.insert(Prop::Nonzero);
+    }
+    if base.contains(&Prop::Integer) {
+        out.insert(Prop::Real);
+    }
+    out
+}
 
 #[cfg(test)]
 mod tests {
@@ -61,5 +98,37 @@ mod tests {
         ctx.assume("x", Prop::Nonzero);
         assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
         assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+    }
+
+    #[test]
+    fn derived_properties() {
+        let mut ctx = Context::new();
+        ctx.assume("x", Prop::Integer);
+        // Integer implies Real
+        assert!(matches!(ctx.has("x", Prop::Real), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+        ctx.assume("y", Prop::Positive);
+        // Positive implies Real and Nonzero
+        assert!(matches!(ctx.has("y", Prop::Real), Truth::True));
+        assert!(matches!(ctx.has("y", Prop::Nonzero), Truth::True));
+    }
+
+    #[test]
+    fn scoped_push_pop() {
+        let mut ctx = Context::new();
+        ctx.assume("x", Prop::Nonzero);
+        // base scope: only Nonzero
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+        ctx.push();
+        ctx.assume("x", Prop::Positive);
+        // inner scope: Positive implies Real and Nonzero
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Real), Truth::True));
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
+        assert!(ctx.pop());
+        // back to base: Positive gone
+        assert!(matches!(ctx.has("x", Prop::Positive), Truth::Unknown));
+        assert!(matches!(ctx.has("x", Prop::Nonzero), Truth::True));
     }
 }
