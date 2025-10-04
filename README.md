@@ -268,6 +268,10 @@ Comprehensive guides for each crate in `docs/`:
 - **[research.md](docs/research.md)**: Design notes and prior art
 - **[skeleton.md](docs/skeleton.md)**: Initial architecture rationale
 
+### Quality Assurance
+
+- **[fuzzing.md](docs/fuzzing.md)**: Fuzz testing infrastructure (Phase L)
+
 ### API Documentation
 
 Generate API docs:

@@ -1,0 +1,53 @@
+[package]
+name = "symmetrica-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.expr_core]
+path = "../crates/expr_core"
+
+[dependencies.simplify]
+path = "../crates/simplify"
+
+[dependencies.io]
+path = "../crates/io"
+
+[dependencies.calculus]
+path = "../crates/calculus"
+
+[dependencies.solver]
+path = "../crates/solver"
+
+# Prevent this from interfering with workspace
+[workspace]
+
+[[bin]]
+name = "fuzz_simplify"
+path = "fuzz_targets/fuzz_simplify.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_expr_ops"
+path = "fuzz_targets/fuzz_expr_ops.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_sexpr_parse"
+path = "fuzz_targets/fuzz_sexpr_parse.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_diff"
+path = "fuzz_targets/fuzz_diff.rs"
+test = false
+doc = false
