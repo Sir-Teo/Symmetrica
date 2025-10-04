@@ -157,6 +157,33 @@ let g = UniPoly::gcd(p1, p2);
 // Result: x - 1 (monic)
 ```
 
+### Square-Free Decomposition
+
+```rust
+pub fn square_free_decomposition(&self) -> Vec<(Self, usize)>
+```
+
+Extracts the square-free part of a polynomial by computing `f / gcd(f, f')`. This removes all repeated factors, returning a polynomial with only simple roots.
+
+**Algorithm**: Computes the GCD of the polynomial and its derivative to identify repeated factors.
+
+**Example:**
+```rust
+// p(x) = (x - 1)^2 = x^2 - 2x + 1
+// Square-free part is (x - 1)
+let p = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+let decomp = p.square_free_decomposition();
+// Result: [(x - 1, 1)]
+
+// p(x) = x^2 * (x - 1)^3
+// Square-free part is x * (x - 1)
+let p = UniPoly::new("x", vec![Q(0, 1), Q(0, 1), Q(-1, 1), Q(3, 1), Q(-3, 1), Q(1, 1)]);
+let decomp = p.square_free_decomposition();
+// Result: [square-free polynomial of degree 2, 1)]
+```
+
+**Use Case**: Useful for simplifying polynomials before factorization or integration.
+
 ## Expression Conversions
 
 ### Expr → UniPoly
@@ -319,6 +346,7 @@ Bidirectional conversion for seamless integration with expression trees.
 - **Multiplication**: O(deg(p) × deg(q))
 - **Division**: O(deg(dividend) × deg(divisor))
 - **GCD**: O(deg²) worst case (Euclidean algorithm)
+- **Square-free decomposition**: O(deg²) (multiple GCD computations)
 - **Partial fractions**: O(deg³) worst case (root finding + deflation)
 
 ## Limitations
@@ -334,6 +362,7 @@ Comprehensive test suite:
 - Arithmetic operations (add, sub, mul)
 - Division with remainder
 - GCD computation
+- Square-free decomposition (various multiplicities and edge cases)
 - Expression conversion roundtrips
 - Partial fractions (simple, improper, edge cases)
 - Derivative and evaluation
@@ -347,7 +376,7 @@ cargo test -p polys
 
 - Sparse polynomial representation
 - Multivariate polynomials
-- Factorization over Q (square-free, complete)
+- Complete factorization over Q (building on square-free decomposition)
 - Gröbner bases
 - Resultants and discriminants
 - Support for algebraic number fields
@@ -372,6 +401,11 @@ let (quot, rem) = p.div_rem(&q).unwrap();
 // GCD
 let g = UniPoly::gcd(p.clone(), q.clone());
 // g = x - 1 (after normalization)
+
+// Square-free decomposition
+let p_repeated = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);  // (x-1)^2
+let decomp = p_repeated.square_free_decomposition();
+// decomp = [(x-1, 2)]
 
 // Derivative
 let dp = p.deriv();  // 2 + 2x

@@ -159,6 +159,39 @@ impl UniPoly {
         }
         a.monic()
     }
+
+    /// Square-free decomposition using a simplified approach.
+    /// Returns true square-free factors (gcd with derivative), removing multiplicity.
+    /// Note: This is a simplified implementation for Phase C.
+    /// Returns a list with the square-free part. 
+    ///
+    /// For a polynomial with repeated roots, extracts square-free factors.
+    pub fn square_free_decomposition(&self) -> Vec<(Self, usize)> {
+        if self.is_zero() {
+            return vec![];
+        }
+
+        let p = self.monic();
+        let dp = p.deriv();
+
+        if dp.is_zero() {
+            return vec![(p, 1)];
+        }
+
+        // Compute gcd(p, p')
+        let g = Self::gcd(p.clone(), dp.clone());
+
+        // If gcd = 1, p is already square-free
+        if g.degree() == Some(0) || g.is_zero() {
+            return vec![(p, 1)];
+        }
+
+        // Simple approach: return square-free part
+        // p / gcd(p, p') is square-free
+        let (square_free_part, _) = p.div_rem(&g).expect("gcd divides p");
+        
+        vec![(square_free_part.monic(), 1)]
+    }
 }
 
 fn trim_trailing_zeros(v: &mut Vec<Q>) {
@@ -635,5 +668,100 @@ mod tests {
         let p = UniPoly::zero("x");
         let m = p.monic();
         assert!(m.is_zero());
+    }
+
+    #[test]
+    fn square_free_already_square_free() {
+        // p(x) = x + 1 is already square-free
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert_eq!(decomp.len(), 1);
+        assert_eq!(decomp[0].1, 1); // multiplicity 1
+        assert_eq!(decomp[0].0.monic(), p.monic());
+    }
+
+    #[test]
+    fn square_free_perfect_square() {
+        // p(x) = (x - 1)^2 = x^2 - 2x + 1
+        // Square-free part should be (x - 1)
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert_eq!(decomp.len(), 1);
+        
+        // The square-free part should be x - 1
+        let expected = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]).monic();
+        assert_eq!(decomp[0].0.monic(), expected);
+    }
+
+    #[test]
+    fn square_free_mixed_multiplicities() {
+        // p(x) = x^2 * (x - 1)^3 = x^5 - 3x^4 + 3x^3 - x^2
+        // Square-free part should be x * (x - 1)
+        let p = UniPoly::new("x", vec![Q(0, 1), Q(0, 1), Q(-1, 1), Q(3, 1), Q(-3, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert!(!decomp.is_empty());
+        
+        // The square-free part x(x-1) should have degree 2
+        assert_eq!(decomp[0].0.degree(), Some(2));
+    }
+
+    #[test]
+    fn square_free_cubic_with_repeated_root() {
+        // p(x) = (x + 2)^2 * (x - 3) = x^3 + x^2 - 8x - 12
+        // Square-free part should be (x + 2)(x - 3)
+        let p = UniPoly::new("x", vec![Q(-12, 1), Q(-8, 1), Q(1, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert!(!decomp.is_empty());
+        
+        // The square-free part should have degree 2
+        assert_eq!(decomp[0].0.degree(), Some(2));
+    }
+
+    #[test]
+    fn square_free_zero_polynomial() {
+        let p = UniPoly::zero("x");
+        let decomp = p.square_free_decomposition();
+        assert_eq!(decomp.len(), 0);
+    }
+
+    #[test]
+    fn square_free_constant_polynomial() {
+        // p(x) = 5 (constant)
+        let p = UniPoly::new("x", vec![Q(5, 1)]);
+        let decomp = p.square_free_decomposition();
+        // Constant is considered square-free with multiplicity 1
+        assert_eq!(decomp.len(), 1);
+        assert_eq!(decomp[0].1, 1);
+    }
+
+    #[test]
+    fn square_free_linear() {
+        // p(x) = 2x + 3
+        let p = UniPoly::new("x", vec![Q(3, 1), Q(2, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert_eq!(decomp.len(), 1);
+        assert_eq!(decomp[0].1, 1);
+    }
+
+    #[test]
+    fn square_free_product_distinct_linear() {
+        // p(x) = (x - 1)(x - 2)(x - 3) = x^3 - 6x^2 + 11x - 6
+        let p = UniPoly::new("x", vec![Q(-6, 1), Q(11, 1), Q(-6, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+        assert_eq!(decomp.len(), 1);
+        assert_eq!(decomp[0].1, 1); // all roots are simple
+    }
+
+    #[test]
+    fn square_free_high_multiplicity() {
+        // p(x) = (x - 1)^4 = x^4 - 4x^3 + 6x^2 - 4x + 1
+        // Square-free part should be (x - 1)
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(-4, 1), Q(6, 1), Q(-4, 1), Q(1, 1)]);
+        let decomp = p.square_free_decomposition();
+
+        assert_eq!(decomp.len(), 1);
+        // The square-free part should be x - 1
+        let expected = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]).monic();
+        assert_eq!(decomp[0].0.monic(), expected);
     }
 }
