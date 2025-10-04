@@ -16,6 +16,8 @@ arith = { path = "../arith" }
 
 [dev-dependencies]
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+proptest = "1.5"
+pattern = { path = "../pattern" }
 
 [[bench]]
 name = "solver_benches"

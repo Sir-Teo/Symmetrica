@@ -7,3 +7,6 @@ description = "Shared arithmetic utilities: small rationals over i64 (tuple Rat 
 
 [lib]
 path = "src/lib.rs"
+
+[dev-dependencies]
+proptest = "1.5"

@@ -43,12 +43,16 @@ dependencies = [
 [[package]]
 name = "arith"
 version = "0.1.0"
+dependencies = [
+ "proptest",
+]
 
 [[package]]
 name = "assumptions"
 version = "0.1.0"
 dependencies = [
  "expr_core",
+ "proptest",
 ]
 
 [[package]]
@@ -231,6 +235,7 @@ name = "evalf"
 version = "0.1.0"
 dependencies = [
  "expr_core",
+ "proptest",
 ]
 
 [[package]]
@@ -443,6 +448,7 @@ version = "0.1.0"
 dependencies = [
  "assumptions",
  "expr_core",
+ "proptest",
  "simplify",
 ]
 
@@ -786,7 +792,9 @@ dependencies = [
  "arith",
  "criterion",
  "expr_core",
+ "pattern",
  "polys",
+ "proptest",
  "simplify",
 ]
 

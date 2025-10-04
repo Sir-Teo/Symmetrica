@@ -12,3 +12,6 @@ path = "src/lib.rs"
 expr_core = { path = "../expr_core" }
 simplify  = { path = "../simplify" }
 assumptions = { path = "../assumptions" }
+
+[dev-dependencies]
+proptest = "1.5"
