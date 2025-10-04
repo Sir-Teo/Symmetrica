@@ -178,4 +178,38 @@ mod tests {
         let b = vec![Q(3, 1), Q(6, 1)];
         assert!(m.solve_bareiss(&b).unwrap().is_none());
     }
+
+    #[test]
+    fn det_non_square_error() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        assert!(m.det_bareiss().is_err());
+    }
+
+    #[test]
+    fn solve_non_square_error() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let b = vec![Q(1, 1), Q(2, 1)];
+        assert!(m.solve_bareiss(&b).is_err());
+    }
+
+    #[test]
+    fn solve_wrong_rhs_length() {
+        let m = MatrixQ::identity(2);
+        let b = vec![Q(1, 1)];
+        assert!(m.solve_bareiss(&b).is_err());
+    }
+
+    #[test]
+    fn det_zero_size() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        assert_eq!(m.det_bareiss().unwrap(), Q(1, 1));
+    }
+
+    #[test]
+    fn solve_zero_size() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        let b = vec![];
+        let x = m.solve_bareiss(&b).unwrap().expect("empty");
+        assert_eq!(x.len(), 0);
+    }
 }

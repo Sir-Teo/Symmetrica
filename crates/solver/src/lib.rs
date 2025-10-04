@@ -309,4 +309,30 @@ mod tests {
         // No rational roots, so should return None
         assert!(result.is_none());
     }
+
+    #[test]
+    fn solve_not_polynomial() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let result = solve_univariate(&mut st, sinx, "x");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn solve_quadratic_with_rational_discriminant() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^2 - 5x + 6 = 0 -> roots 2, 3
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let m5 = st.int(-5);
+        let m5x = st.mul(vec![m5, x]);
+        let six = st.int(6);
+        let e = st.add(vec![x2, m5x, six]);
+        let mut roots = solve_univariate(&mut st, e, "x").expect("solved");
+        roots.sort_by_key(|r| st.to_string(*r));
+        let rs: Vec<String> = roots.into_iter().map(|r| st.to_string(r)).collect();
+        assert_eq!(rs, vec!["2", "3"]);
+    }
 }

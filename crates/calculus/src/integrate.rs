@@ -355,3 +355,108 @@ fn integrate_rational(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
     let sum = st.add(parts);
     Some(simplify(st, sum))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integrate_constant_symbol() {
+        let mut st = Store::new();
+        let c = st.sym("c");
+        let res = integrate(&mut st, c, "x").expect("const");
+        // ∫ c dx = c * x
+        let x = st.sym("x");
+        let expected = st.mul(vec![c, x]);
+        assert_eq!(st.to_string(res), st.to_string(expected));
+    }
+
+    #[test]
+    fn integrate_add_rule() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let expr = st.add(vec![x, two]);
+        let res = integrate(&mut st, expr, "x").expect("sum");
+        assert!(st.to_string(res).contains("x"));
+    }
+
+    #[test]
+    fn integrate_mul_constant_factor() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let expr = st.mul(vec![three, x]);
+        let res = integrate(&mut st, expr, "x").expect("cx");
+        // ∫ 3x dx = 3 * x^2/2
+        assert!(st.to_string(res).contains("3"));
+        assert!(st.to_string(res).contains("x"));
+    }
+
+    #[test]
+    fn integrate_rational_constant() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let x = st.sym("x");
+        let expected = st.mul(vec![half, x]);
+        let res = integrate(&mut st, half, "x").expect("rat");
+        assert_eq!(st.to_string(res), st.to_string(expected));
+    }
+
+    #[test]
+    fn integrate_fails_on_unsupported() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // ∫ sin(x^2) dx not supported
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sinx2 = st.func("sin", vec![x2]);
+        let res = integrate(&mut st, sinx2, "x");
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn integrate_integer_const() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let res = integrate(&mut st, five, "x").expect("const");
+        let res_str = st.to_string(res);
+        assert!(res_str.contains("5"));
+        assert!(res_str.contains("x"));
+    }
+
+    #[test]
+    fn integrate_power_negative_exponent() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let m2 = st.int(-2);
+        let xm2 = st.pow(x, m2);
+        let res = integrate(&mut st, xm2, "x").expect("x^-2");
+        // ∫ x^-2 dx = x^-1 / -1 = -x^-1
+        assert!(st.to_string(res).contains("x"));
+    }
+
+    #[test]
+    fn integrate_exp_constant_derivative() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expx = st.func("exp", vec![x]);
+        let res = integrate(&mut st, expx, "x").expect("exp(x)");
+        assert!(st.to_string(res).contains("exp"));
+    }
+
+    #[test]
+    fn integrate_rational_via_pf_fails_on_complex() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // 1/(x^2 + 1) has no rational roots
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let one = st.int(1);
+        let den = st.add(vec![x2, one]);
+        let m1 = st.int(-1);
+        let expr = st.pow(den, m1);
+        let res = integrate(&mut st, expr, "x");
+        assert!(res.is_none());
+    }
+}

@@ -523,4 +523,117 @@ mod tests {
         let den = UniPoly::new(var, vec![Q(1, 1), Q(0, 1), Q(1, 1)]); // 1 + x^2
         assert!(partial_fractions_simple(&num, &den).is_none());
     }
+
+    #[test]
+    fn unipoly_zero_and_degree() {
+        let p = UniPoly::zero("x");
+        assert!(p.is_zero());
+        assert_eq!(p.degree(), None);
+        assert_eq!(p.leading_coeff(), Q::zero());
+    }
+
+    #[test]
+    fn unipoly_deriv() {
+        let p = UniPoly::new("x", vec![Q(2, 1), Q(3, 1), Q(1, 1)]);
+        let dp = p.deriv();
+        assert_eq!(dp.coeffs, vec![Q(3, 1), Q(2, 1)]);
+    }
+
+    #[test]
+    fn unipoly_eval() {
+        let p = UniPoly::new("x", vec![Q(1, 1), Q(2, 1), Q(1, 1)]);
+        let v = p.eval_q(Q(2, 1));
+        assert_eq!(v, Q(9, 1));
+    }
+
+    #[test]
+    fn unipoly_add_different_lengths() {
+        let p1 = UniPoly::new("x", vec![Q(1, 1)]);
+        let p2 = UniPoly::new("x", vec![Q(1, 1), Q(1, 1), Q(1, 1)]);
+        let sum = p1.add(&p2);
+        assert_eq!(sum.coeffs.len(), 3);
+    }
+
+    #[test]
+    fn unipoly_sub() {
+        let p1 = UniPoly::new("x", vec![Q(5, 1), Q(3, 1)]);
+        let p2 = UniPoly::new("x", vec![Q(2, 1), Q(1, 1)]);
+        let diff = p1.sub(&p2);
+        assert_eq!(diff.coeffs, vec![Q(3, 1), Q(2, 1)]);
+    }
+
+    #[test]
+    fn unipoly_mul_with_zero() {
+        let p1 = UniPoly::new("x", vec![Q(1, 1), Q(2, 1)]);
+        let p2 = UniPoly::zero("x");
+        let prod = p1.mul(&p2);
+        assert!(prod.is_zero());
+    }
+
+    #[test]
+    fn unipoly_div_rem_by_zero() {
+        let p = UniPoly::new("x", vec![Q(1, 1)]);
+        let z = UniPoly::zero("x");
+        let res = p.div_rem(&z);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn expr_to_unipoly_rational_coeff() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let half = st.rat(1, 2);
+        let expr = st.mul(vec![half, x]);
+        let p = expr_to_unipoly(&st, expr, "x").expect("poly");
+        assert_eq!(p.coeffs[1], Q(1, 2));
+    }
+
+    #[test]
+    fn expr_to_unipoly_pow_negative_fails() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let m1 = st.int(-1);
+        let expr = st.pow(x, m1);
+        let p = expr_to_unipoly(&st, expr, "x");
+        assert!(p.is_none());
+    }
+
+    #[test]
+    fn expr_to_unipoly_wrong_var() {
+        let mut st = Store::new();
+        let y = st.sym("y");
+        let p = expr_to_unipoly(&st, y, "x");
+        assert!(p.is_none());
+    }
+
+    #[test]
+    fn expr_to_unipoly_function_fails() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let p = expr_to_unipoly(&st, sinx, "x");
+        assert!(p.is_none());
+    }
+
+    #[test]
+    fn unipoly_to_expr_zero() {
+        let mut st = Store::new();
+        let p = UniPoly::zero("x");
+        let e = unipoly_to_expr(&mut st, &p);
+        assert_eq!(e, st.int(0));
+    }
+
+    #[test]
+    fn unipoly_monic() {
+        let p = UniPoly::new("x", vec![Q(2, 1), Q(4, 1)]);
+        let m = p.monic();
+        assert_eq!(m.leading_coeff(), Q(1, 1));
+    }
+
+    #[test]
+    fn unipoly_monic_zero() {
+        let p = UniPoly::zero("x");
+        let m = p.monic();
+        assert!(m.is_zero());
+    }
 }

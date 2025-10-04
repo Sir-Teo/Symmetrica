@@ -104,3 +104,46 @@ pub fn div_q(a: Q, b: Q) -> Q {
     let (n, d) = q_div((a.0, a.1), (b.0, b.1));
     Q(n, d)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gcd_zero_cases() {
+        assert_eq!(gcd_i64(0, 5), 5);
+        assert_eq!(gcd_i64(5, 0), 5);
+        assert_eq!(gcd_i64(0, 0), 0);
+    }
+
+    #[test]
+    fn gcd_negative() {
+        assert_eq!(gcd_i64(-12, 8), 4);
+        assert_eq!(gcd_i64(12, -8), 4);
+    }
+
+    #[test]
+    fn normalize_negative_den() {
+        let (n, d) = normalize_rat(3, -4);
+        assert_eq!(n, -3);
+        assert_eq!(d, 4);
+    }
+
+    #[test]
+    fn q_operations() {
+        assert_eq!(q_norm(4, 6), (2, 3));
+        assert_eq!(q_add((1, 3), (1, 6)), (1, 2));
+        assert_eq!(q_sub((1, 2), (1, 3)), (1, 6));
+        assert_eq!(q_mul((2, 3), (3, 4)), (1, 2));
+        assert_eq!(q_div((1, 2), (1, 4)), (2, 1));
+    }
+
+    #[test]
+    fn q_struct_methods() {
+        let q = Q::new(6, 9);
+        assert_eq!(q, Q(2, 3));
+        assert!(!q.is_zero());
+        assert!(Q::zero().is_zero());
+        assert_eq!(Q::one(), Q(1, 1));
+    }
+}

@@ -509,6 +509,52 @@ mod tests {
     }
 
     #[test]
+    fn test_add_empty() {
+        let mut st = Store::new();
+        let expr = st.add(vec![]);
+        assert_eq!(expr, st.int(0));
+    }
+
+    #[test]
+    fn test_add_single() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expr = st.add(vec![x]);
+        assert_eq!(expr, x);
+    }
+
+    #[test]
+    fn test_mul_empty() {
+        let mut st = Store::new();
+        let expr = st.mul(vec![]);
+        assert_eq!(expr, st.int(1));
+    }
+
+    #[test]
+    fn test_mul_single() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expr = st.mul(vec![x]);
+        assert_eq!(expr, x);
+    }
+
+    #[test]
+    fn test_pow_base_zero_exp_zero() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let pow = st.pow(zero, zero);
+        // 0^0 stays as Pow node
+        assert!(matches!(st.get(pow).op, Op::Pow));
+    }
+
+    #[test]
+    fn test_printer_rational() {
+        let mut st = Store::new();
+        let r = st.rat(3, 4);
+        assert_eq!(st.to_string(r), "3/4");
+    }
+
+    #[test]
     fn test_arith_q_and_helpers() {
         use arith::*;
 

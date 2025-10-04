@@ -469,4 +469,58 @@ mod tests {
         let expected = st.add(vec![ln_x, neg_ln_y]);
         assert_eq!(s, expected);
     }
+
+    #[test]
+    fn ln_power_rule_with_positivity() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let ln_expr = st.func("ln", vec![x3]);
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Positive);
+        let s = super::simplify_with(&mut st, ln_expr, &ctx);
+        let ln_x = st.func("ln", vec![x]);
+        let expected = st.mul(vec![three, ln_x]);
+        assert_eq!(st.to_string(s), st.to_string(expected));
+    }
+
+    #[test]
+    fn ln_product_rule_with_positivity() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let prod = st.mul(vec![x, y]);
+        let ln_expr = st.func("ln", vec![prod]);
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Positive);
+        ctx.assume("y", Prop::Positive);
+        let s = super::simplify_with(&mut st, ln_expr, &ctx);
+        let ln_x = st.func("ln", vec![x]);
+        let ln_y = st.func("ln", vec![y]);
+        let expected = st.add(vec![ln_x, ln_y]);
+        assert_eq!(st.to_string(s), st.to_string(expected));
+    }
+
+    #[test]
+    fn simplify_pow_rational_non_matching() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let third = st.rat(1, 3);
+        let expr = st.pow(x2, third);
+        let s = super::simplify(&mut st, expr);
+        // Should not simplify without positivity assumption
+        assert!(st.to_string(s).contains("^"));
+    }
+
+    #[test]
+    fn simplify_unknown_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let fx = st.func("unknown", vec![x]);
+        let s = super::simplify(&mut st, fx);
+        assert_eq!(s, fx);
+    }
 }

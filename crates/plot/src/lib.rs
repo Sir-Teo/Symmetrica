@@ -221,4 +221,75 @@ mod tests {
         let v = eval_f64(&st, sqrt_x, "x", 4.0).unwrap();
         assert!((v - 2.0).abs() < 1e-12);
     }
+
+    #[test]
+    fn eval_add() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let expr = st.add(vec![x, two]);
+        let v = eval_f64(&st, expr, "x", 3.0).unwrap();
+        assert!((v - 5.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn eval_mul() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let expr = st.mul(vec![three, x]);
+        let v = eval_f64(&st, expr, "x", 2.0).unwrap();
+        assert!((v - 6.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn eval_cosx() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let cosx = st.func("cos", vec![x]);
+        let v = eval_f64(&st, cosx, "x", 0.0).unwrap();
+        assert!((v - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn eval_expx() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expx = st.func("exp", vec![x]);
+        let v = eval_f64(&st, expx, "x", 0.0).unwrap();
+        assert!((v - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn eval_unknown_func() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let fx = st.func("unknown", vec![x]);
+        assert!(eval_f64(&st, fx, "x", 1.0).is_none());
+    }
+
+    #[test]
+    fn eval_multiarg_func() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let f = st.func("f", vec![x, y]);
+        assert!(eval_f64(&st, f, "x", 1.0).is_none());
+    }
+
+    #[test]
+    fn eval_unbound_symbol() {
+        let mut st = Store::new();
+        let y = st.sym("y");
+        assert!(eval_f64(&st, y, "x", 1.0).is_none());
+    }
+
+    #[test]
+    fn plot_single_sample() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let cfg = PlotConfig::new("x", 0.0, 1.0, 1, 100, 100);
+        let svg = plot_svg(&st, x, &cfg);
+        assert!(svg.contains("<svg"));
+    }
 }

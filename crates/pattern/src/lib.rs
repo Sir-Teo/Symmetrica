@@ -92,4 +92,33 @@ mod tests {
         assert_eq!(st.get(out).digest, st.get(f).digest);
         assert_eq!(st.to_string(out), st.to_string(f));
     }
+
+    #[test]
+    fn subst_in_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let two = st.int(2);
+        let out = subst_symbol(&mut st, sinx, "x", two);
+        assert!(st.to_string(out).contains("sin"));
+        assert!(st.to_string(out).contains("2"));
+    }
+
+    #[test]
+    fn subst_integer_unchanged() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let x = st.sym("x");
+        let out = subst_symbol(&mut st, five, "y", x);
+        assert_eq!(out, five);
+    }
+
+    #[test]
+    fn subst_rational_unchanged() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let x = st.sym("x");
+        let out = subst_symbol(&mut st, half, "y", x);
+        assert_eq!(out, half);
+    }
 }

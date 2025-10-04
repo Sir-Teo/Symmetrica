@@ -120,3 +120,72 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diff_constant() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let d = diff(&mut st, five, "x");
+        assert_eq!(d, st.int(0));
+    }
+
+    #[test]
+    fn diff_rational() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let d = diff(&mut st, half, "x");
+        assert_eq!(d, st.int(0));
+    }
+
+    #[test]
+    fn diff_other_symbol() {
+        let mut st = Store::new();
+        let y = st.sym("y");
+        let d = diff(&mut st, y, "x");
+        assert_eq!(d, st.int(0));
+    }
+
+    #[test]
+    fn diff_pow_zero_exp() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let pow = st.pow(x, zero);
+        let d = diff(&mut st, pow, "x");
+        assert_eq!(d, st.int(0));
+    }
+
+    #[test]
+    fn diff_log_alias() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let logx = st.func("log", vec![x]);
+        let d = diff(&mut st, logx, "x");
+        let m1 = st.int(-1);
+        let expected = st.pow(x, m1);
+        assert_eq!(st.to_string(d), st.to_string(expected));
+    }
+
+    #[test]
+    fn diff_unknown_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let fx = st.func("unknown", vec![x]);
+        let d = diff(&mut st, fx, "x");
+        assert_eq!(d, st.int(0));
+    }
+
+    #[test]
+    fn diff_multiarg_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let f = st.func("f", vec![x, y]);
+        let d = diff(&mut st, f, "x");
+        assert_eq!(d, st.int(0));
+    }
+}
