@@ -184,6 +184,72 @@ let decomp = p.square_free_decomposition();
 
 **Use Case**: Useful for simplifying polynomials before factorization or integration.
 
+### Resultant
+
+```rust
+pub fn resultant(f: &Self, g: &Self) -> Option<Q>
+```
+
+Computes the resultant of two polynomials using the Sylvester matrix determinant. The resultant is zero if and only if the polynomials have a common root (or a common factor).
+
+**Algorithm**: Constructs an (m+n) × (m+n) Sylvester matrix and computes its determinant using fraction-free methods.
+
+**Example:**
+```rust
+// f(x) = x - 1, g(x) = x - 2
+// No common roots, resultant ≠ 0
+let f = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]);
+let g = UniPoly::new("x", vec![Q(-2, 1), Q(1, 1)]);
+let res = UniPoly::resultant(&f, &g).unwrap();
+assert_ne!(res, Q::zero());
+
+// f(x) = (x-1)(x-2), g(x) = (x-1)(x-3)
+// Common root at x=1, resultant = 0
+let f = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+let g = UniPoly::new("x", vec![Q(3, 1), Q(-4, 1), Q(1, 1)]);
+let res = UniPoly::resultant(&f, &g).unwrap();
+assert_eq!(res, Q::zero());
+```
+
+**Applications**:
+- Detecting common roots between polynomials
+- Eliminating variables in polynomial systems
+- Computing discriminants
+
+### Discriminant
+
+```rust
+pub fn discriminant(&self) -> Option<Q>
+```
+
+Computes the discriminant of a polynomial. The discriminant is zero if and only if the polynomial has a repeated root.
+
+**Formula**: For polynomial f of degree n with leading coefficient a_n:
+```
+disc(f) = (-1)^(n(n-1)/2) / a_n × resultant(f, f')
+```
+
+**Example:**
+```rust
+// f(x) = (x-1)(x-2) = x^2 - 3x + 2
+// No repeated roots, disc ≠ 0
+// disc = b^2 - 4ac = 9 - 8 = 1
+let f = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+let disc = f.discriminant().unwrap();
+assert_eq!(disc, Q(1, 1));
+
+// f(x) = (x-1)^2 = x^2 - 2x + 1
+// Has repeated root, disc = 0
+let f = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+let disc = f.discriminant().unwrap();
+assert_eq!(disc, Q::zero());
+```
+
+**Applications**:
+- Detecting repeated roots
+- Determining solvability of polynomial equations
+- Characterizing polynomial behavior
+
 ## Expression Conversions
 
 ### Expr → UniPoly
@@ -347,6 +413,8 @@ Bidirectional conversion for seamless integration with expression trees.
 - **Division**: O(deg(dividend) × deg(divisor))
 - **GCD**: O(deg²) worst case (Euclidean algorithm)
 - **Square-free decomposition**: O(deg²) (multiple GCD computations)
+- **Resultant**: O((deg(f) + deg(g))³) (Sylvester determinant)
+- **Discriminant**: O(deg³) (resultant computation)
 - **Partial fractions**: O(deg³) worst case (root finding + deflation)
 
 ## Limitations
@@ -363,6 +431,8 @@ Comprehensive test suite:
 - Division with remainder
 - GCD computation
 - Square-free decomposition (various multiplicities and edge cases)
+- Resultants (common roots, no common roots, edge cases)
+- Discriminants (repeated roots, distinct roots, various degrees)
 - Expression conversion roundtrips
 - Partial fractions (simple, improper, edge cases)
 - Derivative and evaluation
@@ -378,8 +448,8 @@ cargo test -p polys
 - Multivariate polynomials
 - Complete factorization over Q (building on square-free decomposition)
 - Gröbner bases
-- Resultants and discriminants
 - Support for algebraic number fields
+- Optimized resultant computation (subresultant PRS)
 
 ## Example: Polynomial Algebra
 
@@ -405,7 +475,15 @@ let g = UniPoly::gcd(p.clone(), q.clone());
 // Square-free decomposition
 let p_repeated = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);  // (x-1)^2
 let decomp = p_repeated.square_free_decomposition();
-// decomp = [(x-1, 2)]
+// decomp = [(x-1, 1)]
+
+// Resultant (check for common roots)
+let res = UniPoly::resultant(&p, &q).unwrap();
+// res != 0 => no common roots
+
+// Discriminant (check for repeated roots)
+let disc = p.discriminant().unwrap();
+// disc != 0 => no repeated roots
 
 // Derivative
 let dp = p.deriv();  // 2 + 2x

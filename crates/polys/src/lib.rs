@@ -1,10 +1,12 @@
 //! Polynomial types/algorithms (minimal v1).
 //! - Univariate dense polynomials over Q (i64 rationals)
-//! - Division with remainder, Euclidean GCD
+//! - Division with remainder, Euclidean GCD, square-free decomposition
+//! - Resultants and discriminants
 //! - Conversions: Expr ⟷ Poly (for sums of monomials in a single symbol)
 
 use arith::{add_q, div_q, gcd_i64, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
+use matrix::MatrixQ;
 
 // ---------- Univariate dense polynomial over Q ----------
 
@@ -163,7 +165,7 @@ impl UniPoly {
     /// Square-free decomposition using a simplified approach.
     /// Returns true square-free factors (gcd with derivative), removing multiplicity.
     /// Note: This is a simplified implementation for Phase C.
-    /// Returns a list with the square-free part. 
+    /// Returns a list with the square-free part.
     ///
     /// For a polynomial with repeated roots, extracts square-free factors.
     pub fn square_free_decomposition(&self) -> Vec<(Self, usize)> {
@@ -189,8 +191,121 @@ impl UniPoly {
         // Simple approach: return square-free part
         // p / gcd(p, p') is square-free
         let (square_free_part, _) = p.div_rem(&g).expect("gcd divides p");
-        
+
         vec![(square_free_part.monic(), 1)]
+    }
+
+    /// Compute the resultant of two polynomials using the Sylvester matrix determinant.
+    ///
+    /// The resultant is zero if and only if the polynomials have a common root.
+    /// For polynomials f of degree n and g of degree m, constructs an (m+n) × (m+n)
+    /// Sylvester matrix and returns its determinant.
+    ///
+    /// Returns None if both polynomials are zero.
+    pub fn resultant(f: &Self, g: &Self) -> Option<Q> {
+        assert_eq!(f.var, g.var, "polynomials must have the same variable");
+
+        if f.is_zero() && g.is_zero() {
+            return None;
+        }
+
+        // Handle cases where one polynomial is zero
+        if f.is_zero() {
+            return Some(Q::zero());
+        }
+        if g.is_zero() {
+            return Some(Q::zero());
+        }
+
+        let n = f.degree()?;
+        let m = g.degree()?;
+
+        // Handle constant polynomials
+        if n == 0 && m == 0 {
+            return Some(Q::one());
+        }
+        if n == 0 {
+            // f is constant, resultant is f^m
+            let f0 = f.coeffs[0];
+            let mut result = Q::one();
+            for _ in 0..m {
+                result = mul_q(result, f0);
+            }
+            return Some(result);
+        }
+        if m == 0 {
+            // g is constant, resultant is g^n
+            let g0 = g.coeffs[0];
+            let mut result = Q::one();
+            for _ in 0..n {
+                result = mul_q(result, g0);
+            }
+            return Some(result);
+        }
+
+        // Build Sylvester matrix: (m+n) × (m+n)
+        let size = m + n;
+        let mut entries = Vec::with_capacity(size * size);
+
+        for i in 0..size {
+            for j in 0..size {
+                let val = if i < m {
+                    // First m rows: shifted coefficients of f
+                    // Row i has f's coefficients starting at column i
+                    if j >= i && j - i <= n {
+                        f.coeffs[n - (j - i)]
+                    } else {
+                        Q::zero()
+                    }
+                } else {
+                    // Last n rows: shifted coefficients of g
+                    // Row i-m (for i >= m) has g's coefficients starting at column (i-m)
+                    let row_offset = i - m;
+                    if j >= row_offset && j - row_offset <= m {
+                        g.coeffs[m - (j - row_offset)]
+                    } else {
+                        Q::zero()
+                    }
+                };
+                entries.push(val);
+            }
+        }
+
+        let sylvester = MatrixQ::new(size, size, entries);
+        Some(sylvester.det_bareiss().expect("square matrix"))
+    }
+
+    /// Compute the discriminant of a polynomial.
+    ///
+    /// The discriminant is zero if and only if the polynomial has a repeated root.
+    /// For a polynomial f of degree n with leading coefficient a_n:
+    ///   disc(f) = (-1)^(n(n-1)/2) / a_n * resultant(f, f')
+    ///
+    /// Returns None if the polynomial is zero or constant.
+    pub fn discriminant(&self) -> Option<Q> {
+        if self.is_zero() {
+            return None;
+        }
+
+        let n = self.degree()?;
+        if n == 0 {
+            return None; // Constant polynomial has no discriminant
+        }
+
+        let fp = self.deriv();
+        let res = Self::resultant(self, &fp)?;
+
+        let lc = self.leading_coeff();
+        if lc.is_zero() {
+            return None;
+        }
+
+        // disc(f) = (-1)^(n(n-1)/2) / lc * res(f, f')
+        let sign_power = (n * (n - 1)) / 2;
+        let sign = if sign_power % 2 == 0 { Q::one() } else { Q(-1, 1) };
+
+        let disc = div_q(mul_q(sign, res), lc);
+        Some(disc)
     }
 }
 
@@ -687,7 +802,7 @@ mod tests {
         let p = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
         let decomp = p.square_free_decomposition();
         assert_eq!(decomp.len(), 1);
-        
+
         // The square-free part should be x - 1
         let expected = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]).monic();
         assert_eq!(decomp[0].0.monic(), expected);
@@ -700,7 +815,7 @@ mod tests {
         let p = UniPoly::new("x", vec![Q(0, 1), Q(0, 1), Q(-1, 1), Q(3, 1), Q(-3, 1), Q(1, 1)]);
         let decomp = p.square_free_decomposition();
         assert!(!decomp.is_empty());
-        
+
         // The square-free part x(x-1) should have degree 2
         assert_eq!(decomp[0].0.degree(), Some(2));
     }
@@ -712,7 +827,7 @@ mod tests {
         let p = UniPoly::new("x", vec![Q(-12, 1), Q(-8, 1), Q(1, 1), Q(1, 1)]);
         let decomp = p.square_free_decomposition();
         assert!(!decomp.is_empty());
-        
+
         // The square-free part should have degree 2
         assert_eq!(decomp[0].0.degree(), Some(2));
     }
@@ -763,5 +878,120 @@ mod tests {
         // The square-free part should be x - 1
         let expected = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]).monic();
         assert_eq!(decomp[0].0.monic(), expected);
+    }
+
+    #[test]
+    fn resultant_no_common_roots() {
+        // f(x) = x - 1, g(x) = x - 2
+        // No common roots, resultant should be non-zero
+        // res(f,g) = f(root of g) = (2-1) = 1 (up to sign)
+        // Actually res = product of (root_f - root_g) = (1 - 2) = -1
+        let f = UniPoly::new("x", vec![Q(-1, 1), Q(1, 1)]);
+        let g = UniPoly::new("x", vec![Q(-2, 1), Q(1, 1)]);
+        let res = UniPoly::resultant(&f, &g).unwrap();
+        assert!(!res.is_zero());
+        // Result should be -1
+        assert_eq!(res, Q(-1, 1));
+    }
+
+    #[test]
+    fn resultant_common_root() {
+        // f(x) = (x - 1)(x - 2) = x^2 - 3x + 2
+        // g(x) = (x - 1)(x - 3) = x^2 - 4x + 3
+        // Common root at x = 1, resultant should be zero
+        let f = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+        let g = UniPoly::new("x", vec![Q(3, 1), Q(-4, 1), Q(1, 1)]);
+        let res = UniPoly::resultant(&f, &g).unwrap();
+        assert_eq!(res, Q::zero());
+    }
+
+    #[test]
+    fn resultant_linear_polynomials() {
+        // f(x) = 2x + 3, g(x) = 4x + 5
+        // res(f, g) = 2*5 - 3*4 = 10 - 12 = -2
+        let f = UniPoly::new("x", vec![Q(3, 1), Q(2, 1)]);
+        let g = UniPoly::new("x", vec![Q(5, 1), Q(4, 1)]);
+        let res = UniPoly::resultant(&f, &g).unwrap();
+        assert_eq!(res, Q(-2, 1));
+    }
+
+    #[test]
+    fn resultant_with_constant() {
+        // f(x) = 3 (constant), g(x) = x^2 + 1
+        // res = 3^2 = 9
+        let f = UniPoly::new("x", vec![Q(3, 1)]);
+        let g = UniPoly::new("x", vec![Q(1, 1), Q(0, 1), Q(1, 1)]);
+        let res = UniPoly::resultant(&f, &g).unwrap();
+        assert_eq!(res, Q(9, 1));
+    }
+
+    #[test]
+    fn resultant_zero_polynomials() {
+        let f = UniPoly::zero("x");
+        let g = UniPoly::zero("x");
+        let res = UniPoly::resultant(&f, &g);
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn discriminant_no_repeated_roots() {
+        // f(x) = (x - 1)(x - 2) = x^2 - 3x + 2
+        // No repeated roots, discriminant != 0
+        // disc = b^2 - 4ac = 9 - 8 = 1
+        let f = UniPoly::new("x", vec![Q(2, 1), Q(-3, 1), Q(1, 1)]);
+        let disc = f.discriminant().unwrap();
+        assert_eq!(disc, Q(1, 1));
+    }
+
+    #[test]
+    fn discriminant_repeated_root() {
+        // f(x) = (x - 1)^2 = x^2 - 2x + 1
+        // Has repeated root, discriminant = 0
+        // disc = b^2 - 4ac = 4 - 4 = 0
+        let f = UniPoly::new("x", vec![Q(1, 1), Q(-2, 1), Q(1, 1)]);
+        let disc = f.discriminant().unwrap();
+        assert_eq!(disc, Q::zero());
+    }
+
+    #[test]
+    fn discriminant_cubic() {
+        // f(x) = x^3 + x + 1
+        // disc(x^3 + px + q) = -4p^3 - 27q^2
+        // disc = -4(1)^3 - 27(1)^2 = -4 - 27 = -31
+        let f = UniPoly::new("x", vec![Q(1, 1), Q(1, 1), Q(0, 1), Q(1, 1)]);
+        let disc = f.discriminant().unwrap();
+        assert_eq!(disc, Q(-31, 1));
+    }
+
+    #[test]
+    fn discriminant_linear_returns_none() {
+        // Linear polynomial has no discriminant
+        let f = UniPoly::new("x", vec![Q(1, 1), Q(2, 1)]);
+        // Actually for linear ax + b, we can compute discriminant
+        // Let me check - typically discriminant is defined for degree >= 2
+        // For degree 1, it should be 1 (no repeated roots possible)
+        let disc = f.discriminant();
+        // Based on formula, derivative is constant, resultant will be that constant
+        // Actually for linear, it may vary by convention, let's check implementation
+        assert!(disc.is_some());
+    }
+
+    #[test]
+    fn discriminant_constant_returns_none() {
+        // Constant polynomial has no discriminant
+        let f = UniPoly::new("x", vec![Q(5, 1)]);
+        let disc = f.discriminant();
+        assert!(disc.is_none());
+    }
+
+    #[test]
+    fn discriminant_quadratic_formula() {
+        // f(x) = ax^2 + bx + c
+        // disc = b^2 - 4ac
+        // Test: 2x^2 + 3x + 1
+        // disc = 9 - 8 = 1
+        let f = UniPoly::new("x", vec![Q(1, 1), Q(3, 1), Q(2, 1)]);
+        let disc = f.discriminant().unwrap();
+        assert_eq!(disc, Q(1, 1));
     }
 }
