@@ -20,6 +20,8 @@ use expr_core::{ExprId, Op, Payload, Store};
 /// - cos(2*u) -> cos(u)^2 - sin(u)^2 (double-angle)
 /// - sin(u + v) -> sin(u)*cos(v) + cos(u)*sin(v) (angle addition)
 /// - cos(u + v) -> cos(u)*cos(v) - sin(u)*sin(v) (angle addition)
+/// - tan(u + v) -> (tan(u) + tan(v)) / (1 - tan(u)*tan(v)) (tangent angle addition)
+/// - tan(2*u) -> 2*tan(u) / (1 - tan(u)^2) (tangent double-angle)
 pub fn rewrite_basic(store: &mut Store, id: ExprId) -> ExprId {
     // For Add nodes, try top-level rules first (e.g., Pythagorean identity)
     // before recursing, so that sin^2 + cos^2 is recognized before
@@ -293,6 +295,60 @@ fn apply_rules(store: &mut Store, id: ExprId) -> Option<ExprId> {
             let neg_one = store.int(-1);
             let term2 = store.mul(vec![neg_one, prod]);
             let result = store.add(vec![term1, term2]);
+            return Some(result);
+        }
+    }
+
+    // tan(u + v) -> (tan(u) + tan(v)) / (1 - tan(u)*tan(v)) (tangent angle addition)
+    {
+        let pat = Pat::Function(
+            "tan".into(),
+            vec![Pat::Add(vec![Pat::Any("u".into()), Pat::Any("v".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            let v = *bind.get("v").unwrap();
+            // Build tan(u) + tan(v)
+            let tan_u = store.func("tan", vec![u]);
+            let tan_v = store.func("tan", vec![v]);
+            let numerator = store.add(vec![tan_u, tan_v]);
+            // Build 1 - tan(u)*tan(v)
+            let one = store.int(1);
+            let prod = store.mul(vec![tan_u, tan_v]);
+            let neg_one = store.int(-1);
+            let neg_prod = store.mul(vec![neg_one, prod]);
+            let denominator = store.add(vec![one, neg_prod]);
+            // Build (numerator) / (denominator) = numerator * denominator^(-1)
+            let neg_one2 = store.int(-1);
+            let denom_inv = store.pow(denominator, neg_one2);
+            let result = store.mul(vec![numerator, denom_inv]);
+            return Some(result);
+        }
+    }
+
+    // tan(2*u) -> 2*tan(u) / (1 - tan(u)^2) (tangent double-angle)
+    {
+        let pat = Pat::Function(
+            "tan".into(),
+            vec![Pat::Mul(vec![Pat::Integer(2), Pat::Any("u".into())])],
+        );
+        if let Some(bind) = match_expr(store, &pat, id) {
+            let u = *bind.get("u").unwrap();
+            // Build 2*tan(u)
+            let two = store.int(2);
+            let tan_u = store.func("tan", vec![u]);
+            let numerator = store.mul(vec![two, tan_u]);
+            // Build 1 - tan(u)^2
+            let one = store.int(1);
+            let two2 = store.int(2);
+            let tan_sq = store.pow(tan_u, two2);
+            let neg_one = store.int(-1);
+            let neg_tan_sq = store.mul(vec![neg_one, tan_sq]);
+            let denominator = store.add(vec![one, neg_tan_sq]);
+            // Build (numerator) / (denominator) = numerator * denominator^(-1)
+            let neg_one2 = store.int(-1);
+            let denom_inv = store.pow(denominator, neg_one2);
+            let result = store.mul(vec![numerator, denom_inv]);
             return Some(result);
         }
     }
@@ -600,5 +656,103 @@ mod tests {
         let result_str = st.to_string(result);
         assert!(result_str.contains("sin"));
         assert!(result_str.contains("cos"));
+    }
+
+    #[test]
+    fn rewrite_tan_angle_addition() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sum = st.add(vec![x, y]);
+        let tan_sum = st.func("tan", vec![sum]);
+
+        let result = rewrite_basic(&mut st, tan_sum);
+
+        // Expected: (tan(x) + tan(y)) / (1 - tan(x)*tan(y))
+        // Which is: (tan(x) + tan(y)) * (1 - tan(x)*tan(y))^(-1)
+        let x2 = st.sym("x");
+        let y2 = st.sym("y");
+        let tanx = st.func("tan", vec![x2]);
+        let tany = st.func("tan", vec![y2]);
+        let numerator = st.add(vec![tanx, tany]);
+        let one = st.int(1);
+        let prod = st.mul(vec![tanx, tany]);
+        let neg_one = st.int(-1);
+        let neg_prod = st.mul(vec![neg_one, prod]);
+        let denominator = st.add(vec![one, neg_prod]);
+        let neg_one2 = st.int(-1);
+        let denom_inv = st.pow(denominator, neg_one2);
+        let expected = st.mul(vec![numerator, denom_inv]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_tan_double_angle() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let tan_2x = st.func("tan", vec![two_x]);
+
+        let result = rewrite_basic(&mut st, tan_2x);
+
+        // Expected: 2*tan(x) / (1 - tan(x)^2)
+        // Which is: 2*tan(x) * (1 - tan(x)^2)^(-1)
+        let x2 = st.sym("x");
+        let two2 = st.int(2);
+        let tanx = st.func("tan", vec![x2]);
+        let numerator = st.mul(vec![two2, tanx]);
+        let one = st.int(1);
+        let two3 = st.int(2);
+        let tan_sq = st.pow(tanx, two3);
+        let neg_one = st.int(-1);
+        let neg_tan_sq = st.mul(vec![neg_one, tan_sq]);
+        let denominator = st.add(vec![one, neg_tan_sq]);
+        let neg_one2 = st.int(-1);
+        let denom_inv = st.pow(denominator, neg_one2);
+        let expected = st.mul(vec![numerator, denom_inv]);
+
+        assert_eq!(st.to_string(result), st.to_string(expected));
+    }
+
+    #[test]
+    fn rewrite_tan_subtraction() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let neg_one = st.int(-1);
+        let neg_y = st.mul(vec![neg_one, y]);
+        let diff = st.add(vec![x, neg_y]);
+        let tan_diff = st.func("tan", vec![diff]);
+
+        let result = rewrite_basic(&mut st, tan_diff);
+
+        // tan(x - y) should expand via the angle addition formula
+        // Result should contain tan terms and a division (represented as power -1)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("tan"));
+        // Division is represented as a^(-1), so we should see a power
+        assert!(result_str.contains("^"));
+    }
+
+    #[test]
+    fn rewrite_tan_with_complex_arg() {
+        let mut st = Store::new();
+        // tan(2*(x+y))
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sum = st.add(vec![x, y]);
+        let two = st.int(2);
+        let two_sum = st.mul(vec![two, sum]);
+        let tan_2sum = st.func("tan", vec![two_sum]);
+
+        let result = rewrite_basic(&mut st, tan_2sum);
+
+        // Should apply tan(2*u) formula
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("tan"));
+        // Should have division (power -1)
+        assert!(result_str.contains("^"));
     }
 }
