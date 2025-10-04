@@ -291,7 +291,11 @@ dependencies = [
 name = "plot"
 version = "0.1.0"
 dependencies = [
+ "calculus",
  "expr_core",
+ "io",
+ "pattern",
+ "simplify",
 ]
 
 [[package]]

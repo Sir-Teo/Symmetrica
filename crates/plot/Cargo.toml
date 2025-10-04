@@ -10,3 +10,9 @@ path = "src/lib.rs"
 
 [dependencies]
 expr_core = { path = "../expr_core" }
+
+[dev-dependencies]
+calculus = { path = "../calculus" }
+simplify = { path = "../simplify" }
+pattern = { path = "../pattern" }
+io = { path = "../io" }
