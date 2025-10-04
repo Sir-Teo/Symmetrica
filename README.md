@@ -1,24 +1,50 @@
 # Symmetrica
 [![CI](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml/badge.svg)](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml)
 
-A lightweight, embeddable symbolic computation engine (CAS) in Rust.
-Core principles:
-- Immutable DAG + hash-consing; canonical `Add`/`Mul`/`Pow`.
-- Default simplifier: constant folding, like-term/factor collection, rational normalization.
-- Deterministic ordering and stable digests; resource guards (planned).
+A lightweight, embeddable symbolic computation engine (CAS) in Rust for symbolic mathematics, calculus, and equation solving.
 
-- Minimal kernel; heavier features live in separate crates.
+## Key Features
 
-## Workspace layout
+- **Symbolic Computation**: Expression manipulation with automatic simplification
+- **Calculus**: Differentiation, integration, series expansion, and limits
+- **Equation Solving**: Univariate polynomial solving with exact rational and symbolic roots
+- **Linear Algebra**: Exact matrix operations over rational numbers
+- **Plotting**: SVG visualization of mathematical functions
+- **Multiple Formats**: LaTeX, JSON, and S-expression I/O
 
-- `crates/expr_core`: expression kernel (immutable DAG + interner) with canonical constructors and small rational helpers.
-- `crates/simplify`: explicit simplification passes; `simplify::simplify(&mut Store, id)`.
-- `crates/pattern`: basic substitution utilities.
-- `crates/polys`: univariate dense polynomials (Q), division/GCD, expr↔poly conversions.
-- `crates/calculus`: differentiation for Add/Mul/Pow with integer exponents.
-- `crates/cli`: tiny demonstration CLI.
-- Skeleton/stubs: `solver`, `matrix`, `assumptions`, `api`, `io`.
- - `crates/arith`: shared small-rational (i64) and gcd helpers used across crates.
+## Core Principles
+
+- **Immutable DAG**: Hash-consed expression trees for structural sharing
+- **Canonical Forms**: Automatic normalization of `Add`, `Mul`, and `Pow`
+- **Deterministic**: Stable ordering and digests for reproducible results
+- **Exact Arithmetic**: Rational numbers (no floating-point errors)
+- **Modular Design**: Minimal kernel with optional feature crates
+- **Zero Dependencies**: Core functionality uses only Rust stdlib
+
+## Workspace Layout
+
+### Core Modules
+
+- **`expr_core`**: Expression kernel with immutable DAG, hash-consing, and canonical constructors
+- **`arith`**: Small rational arithmetic (i64) and GCD utilities
+- **`simplify`**: Algebraic simplification passes (like-term collection, power merging)
+- **`pattern`**: Symbol substitution and pattern matching
+
+### Mathematical Modules
+
+- **`calculus`**: Differentiation, integration, Maclaurin series, and limits
+- **`polys`**: Univariate polynomials over Q with division, GCD, and partial fractions
+- **`solver`**: Univariate polynomial equation solving
+- **`matrix`**: Exact linear algebra over rationals (determinants, linear systems)
+- **`assumptions`**: Tri-valued logic for assumption-guarded transformations
+
+### I/O and Applications
+
+- **`io`**: LaTeX, JSON, and S-expression serialization/parsing
+- **`plot`**: SVG plotting with numerical evaluation
+- **`cli`**: Command-line interface (matika_cli)
+- **`api`**: FFI/bindings stub (future WASM/Python bindings)
+- **`tests_e2e`**: End-to-end integration tests
 
 ## Quickstart
 
@@ -52,62 +78,121 @@ Core principles:
    - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
  - Pattern/substitution (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
  - Polynomials (`crates/polys`): univariate dense over Q; division, GCD; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
-## Usage examples
+## Usage Examples
 
-Build and simplify an expression:
-{{ ... }}
- ```rust
- use expr_core::Store;
- use simplify::simplify;
+### Build and Simplify Expressions
 
- let mut st = Store::new();
- let x = st.sym("x");
- let expr = st.add(vec![
-     st.pow(x, st.int(2)),
-     st.mul(vec![st.int(3), x]),
-     st.int(1),
- ]);
- let s = simplify(&mut st, expr);
- println!("{}", st.to_string(s));
- ```
+```rust
+use expr_core::Store;
+use simplify::simplify;
 
- Differentiate with respect to `x`:
+let mut st = Store::new();
+let x = st.sym("x");
 
- ```rust
- use calculus::diff;
- let df = diff(&mut st, s, "x");
- println!("{}", st.to_string(df));
- ```
- Integrate with respect to `x`:
+// Build expression: x^2 + 3x + 1
+let expr = st.add(vec![
+    st.pow(x, st.int(2)),
+    st.mul(vec![st.int(3), x]),
+    st.int(1),
+]);
 
- ```rust
- use calculus::integrate;
- let ix2 = integrate(&mut st, st.pow(x, st.int(2)), "x").unwrap();
- let iinvx = integrate(&mut st, st.pow(x, st.int(-1)), "x").unwrap();
- println!("{}", st.to_string(ix2));      // 1/3 x^3
- println!("{}", st.to_string(iinvx));    // ln(x)
- ```
+// Simplify and print
+let simplified = simplify(&mut st, expr);
+println!("{}", st.to_string(simplified));  // Output: 1 + 3 * x + x^2
+```
 
- Substitute `x -> (y+1)`:
+### Differentiation
 
- ```rust
- use pattern::subst_symbol;
- let y = st.sym("y");
- let y1 = st.add(vec![y, st.int(1)]);
- let replaced = subst_symbol(&mut st, s, "x", y1);
- println!("{}", st.to_string(replaced));
- ```
+```rust
+use calculus::diff;
 
- Convert to/from univariate polynomial over Q:
+// Differentiate x^3 + 2x
+let expr = st.add(vec![
+    st.pow(x, st.int(3)),
+    st.mul(vec![st.int(2), x]),
+]);
 
- ```rust
- use polys::{expr_to_unipoly, unipoly_to_expr};
- let p = expr_to_unipoly(&st, s, "x").expect("convertible to UniPoly");
- let s_back = unipoly_to_expr(&mut st, &p);
- assert_eq!(st.get(s_back).digest, st.get(s).digest);
- ```
+let derivative = diff(&mut st, expr, "x");
+let simplified = simplify(&mut st, derivative);
+println!("{}", st.to_string(simplified));  // Output: 2 + 3 * x^2
+```
 
- See `crates/cli/src/main.rs` for a runnable end-to-end example.
+### Integration
+
+```rust
+use calculus::integrate;
+
+// Integrate x^2
+let x2 = st.pow(x, st.int(2));
+let integral = integrate(&mut st, x2, "x").unwrap();
+println!("{}", st.to_string(integral));  // Output: 1/3 * x^3
+
+// Integrate 1/x
+let inv_x = st.pow(x, st.int(-1));
+let ln_x = integrate(&mut st, inv_x, "x").unwrap();
+println!("{}", st.to_string(ln_x));  // Output: ln(x)
+```
+
+### Equation Solving
+
+```rust
+use solver::solve_univariate;
+
+// Solve x^2 + 3x + 2 = 0
+let eq = st.add(vec![
+    st.pow(x, st.int(2)),
+    st.mul(vec![st.int(3), x]),
+    st.int(2),
+]);
+
+let roots = solve_univariate(&mut st, eq, "x").unwrap();
+for root in roots {
+    println!("x = {}", st.to_string(root));
+}
+// Output: x = -1
+//         x = -2
+```
+
+### Pattern Substitution
+
+```rust
+use pattern::subst_symbol;
+
+// Substitute x -> (y + 1) in x^2
+let y = st.sym("y");
+let y_plus_1 = st.add(vec![y, st.int(1)]);
+let x2 = st.pow(x, st.int(2));
+
+let result = subst_symbol(&mut st, x2, "x", y_plus_1);
+let simplified = simplify(&mut st, result);
+println!("{}", st.to_string(simplified));  // Output: (1 + y)^2
+```
+
+### Polynomial Conversion
+
+```rust
+use polys::{expr_to_unipoly, unipoly_to_expr};
+
+// Convert expression to polynomial
+let poly = expr_to_unipoly(&st, expr, "x").expect("valid polynomial");
+println!("Degree: {:?}", poly.degree());
+
+// Convert back to expression
+let expr_back = unipoly_to_expr(&mut st, &poly);
+assert_eq!(st.get(expr).digest, st.get(expr_back).digest);
+```
+
+### LaTeX Output
+
+```rust
+use io::to_latex;
+
+let expr = st.pow(st.add(vec![x, st.int(1)]), st.int(2));
+let latex = to_latex(&st, expr);
+println!("{}", latex);  // Output: (1 + x)^{2}
+```
+
+For complete examples, see the `examples/` directory and `crates/cli/src/main.rs`.
 
 ## Local quality gates (what CI enforces)
 
@@ -153,12 +238,37 @@ cargo bench -p expr_core
 # HTML report: target/criterion/report/index.html
 ```
 
-## Docs & roadmap
+## Documentation
 
-- API docs: `cargo doc --workspace --no-deps --open`
-- roadmap: `docs/roadmap.md`
-- Design notes and prior art: `docs/research.md`
-- Initial skeleton and rationale: `docs/skeleton.md`
+### Module Documentation
+
+Comprehensive guides for each crate in `docs/`:
+
+- **[expr_core.md](docs/expr_core.md)**: Expression kernel, DAG, hash-consing
+- **[arith.md](docs/arith.md)**: Rational arithmetic and GCD
+- **[simplify.md](docs/simplify.md)**: Algebraic simplification passes
+- **[calculus.md](docs/calculus.md)**: Differentiation, integration, series
+- **[polys.md](docs/polys.md)**: Polynomial operations and conversions
+- **[solver.md](docs/solver.md)**: Equation solving algorithms
+- **[matrix.md](docs/matrix.md)**: Linear algebra over rationals
+- **[pattern.md](docs/pattern.md)**: Pattern matching and substitution
+- **[assumptions.md](docs/assumptions.md)**: Assumption system
+- **[io.md](docs/io.md)**: Serialization formats (LaTeX, JSON, S-expr)
+- **[plot.md](docs/plot.md)**: SVG plotting
+- **[cli.md](docs/cli.md)**: Command-line interface
+
+### Design Documentation
+
+- **[roadmap.md](docs/roadmap.md)**: Future development plans
+- **[research.md](docs/research.md)**: Design notes and prior art
+- **[skeleton.md](docs/skeleton.md)**: Initial architecture rationale
+
+### API Documentation
+
+Generate API docs:
+```bash
+cargo doc --workspace --no-deps --open
+```
 
 ## Release
 
