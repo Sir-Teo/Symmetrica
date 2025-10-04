@@ -89,6 +89,7 @@ name = "calculus"
 version = "0.1.0"
 dependencies = [
  "arith",
+ "criterion",
  "expr_core",
  "polys",
  "proptest",
@@ -816,6 +817,7 @@ version = "0.1.0"
 dependencies = [
  "arith",
  "assumptions",
+ "criterion",
  "expr_core",
  "proptest",
 ]
@@ -831,8 +833,10 @@ name = "solver"
 version = "0.1.0"
 dependencies = [
  "arith",
+ "criterion",
  "expr_core",
  "polys",
+ "simplify",
 ]
 
 [[package]]

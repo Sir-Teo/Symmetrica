@@ -16,3 +16,8 @@ arith = { path = "../arith" }
 
 [dev-dependencies]
 proptest = "1.5"
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+
+[[bench]]
+name = "simplify_benches"
+harness = false

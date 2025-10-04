@@ -272,6 +272,7 @@ Comprehensive guides for each crate in `docs/`:
 
 - **[fuzzing.md](docs/fuzzing.md)**: Fuzz testing infrastructure (Phase L)
 - **[property_testing.md](docs/property_testing.md)**: Property-based testing (Phase L)
+- **[benchmarking.md](docs/benchmarking.md)**: Performance regression testing (Phase L)
 
 ### API Documentation
 
