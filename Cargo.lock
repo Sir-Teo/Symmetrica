@@ -468,6 +468,7 @@ name = "polys"
 version = "0.1.0"
 dependencies = [
  "arith",
+ "criterion",
  "expr_core",
  "matrix",
  "proptest",

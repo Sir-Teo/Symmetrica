@@ -15,3 +15,8 @@ matrix = { path = "../matrix" }
 
 [dev-dependencies]
 proptest = "1.5"
+criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
+
+[[bench]]
+name = "polys_benches"
+harness = false
