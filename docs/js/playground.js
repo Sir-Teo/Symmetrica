@@ -221,6 +221,93 @@ function copyCode() {
     });
 }
 
+// Run example with WASM
+function runExample() {
+    const status = document.getElementById('output-status');
+    const output = document.getElementById('output');
+    
+    if (!window.SYM_WASM_READY) {
+        status.textContent = 'Initializing WASM...';
+        output.textContent = 'Please wait for WASM to load...';
+        return;
+    }
+    
+    status.textContent = 'Running...';
+    
+    try {
+        const Sym = window.Symmetrica;
+        
+        // Get active example
+        const activeBtn = document.querySelector('.example-btn.active');
+        const exampleKey = activeBtn ? activeBtn.getAttribute('data-example') : 'basic';
+        
+        let result;
+        
+        switch(exampleKey) {
+            case 'basic': {
+                const x = Sym.Expr.symbol('x');
+                const x2 = x.pow(new Sym.Expr(2));
+                const three_x = new Sym.Expr(3).mul(x);
+                const one = new Sym.Expr(1);
+                const expr = x2.add(three_x).add(one);
+                const simplified = expr.simplify();
+                result = simplified.toString();
+                break;
+            }
+            case 'diff': {
+                const x = Sym.Expr.symbol('x');
+                const x2 = x.pow(new Sym.Expr(2));
+                const sin_x2 = Sym.sin(x2);
+                const derivative = sin_x2.diff('x');
+                result = derivative.toString();
+                break;
+            }
+            case 'integrate': {
+                const x = Sym.Expr.symbol('x');
+                const x2 = x.pow(new Sym.Expr(2));
+                const integral = x2.integrate('x');
+                result = integral.toString();
+                break;
+            }
+            case 'simplify': {
+                const x = Sym.Expr.symbol('x');
+                const y = Sym.Expr.symbol('y');
+                const product = x.mul(y);
+                const ln_product = Sym.ln(product);
+                const simplified = ln_product.simplify();
+                result = simplified.toString();
+                break;
+            }
+            case 'solve': {
+                const x = Sym.Expr.symbol('x');
+                const x2 = x.pow(new Sym.Expr(2));
+                const three_x = new Sym.Expr(3).mul(x);
+                const two = new Sym.Expr(2);
+                const eq = x2.add(three_x).add(two);
+                const roots = eq.solve('x');
+                result = 'Roots: ' + JSON.stringify(roots);
+                break;
+            }
+            case 'series': {
+                const x = Sym.Expr.symbol('x');
+                const exp_x = Sym.exp(x);
+                result = 'Series expansion: ' + exp_x.toString();
+                break;
+            }
+            default:
+                result = 'Example not implemented yet';
+        }
+        
+        output.textContent = result;
+        status.textContent = 'Success';
+        
+    } catch (e) {
+        output.textContent = 'Error: ' + e.message;
+        status.textContent = 'Error';
+        console.error('Execution error:', e);
+    }
+}
+
 // Setup event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Example buttons

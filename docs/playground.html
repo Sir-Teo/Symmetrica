@@ -66,7 +66,10 @@
                 <div class="code-panel">
                     <div class="panel-header">
                         <span>Rust Code</span>
-                        <button class="btn-copy" onclick="copyCode()">Copy</button>
+                        <div>
+                            <button class="btn-run" onclick="runExample()">▶ Run</button>
+                            <button class="btn-copy" onclick="copyCode()">Copy</button>
+                        </div>
                     </div>
                     <pre><code id="code-editor" class="language-rust" contenteditable="true">use expr_core::Store;
 use simplify::simplify;
@@ -143,6 +146,27 @@ cargo run --example basic_polynomial</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
     <script src="js/main.js"></script>
+    
+    <!-- Initialize WASM before playground -->
+    <script type="module">
+        import init, * as Symmetrica from './pkg/symmetrica_wasm.js';
+        
+        (async () => {
+            try {
+                await init();
+                window.Symmetrica = Symmetrica;
+                window.SYM_WASM_READY = true;
+                const el = document.getElementById('output-status');
+                if (el) el.textContent = 'Ready (WASM)';
+                console.log('✓ Symmetrica WASM loaded successfully');
+            } catch (e) {
+                console.error('WASM initialization failed:', e);
+                const el = document.getElementById('output-status');
+                if (el) el.textContent = 'WASM load failed';
+            }
+        })();
+    </script>
+    
     <script src="js/playground.js"></script>
 </body>
 </html>
