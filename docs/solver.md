@@ -122,7 +122,48 @@ let roots = solve_univariate(&mut st, eq, "x").unwrap();
 
 **Note:** Currently returns one real root expressed with cube roots and square roots. Full implementation of all three roots requires complex number support (cube roots of unity).
 
-### Higher Degree Polynomials (Degree ≥ 4)
+### Quartic Equations (Degree 4)
+
+**Form:** `ax⁴ + bx³ + cx² + dx + e = 0`
+
+The solver uses a hybrid approach:
+
+1. **Factorization first**: Attempt to factor the quartic over Q
+2. **Ferrari's method**: If irreducible, apply Ferrari's resolvent cubic approach
+
+#### Ferrari's Method
+
+For quartics that don't factor over rationals, the solver uses Ferrari's method:
+
+**Algorithm:**
+1. Reduce general quartic to **depressed form** `y⁴ + py² + qy + r = 0` via substitution `x = y - b/(4a)`
+2. Solve the **resolvent cubic**: `z³ + 2pz² + (p² - 4r)z - q² = 0`
+3. Use one root of the resolvent to construct factorization
+4. The depressed quartic factors as `(y² + αy + β)(y² - αy + γ)` where `α = √(2z₀)`
+5. Transform back to get roots of original equation
+
+**Example:**
+```rust
+let mut st = Store::new();
+let x = st.sym("x");
+
+// Solve: x⁴ + x + 1 = 0 (no rational roots)
+let x4 = st.pow(x, st.int(4));
+let eq = st.add(vec![x4, x, st.int(1)]);
+
+let roots = solve_univariate(&mut st, eq, "x").unwrap();
+// Returns one symbolic root using Ferrari's method
+```
+
+**Biquadratic case** (missing x³ and x terms):
+```rust
+// x⁴ - 5x² + 4 = 0 → (x² - 1)(x² - 4) = 0
+// Factorization handles this automatically: x = ±1, ±2
+```
+
+**Note:** Currently returns one root expressed symbolically. Full implementation of all four roots would require solving two quadratic factors explicitly.
+
+### Higher Degree Polynomials (Degree ≥ 5)
 
 Uses **Rational Root Theorem** + **deflation** strategy:
 
@@ -341,6 +382,8 @@ Comprehensive test coverage:
 - Cubic with all rational roots (via factorization)
 - Cubic with no rational roots (Cardano's formula)
 - Depressed cubic (simple cube root)
+- Quartic biquadratic (via factorization)
+- Quartic with no rational roots (Ferrari's method)
 - Transcendental equations (exponential patterns)
 - Zero polynomial (empty result)
 - Constant polynomial (empty result)
@@ -354,10 +397,10 @@ cargo test -p solver
 ## Future Enhancements
 
 - ✅ ~~**Cardano's formula**~~: Implemented for cubic equations (returns one real root)
-- **Ferrari's method**: Quartic solving
-- **Complex roots**: Full support for all 3 cubic roots (requires complex cube roots of unity)
+- ✅ ~~**Ferrari's method**~~: Implemented for quartic equations (returns one real root)
+- **Complete root sets**: Return all roots for cubics (3) and quartics (4) with complex number support
 - **Algebraic numbers**: Represent roots symbolically (e.g., Root objects)
-- **Numerical solving**: Newton-Raphson for high-degree polynomials
+- **Numerical solving**: Newton-Raphson for high-degree polynomials (degree ≥ 5)
 - **Multiplicity**: Track root multiplicities explicitly
 - **Systems of equations**: Multivariate polynomial systems
 - **Inequalities**: Solve polynomial inequalities
