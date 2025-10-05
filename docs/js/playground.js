@@ -221,6 +221,17 @@ function copyCode() {
     });
 }
 
+// Parse numbers from code editor
+function extractNumbers(code) {
+    const numbers = [];
+    // Match st.int(number) patterns
+    const intMatches = code.matchAll(/st\.int\((-?\d+)\)/g);
+    for (const match of intMatches) {
+        numbers.push(parseInt(match[1]));
+    }
+    return numbers;
+}
+
 // Run example with WASM
 function runExample() {
     const status = document.getElementById('output-status');
@@ -237,35 +248,46 @@ function runExample() {
     try {
         const Sym = window.Symmetrica;
         
-        // Get active example
+        // Get active example and code from editor
         const activeBtn = document.querySelector('.example-btn.active');
         const exampleKey = activeBtn ? activeBtn.getAttribute('data-example') : 'basic';
+        const code = document.getElementById('code-editor').textContent;
+        
+        // Extract numbers from the edited code
+        const numbers = extractNumbers(code);
         
         let result;
         
         switch(exampleKey) {
             case 'basic': {
                 const x = Sym.Expr.symbol('x');
-                const x2 = x.pow(new Sym.Expr(2));
-                const three_x = new Sym.Expr(3).mul(x);
-                const one = new Sym.Expr(1);
-                const expr = x2.add(three_x).add(one);
+                // Use numbers from code if available, otherwise use defaults
+                const pow_exp = numbers[0] || 2;
+                const coeff = numbers[1] || 3;
+                const const_term = numbers[2] || 1;
+                
+                const x_pow = x.pow(new Sym.Expr(pow_exp));
+                const coeff_x = new Sym.Expr(coeff).mul(x);
+                const one = new Sym.Expr(const_term);
+                const expr = x_pow.add(coeff_x).add(one);
                 const simplified = expr.simplify();
                 result = simplified.toString();
                 break;
             }
             case 'diff': {
                 const x = Sym.Expr.symbol('x');
-                const x2 = x.pow(new Sym.Expr(2));
-                const sin_x2 = Sym.sin(x2);
-                const derivative = sin_x2.diff('x');
+                const pow_exp = numbers[0] || 2;
+                const x_pow = x.pow(new Sym.Expr(pow_exp));
+                const sin_x_pow = Sym.sin(x_pow);
+                const derivative = sin_x_pow.diff('x');
                 result = derivative.toString();
                 break;
             }
             case 'integrate': {
                 const x = Sym.Expr.symbol('x');
-                const x2 = x.pow(new Sym.Expr(2));
-                const integral = x2.integrate('x');
+                const pow_exp = numbers[0] || 2;
+                const x_pow = x.pow(new Sym.Expr(pow_exp));
+                const integral = x_pow.integrate('x');
                 result = integral.toString();
                 break;
             }
@@ -280,10 +302,15 @@ function runExample() {
             }
             case 'solve': {
                 const x = Sym.Expr.symbol('x');
-                const x2 = x.pow(new Sym.Expr(2));
-                const three_x = new Sym.Expr(3).mul(x);
-                const two = new Sym.Expr(2);
-                const eq = x2.add(three_x).add(two);
+                // Use numbers from code if available
+                const pow_exp = numbers[0] || 2;
+                const coeff = numbers[1] || 3;
+                const const_term = numbers[2] || 2;
+                
+                const x_pow = x.pow(new Sym.Expr(pow_exp));
+                const coeff_x = new Sym.Expr(coeff).mul(x);
+                const const_expr = new Sym.Expr(const_term);
+                const eq = x_pow.add(coeff_x).add(const_expr);
                 const roots = eq.solve('x');
                 result = 'Roots: ' + JSON.stringify(roots);
                 break;

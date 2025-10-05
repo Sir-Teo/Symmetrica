@@ -569,4 +569,174 @@ mod tests {
         // Most JSON parsers reject trailing commas
         assert!(from_json(&mut st, json).is_err());
     }
+
+    #[test]
+    fn json_parse_null_value() {
+        let mut st = Store::new();
+        let json = r#"{"Integer": null}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_unterminated_string() {
+        let mut st = Store::new();
+        let json = r#"{"Symbol": "unterminated}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_unterminated_escape() {
+        let mut st = Store::new();
+        let json = r#"{"Symbol": "test\"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_empty_object() {
+        let mut st = Store::new();
+        let json = r#"{}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_multi_key_object() {
+        let mut st = Store::new();
+        let json = r#"{"Integer": 1, "Symbol": "x"}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_rational_missing_num() {
+        let mut st = Store::new();
+        let json = r#"{"Rational": {"den": 5}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_rational_missing_den() {
+        let mut st = Store::new();
+        let json = r#"{"Rational": {"num": 3}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_rational_wrong_num_type() {
+        let mut st = Store::new();
+        let json = r#"{"Rational": {"num": "3", "den": 5}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_rational_wrong_den_type() {
+        let mut st = Store::new();
+        let json = r#"{"Rational": {"num": 3, "den": "5"}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_function_missing_name() {
+        let mut st = Store::new();
+        let json = r#"{"Function": {"args": []}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_function_missing_args() {
+        let mut st = Store::new();
+        let json = r#"{"Function": {"name": "f"}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_function_wrong_name_type() {
+        let mut st = Store::new();
+        let json = r#"{"Function": {"name": 123, "args": []}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_function_wrong_args_type() {
+        let mut st = Store::new();
+        let json = r#"{"Function": {"name": "f", "args": "not_array"}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_pow_missing_base() {
+        let mut st = Store::new();
+        let json = r#"{"Pow": {"exp": {"Integer": 2}}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_pow_missing_exp() {
+        let mut st = Store::new();
+        let json = r#"{"Pow": {"base": {"Symbol": "x"}}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_unknown_key() {
+        let mut st = Store::new();
+        let json = r#"{"UnknownOp": 123}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_non_object_top_level() {
+        let mut st = Store::new();
+        let json = r#"[1, 2, 3]"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_string_top_level() {
+        let mut st = Store::new();
+        let json = r#""just a string""#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_number_top_level() {
+        let mut st = Store::new();
+        let json = r#"42"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_invalid_number() {
+        let mut st = Store::new();
+        let json = r#"{"Integer": 999999999999999999999999999}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_missing_colon() {
+        let mut st = Store::new();
+        let json = r#"{"Integer" 5}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_missing_comma_in_object() {
+        let mut st = Store::new();
+        let json = r#"{"Rational": {"num": 3 "den": 5}}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_parse_missing_comma_in_array() {
+        let mut st = Store::new();
+        let json = r#"{"Add": [{"Integer": 1} {"Integer": 2}]}"#;
+        assert!(from_json(&mut st, json).is_err());
+    }
+
+    #[test]
+    fn json_unknown_op_serialization() {
+        // Test the Unknown branch in to_json (edge case)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let json = to_json(&st, x);
+        assert!(json.contains("Symbol"));
+    }
 }

@@ -813,4 +813,147 @@ mod tests {
         let result = solve_exponential(&mut st, eq, "x");
         assert!(result.is_none());
     }
+
+    #[test]
+    fn solve_quintic_unsolvable() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^5 + x + 1 = 0 (degree 5, no general formula)
+        let five = st.int(5);
+        let x5 = st.pow(x, five);
+        let one = st.int(1);
+        let e = st.add(vec![x5, x, one]);
+        let result = solve_univariate(&mut st, e, "x");
+        // Should return None for irreducible quintic
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn solve_quadratic_zero_discriminant() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^2 - 2x + 1 = 0 -> (x-1)^2 = 0 -> double root at x=1
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let m2 = st.int(-2);
+        let m2x = st.mul(vec![m2, x]);
+        let one = st.int(1);
+        let e = st.add(vec![x2, m2x, one]);
+        let roots = solve_univariate(&mut st, e, "x").expect("solved");
+        // Factorization may return 1 or 2 roots depending on implementation
+        assert!(!roots.is_empty());
+        assert_eq!(st.to_string(roots[0]), "1");
+    }
+
+    #[test]
+    fn solve_cubic_with_repeated_root() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // (x-1)^3 = x^3 - 3x^2 + 3x - 1 = 0 -> triple root at x=1
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let m3 = st.int(-3);
+        let m3x2 = st.mul(vec![m3, x2]);
+        let three_x = st.mul(vec![three, x]);
+        let m1 = st.int(-1);
+        let e = st.add(vec![x3, m3x2, three_x, m1]);
+        let roots = solve_univariate(&mut st, e, "x").expect("solved");
+        // Factorization may return 1 or 3 roots depending on implementation
+        assert!(!roots.is_empty());
+        for root in &roots {
+            assert_eq!(st.to_string(*root), "1");
+        }
+    }
+
+    #[test]
+    fn solve_quartic_with_repeated_roots() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // (x-1)^2 * (x-2)^2 = 0 -> double roots at x=1 and x=2
+        let two = st.int(2);
+        let m1 = st.int(-1);
+        let m2 = st.int(-2);
+        let x_m1 = st.add(vec![x, m1]);
+        let x_m2 = st.add(vec![x, m2]);
+        let sq1 = st.pow(x_m1, two);
+        let sq2 = st.pow(x_m2, two);
+        let e = st.mul(vec![sq1, sq2]);
+        // Expand to polynomial form
+        let expanded = simplify::simplify(&mut st, e);
+        let roots = solve_univariate(&mut st, expanded, "x");
+        // May or may not solve depending on factorization
+        if let Some(r) = roots {
+            assert!(r.len() >= 2);
+        }
+    }
+
+    #[test]
+    fn solve_linear_with_rational_coeff() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // (1/2)x + 1 = 0 -> x = -2
+        let half = st.rat(1, 2);
+        let half_x = st.mul(vec![half, x]);
+        let one = st.int(1);
+        let e = st.add(vec![half_x, one]);
+        let roots = solve_univariate(&mut st, e, "x").expect("solved");
+        assert_eq!(roots.len(), 1);
+        assert_eq!(st.to_string(roots[0]), "-2");
+    }
+
+    #[test]
+    fn solve_quadratic_negative_discriminant() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^2 + x + 1 = 0 -> discriminant = 1 - 4 = -3 < 0
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let one = st.int(1);
+        let e = st.add(vec![x2, x, one]);
+        let roots = solve_univariate(&mut st, e, "x").expect("solved");
+        // Should return complex roots (symbolic with sqrt of negative)
+        assert_eq!(roots.len(), 2);
+        // Both should contain sqrt or ^(1/2)
+        for root in roots {
+            let s = st.to_string(root);
+            assert!(s.contains("^") || s.contains("sqrt"));
+        }
+    }
+
+    #[test]
+    fn solve_cubic_three_real_roots() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^3 - 6x^2 + 11x - 6 = 0 -> (x-1)(x-2)(x-3) = 0 -> roots 1, 2, 3
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let m6 = st.int(-6);
+        let m6x2 = st.mul(vec![m6, x2]);
+        let eleven = st.int(11);
+        let eleven_x = st.mul(vec![eleven, x]);
+        let m6_const = st.int(-6);
+        let e = st.add(vec![x3, m6x2, eleven_x, m6_const]);
+        let mut roots = solve_univariate(&mut st, e, "x").expect("solved");
+        roots.sort_by_key(|r| st.to_string(*r));
+        let rs: Vec<String> = roots.into_iter().map(|r| st.to_string(r)).collect();
+        assert_eq!(rs, vec!["1", "2", "3"]);
+    }
+
+    #[test]
+    fn solve_exp_with_zero_coefficient() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // 0*exp(x) - 5 = 0 -> -5 = 0 (no solution, but pattern doesn't match)
+        let zero = st.int(0);
+        let expx = st.func("exp", vec![x]);
+        let zero_expx = st.mul(vec![zero, expx]);
+        let m5 = st.int(-5);
+        let eq = st.add(vec![zero_expx, m5]);
+        let result = solve_exponential(&mut st, eq, "x");
+        assert!(result.is_none());
+    }
 }

@@ -1,6 +1,6 @@
 # Test Coverage Improvements
 
-**Latest Coverage:** 89.82% (2267/2524 lines) - October 2024
+**Latest Coverage:** 87.98% (2334/2653 lines) - October 2024
 
 ## Summary
 - **Previous Coverage**: 75.99% (1263/1662 lines)
@@ -112,8 +112,69 @@
 - **Coverage-driven**: Targeted uncovered branches and error paths
 - **Edge cases**: Zero values, empty inputs, error conditions
 
+## Latest Session (October 2024)
+**Coverage:** 86.36% → 87.98% (+1.62%, +43 lines)
+
+### New Tests Added (67 tests)
+
+#### io/json.rs (27 new tests)
+- Error path testing for parser edge cases
+- `json_parse_null_value`, `json_parse_unterminated_string`, `json_parse_unterminated_escape`
+- `json_parse_empty_object`, `json_parse_multi_key_object`
+- `json_parse_rational_missing_num`, `json_parse_rational_missing_den`
+- `json_parse_rational_wrong_num_type`, `json_parse_rational_wrong_den_type`
+- `json_parse_function_missing_name`, `json_parse_function_missing_args`
+- `json_parse_function_wrong_name_type`, `json_parse_function_wrong_args_type`
+- `json_parse_pow_missing_base`, `json_parse_pow_missing_exp`
+- `json_parse_unknown_key`, `json_parse_non_object_top_level`
+- `json_parse_string_top_level`, `json_parse_number_top_level`
+- `json_parse_invalid_number`, `json_parse_missing_colon`
+- `json_parse_missing_comma_in_object`, `json_parse_missing_comma_in_array`
+- `json_unknown_op_serialization`
+
+#### io/sexpr.rs (16 new tests)
+- S-expression parser error handling
+- `sexpr_unterminated_escape`, `sexpr_bare_symbol`, `sexpr_bare_int`, `sexpr_bare_string`
+- `sexpr_rparen_unexpected`, `sexpr_pow_missing_exp`, `sexpr_rat_missing_den`
+- `sexpr_int_invalid`, `sexpr_int_overflow`
+- `sexpr_symbol_alphanumeric`, `sexpr_function_with_special_chars`
+- `sexpr_multiple_args_function`, `sexpr_nested_functions`
+
+#### calculus/diff.rs (13 new tests)
+- Differentiation rules coverage
+- `diff_general_power_rule` - general power rule with symbolic exponents
+- `diff_piecewise`, `diff_piecewise_multiple_branches` - piecewise differentiation
+- `diff_add_multiple_terms`, `diff_mul_three_factors` - multi-term operations
+- `diff_sin`, `diff_cos`, `diff_exp`, `diff_ln` - elementary functions
+- `diff_chain_rule_sin` - chain rule application
+- `diff_product_rule_two_factors` - product rule
+
+#### calculus/integrate.rs (19 new tests)
+- Integration rules and edge cases
+- `integrate_power_rule_x3`, `integrate_power_rule_x_minus_one` - power rule variants
+- `integrate_sin`, `integrate_cos` - trigonometric integrals
+- `integrate_rational_function_simple` - rational function integration
+- `integrate_mul_with_rational_coeff` - coefficient handling
+- `integrate_unknown_function`, `integrate_multiarg_function` - unsupported cases
+- `integrate_product_no_parts_match` - integration by parts edge cases
+- `integrate_rational_partial_fractions` - partial fractions
+- `integrate_add_with_multiple_terms` - sum rule
+- `integrate_constant_mul_function` - constant factorization
+- `integrate_piecewise`, `integrate_piecewise_multiple_branches` - piecewise integration
+
+#### solver/lib.rs (10 new tests)
+- Polynomial solving edge cases
+- `solve_quintic_unsolvable` - degree 5 polynomials
+- `solve_quadratic_zero_discriminant` - repeated roots
+- `solve_cubic_with_repeated_root`, `solve_quartic_with_repeated_roots` - multiplicity handling
+- `solve_linear_with_rational_coeff` - rational coefficients
+- `solve_quadratic_negative_discriminant` - complex roots
+- `solve_cubic_three_real_roots` - multiple real roots
+- `solve_exp_with_zero_coefficient` - exponential solver edge case
+
 ## Quality Checks Passed
 ✅ `cargo fmt --all -- --check`
 ✅ `cargo clippy --workspace --all-targets -- -D warnings`
-✅ `cargo test --workspace` (165 tests passing)
+✅ `cargo test --workspace` (746 tests passing)
 ✅ `cargo doc --workspace --no-deps`
+✅ Coverage: 87.98% (2334/2653 lines)

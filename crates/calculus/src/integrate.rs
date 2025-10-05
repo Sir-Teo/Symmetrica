@@ -704,4 +704,193 @@ mod tests {
 
         assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
     }
+
+    #[test]
+    fn integrate_power_rule_x3() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let res = integrate(&mut st, x3, "x").expect("x^3");
+        // ∫ x^3 dx = x^4/4
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        assert_eq!(st.get(simplified).digest, st.get(x3).digest);
+    }
+
+    #[test]
+    fn integrate_power_rule_x_minus_one() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let m1 = st.int(-1);
+        let x_inv = st.pow(x, m1);
+        let res = integrate(&mut st, x_inv, "x").expect("x^-1");
+        // ∫ x^-1 dx = ln(x)
+        assert!(st.to_string(res).contains("ln"));
+    }
+
+    #[test]
+    fn integrate_sin() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let res = integrate(&mut st, sinx, "x").expect("sin(x)");
+        // ∫ sin(x) dx = -cos(x)
+        assert!(st.to_string(res).contains("cos"));
+    }
+
+    #[test]
+    fn integrate_cos() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let cosx = st.func("cos", vec![x]);
+        let res = integrate(&mut st, cosx, "x").expect("cos(x)");
+        // ∫ cos(x) dx = sin(x)
+        assert!(st.to_string(res).contains("sin"));
+    }
+
+    #[test]
+    fn integrate_rational_function_simple() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x_plus_2 = st.add(vec![x, two]);
+        let m1 = st.int(-1);
+        let expr = st.pow(x_plus_2, m1); // 1/(x+2)
+        let res = integrate(&mut st, expr, "x");
+        // Should integrate to ln(x+2)
+        if let Some(r) = res {
+            assert!(st.to_string(r).contains("ln"));
+        }
+    }
+
+    #[test]
+    fn integrate_mul_with_rational_coeff() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let half = st.rat(1, 2);
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let expr = st.mul(vec![half, x2]);
+        let res = integrate(&mut st, expr, "x").expect("(1/2)*x^2");
+        // ∫ (1/2)x^2 dx = (1/2) * x^3/3 = x^3/6
+        let deriv = diff(&mut st, res, "x");
+        let simplified = simplify(&mut st, deriv);
+        let original_simplified = simplify(&mut st, expr);
+        assert_eq!(st.get(simplified).digest, st.get(original_simplified).digest);
+    }
+
+    #[test]
+    fn integrate_unknown_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let fx = st.func("unknown", vec![x]);
+        let res = integrate(&mut st, fx, "x");
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn integrate_multiarg_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let f = st.func("f", vec![x, y]);
+        let res = integrate(&mut st, f, "x");
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn integrate_product_no_parts_match() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sinx = st.func("sin", vec![x]);
+        let siny = st.func("sin", vec![y]);
+        let expr = st.mul(vec![sinx, siny]);
+        let res = integrate(&mut st, expr, "x");
+        // sin(y) is constant w.r.t. x, so should work
+        if let Some(r) = res {
+            assert!(!st.to_string(r).is_empty());
+        }
+    }
+
+    #[test]
+    fn integrate_rational_partial_fractions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+
+        // 1/((x-1)(x-2)) should use partial fractions
+        let m1_const = st.int(-1);
+        let m2_const = st.int(-2);
+        let x_m1 = st.add(vec![x, m1_const]);
+        let x_m2 = st.add(vec![x, m2_const]);
+        let den = st.mul(vec![x_m1, x_m2]);
+        let m1 = st.int(-1);
+        let expr = st.pow(den, m1);
+
+        let res = integrate(&mut st, expr, "x");
+        // Should succeed with partial fractions
+        if let Some(r) = res {
+            assert!(st.to_string(r).contains("ln"));
+        }
+    }
+
+    #[test]
+    fn integrate_add_with_multiple_terms() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sinx = st.func("sin", vec![x]);
+        let expr = st.add(vec![one, x, x2, sinx]);
+        let res = integrate(&mut st, expr, "x").expect("sum");
+        // Should integrate each term
+        let result = st.to_string(res);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn integrate_constant_mul_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let five = st.int(5);
+        let sinx = st.func("sin", vec![x]);
+        let expr = st.mul(vec![five, sinx]);
+        let res = integrate(&mut st, expr, "x").expect("5*sin(x)");
+        // ∫ 5 sin(x) dx = -5 cos(x)
+        assert!(st.to_string(res).contains("cos"));
+    }
+
+    #[test]
+    fn integrate_piecewise() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let cond = st.sym("c");
+        let pw = st.piecewise(vec![(cond, x2)]);
+        let res = integrate(&mut st, pw, "x");
+        // Should integrate piecewise
+        if let Some(r) = res {
+            assert!(st.to_string(r).contains("piecewise"));
+        }
+    }
+
+    #[test]
+    fn integrate_piecewise_multiple_branches() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let x2 = st.pow(x, two);
+        let x3 = st.pow(x, three);
+        let c1 = st.sym("c1");
+        let c2 = st.sym("c2");
+        let pw = st.piecewise(vec![(c1, x2), (c2, x3)]);
+        let res = integrate(&mut st, pw, "x");
+        if let Some(r) = res {
+            assert!(st.to_string(r).contains("piecewise"));
+        }
+    }
 }

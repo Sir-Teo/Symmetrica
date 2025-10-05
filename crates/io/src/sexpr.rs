@@ -544,4 +544,105 @@ mod tests {
         let mut st = Store::new();
         assert!(from_sexpr(&mut st, "(Sym \"unclosed").is_err());
     }
+
+    #[test]
+    fn sexpr_unterminated_escape() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(Sym \"test\\").is_err());
+    }
+
+    #[test]
+    fn sexpr_bare_symbol() {
+        let mut st = Store::new();
+        let parsed = from_sexpr(&mut st, "x").expect("parse");
+        assert_eq!(st.to_string(parsed), "x");
+    }
+
+    #[test]
+    fn sexpr_bare_int() {
+        let mut st = Store::new();
+        let parsed = from_sexpr(&mut st, "42").expect("parse");
+        assert_eq!(st.to_string(parsed), "42");
+    }
+
+    #[test]
+    fn sexpr_bare_string() {
+        let mut st = Store::new();
+        let parsed = from_sexpr(&mut st, "\"hello\"").expect("parse");
+        assert_eq!(st.to_string(parsed), "hello");
+    }
+
+    #[test]
+    fn sexpr_rparen_unexpected() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, ")").is_err());
+    }
+
+    #[test]
+    fn sexpr_pow_missing_exp() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(^ (Int 2))").is_err());
+    }
+
+    #[test]
+    fn sexpr_rat_missing_den() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(Rat 3)").is_err());
+    }
+
+    #[test]
+    fn sexpr_int_invalid() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(Int abc)").is_err());
+    }
+
+    #[test]
+    fn sexpr_int_overflow() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(Int 99999999999999999999999999)").is_err());
+    }
+
+    #[test]
+    fn sexpr_symbol_alphanumeric() {
+        let mut st = Store::new();
+        let sym = st.sym("test_var-123");
+        let s = to_sexpr(&st, sym);
+        // Should not be quoted
+        assert!(!s.contains("\""));
+        assert!(s.contains("test_var-123"));
+    }
+
+    #[test]
+    fn sexpr_function_with_special_chars() {
+        let mut st = Store::new();
+        let f = st.func("my func", vec![]);
+        let s = to_sexpr(&st, f);
+        // Should be quoted due to space
+        assert!(s.contains("\"my func\""));
+    }
+
+    #[test]
+    fn sexpr_multiple_args_function() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let z = st.sym("z");
+        let f = st.func("f", vec![x, y, z]);
+        let s = to_sexpr(&st, f);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(f), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_nested_functions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let inner = st.func("sin", vec![x]);
+        let outer = st.func("cos", vec![inner]);
+        let s = to_sexpr(&st, outer);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(outer), st2.to_string(parsed));
+    }
 }

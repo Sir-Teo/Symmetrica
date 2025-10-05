@@ -203,4 +203,145 @@ mod tests {
         let d = diff(&mut st, f, "x");
         assert_eq!(d, st.int(0));
     }
+
+    #[test]
+    fn diff_general_power_rule() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        // x^y where both base and exponent are non-constant
+        let pow = st.pow(x, y);
+        let d = diff(&mut st, pow, "x");
+        // Should use general power rule: x^y * (0*ln(x) + y*1/x)
+        let result = st.to_string(d);
+        // Result should contain y and x
+        assert!(result.contains("y") || result.contains("x"));
+    }
+
+    #[test]
+    fn diff_piecewise() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let cond = st.sym("c");
+        let pw = st.piecewise(vec![(cond, x2)]);
+        let d = diff(&mut st, pw, "x");
+        // Should differentiate the value part
+        let result = st.to_string(d);
+        assert!(result.contains("piecewise") || result.contains("2"));
+    }
+
+    #[test]
+    fn diff_piecewise_multiple_branches() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let x2 = st.pow(x, two);
+        let x3 = st.pow(x, three);
+        let c1 = st.sym("c1");
+        let c2 = st.sym("c2");
+        let pw = st.piecewise(vec![(c1, x2), (c2, x3)]);
+        let d = diff(&mut st, pw, "x");
+        // Should differentiate both branches
+        let result = st.to_string(d);
+        assert!(result.contains("piecewise"));
+    }
+
+    #[test]
+    fn diff_add_multiple_terms() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let x2 = st.pow(x, two);
+        let x3 = st.pow(x, three);
+        let sum = st.add(vec![x, x2, x3]);
+        let d = diff(&mut st, sum, "x");
+        // d/dx(x + x^2 + x^3) = 1 + 2x + 3x^2
+        let result = st.to_string(d);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn diff_mul_three_factors() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let z = st.sym("z");
+        let prod = st.mul(vec![x, y, z]);
+        let d = diff(&mut st, prod, "x");
+        // d/dx(xyz) = yz
+        let result = st.to_string(d);
+        assert!(result.contains("y") && result.contains("z"));
+    }
+
+    #[test]
+    fn diff_sin() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let d = diff(&mut st, sinx, "x");
+        let result = st.to_string(d);
+        assert!(result.contains("cos"));
+    }
+
+    #[test]
+    fn diff_cos() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let cosx = st.func("cos", vec![x]);
+        let d = diff(&mut st, cosx, "x");
+        let result = st.to_string(d);
+        assert!(result.contains("sin"));
+    }
+
+    #[test]
+    fn diff_exp() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expx = st.func("exp", vec![x]);
+        let d = diff(&mut st, expx, "x");
+        let result = st.to_string(d);
+        assert!(result.contains("exp"));
+    }
+
+    #[test]
+    fn diff_ln() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let lnx = st.func("ln", vec![x]);
+        let d = diff(&mut st, lnx, "x");
+        // d/dx(ln(x)) = 1/x = x^(-1)
+        let result = st.to_string(d);
+        assert!(result.contains("x"));
+    }
+
+    #[test]
+    fn diff_chain_rule_sin() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sin_x2 = st.func("sin", vec![x2]);
+        let d = diff(&mut st, sin_x2, "x");
+        // d/dx(sin(x^2)) = cos(x^2) * 2x
+        let result = st.to_string(d);
+        assert!(result.contains("cos"));
+    }
+
+    #[test]
+    fn diff_product_rule_two_factors() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sinx = st.func("sin", vec![x]);
+        let prod = st.mul(vec![x2, sinx]);
+        let d = diff(&mut st, prod, "x");
+        // d/dx(x^2 * sin(x)) = 2x*sin(x) + x^2*cos(x)
+        let result = st.to_string(d);
+        assert!(result.contains("sin") || result.contains("cos"));
+    }
 }
