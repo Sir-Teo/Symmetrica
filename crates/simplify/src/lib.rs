@@ -7,14 +7,28 @@ use assumptions::{Context, Prop, Truth};
 use expr_core::{ExprId, Op, Payload, Store};
 
 /// Simplify with a default assumptions context.
+/// Results are memoized in the store to avoid redundant computation.
 pub fn simplify(store: &mut Store, id: ExprId) -> ExprId {
     let ctx = Context::default();
     simplify_with(store, id, &ctx)
 }
 
 /// Simplify with an explicit assumptions context.
+/// Note: Memoization currently only works for default context simplification.
+/// When using a custom context, results are not cached to avoid incorrect cache hits.
 pub fn simplify_with(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
-    simplify_rec(store, id, ctx)
+    // Only use cache for default context to avoid incorrect cached results
+    // when different assumption contexts are used
+    if ctx.is_default() {
+        if let Some(cached) = store.get_simplify_cached(id) {
+            return cached;
+        }
+        let result = simplify_rec(store, id, ctx);
+        store.cache_simplify(id, result);
+        result
+    } else {
+        simplify_rec(store, id, ctx)
+    }
 }
 
 fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {

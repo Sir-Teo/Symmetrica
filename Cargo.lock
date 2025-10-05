@@ -25,7 +25,7 @@ checksum = "5192cca8006f1fd4f7237516f40fa183bb07f8fbdfedaa0036de5ea9b0b45e78"
 
 [[package]]
 name = "api"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "calculus",
  "evalf",
@@ -42,14 +42,14 @@ dependencies = [
 
 [[package]]
 name = "arith"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "proptest",
 ]
 
 [[package]]
 name = "assumptions"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
  "proptest",
@@ -90,7 +90,7 @@ checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
 name = "calculus"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "criterion",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "evalf"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
  "proptest",
@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "expr_core"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "criterion",
@@ -308,7 +308,7 @@ checksum = "f4c7245a08504955605670dbf141fceab975f15ca21570696aebe9d2e71576bd"
 
 [[package]]
 name = "io"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
  "proptest",
@@ -376,7 +376,7 @@ checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "matika_cli"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "calculus",
  "expr_core",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "matrix"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "criterion",
@@ -445,7 +445,7 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "pattern"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "assumptions",
  "expr_core",
@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "plot"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "calculus",
  "expr_core",
@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "polys"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "criterion",
@@ -778,7 +778,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "simplify"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "assumptions",
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "solver"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "criterion",
@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "symmetrica-wasm"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "calculus",
  "evalf",
@@ -849,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "tests_e2e"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "assumptions",

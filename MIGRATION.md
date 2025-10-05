@@ -119,7 +119,7 @@ let back = unipoly_to_expr(&mut st, &poly);
 ```rust
 use matrix::MatrixQ;
 
-let m = MatrixQ::from_i64(2, 2, vec![1, 2, 3, 4]);
+let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
 let det = m.det_bareiss();
 // ✅ No changes needed
 ```

@@ -9,16 +9,16 @@
 //! 3. Serialization format stability (io)
 //! 4. Error handling consistency
 
-use expr_core::{Op, Payload, Store};
-use simplify::simplify;
-use calculus::{diff, integrate};
-use polys::{expr_to_unipoly, unipoly_to_expr, UniPoly};
-use matrix::MatrixQ;
-use solver::solve_univariate;
-use pattern::subst_symbol;
-use assumptions::{Context, Prop, Truth};
-use io::{to_sexpr, from_sexpr, to_latex, to_json};
 use arith::Q;
+use assumptions::{Context, Prop, Truth};
+use calculus::{diff, integrate};
+use expr_core::{Op, Payload, Store};
+use io::{from_sexpr, to_json, to_latex, to_sexpr};
+use matrix::MatrixQ;
+use pattern::subst_symbol;
+use polys::{expr_to_unipoly, unipoly_to_expr, UniPoly};
+use simplify::simplify;
+use solver::solve_univariate;
 
 // ============================================================================
 // CORE API GUARANTEES (expr_core)
@@ -359,7 +359,7 @@ fn api_guarantee_poly_arithmetic() {
     assert_eq!(product.coeffs.len(), 3);
     assert_eq!(product.coeffs[0], Q(-1, 1)); // constant term
     assert_eq!(product.coeffs[2], Q(1, 1)); // x^2 term
-                                             // GUARANTEED: polynomial arithmetic is correct
+                                            // GUARANTEED: polynomial arithmetic is correct
 }
 
 #[test]

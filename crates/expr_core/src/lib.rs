@@ -57,6 +57,10 @@ struct NodeKey {
 pub struct Store {
     nodes: Vec<Node>,
     interner: HashMap<NodeKey, ExprId>,
+    /// Memoization cache for differentiation: (expr_id, variable_name) -> derivative
+    diff_cache: HashMap<(ExprId, String), ExprId>,
+    /// Memoization cache for simplification: expr_id -> simplified_expr
+    simplify_cache: HashMap<ExprId, ExprId>,
 }
 
 impl Store {
@@ -66,6 +70,34 @@ impl Store {
 
     pub fn get(&self, id: ExprId) -> &Node {
         &self.nodes[id.0]
+    }
+
+    // ---- Memoization cache access ----
+
+    /// Check if a differentiation result is cached
+    pub fn get_diff_cached(&self, expr: ExprId, var: &str) -> Option<ExprId> {
+        self.diff_cache.get(&(expr, var.to_string())).copied()
+    }
+
+    /// Store a differentiation result in the cache
+    pub fn cache_diff(&mut self, expr: ExprId, var: String, result: ExprId) {
+        self.diff_cache.insert((expr, var), result);
+    }
+
+    /// Check if a simplification result is cached
+    pub fn get_simplify_cached(&self, expr: ExprId) -> Option<ExprId> {
+        self.simplify_cache.get(&expr).copied()
+    }
+
+    /// Store a simplification result in the cache
+    pub fn cache_simplify(&mut self, expr: ExprId, result: ExprId) {
+        self.simplify_cache.insert(expr, result);
+    }
+
+    /// Clear all memoization caches
+    pub fn clear_caches(&mut self) {
+        self.diff_cache.clear();
+        self.simplify_cache.clear();
     }
 
     // ---- Constructors (atoms) ----
@@ -657,5 +689,71 @@ mod tests {
         let pw1 = st.piecewise(vec![(cond, x), (cond, one)]);
         let pw2 = st.piecewise(vec![(cond, x), (cond, one)]);
         assert_eq!(pw1, pw2); // Should be hash-consed
+    }
+
+    #[test]
+    fn test_memoization_diff_cache() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let result = st.int(1);
+
+        // Initially no cached result
+        assert_eq!(st.get_diff_cached(x, "x"), None);
+
+        // Cache a result
+        st.cache_diff(x, "x".to_string(), result);
+
+        // Should retrieve cached result
+        assert_eq!(st.get_diff_cached(x, "x"), Some(result));
+
+        // Different variable should not be cached
+        assert_eq!(st.get_diff_cached(x, "y"), None);
+
+        // Clear cache
+        st.clear_caches();
+        assert_eq!(st.get_diff_cached(x, "x"), None);
+    }
+
+    #[test]
+    fn test_memoization_simplify_cache() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let expr = st.add(vec![x, zero]); // x + 0
+        let simplified = x; // Should simplify to x
+
+        // Initially no cached result
+        assert_eq!(st.get_simplify_cached(expr), None);
+
+        // Cache a result
+        st.cache_simplify(expr, simplified);
+
+        // Should retrieve cached result
+        assert_eq!(st.get_simplify_cached(expr), Some(simplified));
+
+        // Clear cache
+        st.clear_caches();
+        assert_eq!(st.get_simplify_cached(expr), None);
+    }
+
+    #[test]
+    fn test_memoization_cache_persistence() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let dx_result = st.int(1);
+        let dy_result = st.int(0);
+
+        // Cache multiple differentiation results
+        st.cache_diff(x, "x".to_string(), dx_result);
+        st.cache_diff(x, "y".to_string(), dy_result);
+        st.cache_diff(y, "x".to_string(), dy_result);
+        st.cache_diff(y, "y".to_string(), dx_result);
+
+        // All should be retrievable
+        assert_eq!(st.get_diff_cached(x, "x"), Some(dx_result));
+        assert_eq!(st.get_diff_cached(x, "y"), Some(dy_result));
+        assert_eq!(st.get_diff_cached(y, "x"), Some(dy_result));
+        assert_eq!(st.get_diff_cached(y, "y"), Some(dx_result));
     }
 }

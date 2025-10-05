@@ -5,7 +5,22 @@ use simplify::simplify;
 
 /// Differentiate expression `id` with respect to symbol `var`.
 /// Supported: Add (linearity), Mul (product rule), Pow with integer exponent (chain rule).
+/// Results are memoized in the store to avoid redundant computation.
 pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
+    // Check cache first
+    if let Some(cached) = store.get_diff_cached(id, var) {
+        return cached;
+    }
+
+    let result = diff_impl(store, id, var);
+
+    // Cache the result before returning
+    store.cache_diff(id, var.to_string(), result);
+    result
+}
+
+/// Internal implementation of differentiation (without caching).
+fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
     match store.get(id).op {
         Op::Integer | Op::Rational => store.int(0),
         Op::Symbol => match &store.get(id).payload {

@@ -74,6 +74,11 @@ impl Context {
             Truth::Unknown
         }
     }
+
+    /// Check if this context is in the default state (no assumptions).
+    pub fn is_default(&self) -> bool {
+        self.stack.is_empty() || self.stack.iter().all(|frame| frame.is_empty())
+    }
 }
 
 // Default is derived; `new()` is provided for explicit construction convenience.
