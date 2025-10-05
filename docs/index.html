@@ -84,6 +84,98 @@ println!("{}", st.to_string(simplified));
         </div>
     </header>
 
+    <section class="why-symmetrica">
+        <div class="container">
+            <h2 class="section-title">Why Symmetrica?</h2>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <div class="comparison-icon">🚀</div>
+                    <h3>Performance</h3>
+                    <p>Hash-consed DAG with O(1) equality checks. Structural sharing keeps memory usage minimal even with complex expressions.</p>
+                    <div class="metric">
+                        <span class="metric-value">10⁴</span>
+                        <span class="metric-label">nodes/second</span>
+                    </div>
+                </div>
+                <div class="comparison-card">
+                    <div class="comparison-icon">🔒</div>
+                    <h3>Type Safety</h3>
+                    <p>100% Rust safe code with zero unsafe blocks in core. Compile-time guarantees prevent runtime errors.</p>
+                    <div class="metric">
+                        <span class="metric-value">0</span>
+                        <span class="metric-label">unsafe blocks</span>
+                    </div>
+                </div>
+                <div class="comparison-card">
+                    <div class="comparison-icon">📦</div>
+                    <h3>Lightweight</h3>
+                    <p>Core functionality requires only Rust stdlib. No heavy dependencies means fast compilation and small binaries.</p>
+                    <div class="metric">
+                        <span class="metric-value">&lt;15MB</span>
+                        <span class="metric-label">static binary</span>
+                    </div>
+                </div>
+                <div class="comparison-card">
+                    <div class="comparison-icon">🎯</div>
+                    <h3>Deterministic</h3>
+                    <p>Canonical forms with stable ordering produce identical results every time. Perfect for testing and reproducibility.</p>
+                    <div class="metric">
+                        <span class="metric-value">100%</span>
+                        <span class="metric-label">reproducible</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="use-cases">
+        <div class="container">
+            <h2 class="section-title">Use Cases</h2>
+            <div class="use-cases-grid">
+                <div class="use-case-card">
+                    <div class="use-case-icon">🎓</div>
+                    <h3>Education</h3>
+                    <p>Build interactive math tools, symbolic calculators, and educational software with exact arithmetic.</p>
+                    <ul class="use-case-features">
+                        <li>Step-by-step solutions</li>
+                        <li>Expression visualization</li>
+                        <li>Automated grading</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">🔬</div>
+                    <h3>Scientific Computing</h3>
+                    <p>Perform symbolic computations in physics, engineering, and research with exact rational arithmetic.</p>
+                    <ul class="use-case-features">
+                        <li>Symbolic derivations</li>
+                        <li>Equation manipulation</li>
+                        <li>Formula simplification</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">⚙️</div>
+                    <h3>Embedded Systems</h3>
+                    <p>Deploy in constrained environments with minimal dependencies and predictable memory usage.</p>
+                    <ul class="use-case-features">
+                        <li>No heap allocations (optional)</li>
+                        <li>Small binary size</li>
+                        <li>WebAssembly support</li>
+                    </ul>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">🤖</div>
+                    <h3>AI & Machine Learning</h3>
+                    <p>Symbolic regression, automatic differentiation, and mathematical reasoning for ML pipelines.</p>
+                    <ul class="use-case-features">
+                        <li>Symbolic derivatives</li>
+                        <li>Expression optimization</li>
+                        <li>Model interpretability</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="features">
         <div class="container">
             <h2 class="section-title">Core Features</h2>
@@ -223,6 +315,57 @@ apply_rule(&mut st, expr, &pattern);
         </div>
     </section>
 
+    <section class="roadmap-section">
+        <div class="container">
+            <h2 class="section-title">Development Roadmap</h2>
+            <div class="roadmap">
+                <div class="roadmap-item completed">
+                    <div class="roadmap-marker"></div>
+                    <div class="roadmap-content">
+                        <h3>Phase A-H: Foundation Complete ✓</h3>
+                        <p>Core kernel, simplification, calculus, polynomials, solver, and pattern matching</p>
+                        <span class="roadmap-status">Completed</span>
+                    </div>
+                </div>
+                <div class="roadmap-item completed">
+                    <div class="roadmap-marker"></div>
+                    <div class="roadmap-content">
+                        <h3>Phase I: Assumptions v2 ✓</h3>
+                        <p>Domain-aware simplification with piecewise propagation</p>
+                        <span class="roadmap-status">Just Released</span>
+                    </div>
+                </div>
+                <div class="roadmap-item in-progress">
+                    <div class="roadmap-marker"></div>
+                    <div class="roadmap-content">
+                        <h3>Phase J: Advanced Integration</h3>
+                        <p>Heuristic Risch fragments, enhanced integration by parts</p>
+                        <span class="roadmap-status">In Progress</span>
+                    </div>
+                </div>
+                <div class="roadmap-item">
+                    <div class="roadmap-marker"></div>
+                    <div class="roadmap-content">
+                        <h3>Phase K: WASM & Python</h3>
+                        <p>Optimized WASM build, Python wheels for all platforms</p>
+                        <span class="roadmap-status">Planned</span>
+                    </div>
+                </div>
+                <div class="roadmap-item">
+                    <div class="roadmap-marker"></div>
+                    <div class="roadmap-content">
+                        <h3>Phase L: v1.0 Release</h3>
+                        <p>Fuzzing, differential testing, performance optimization, stable API</p>
+                        <span class="roadmap-status">Future</span>
+                    </div>
+                </div>
+            </div>
+            <div class="cta-centered">
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/docs/roadmap.md" class="btn btn-secondary" target="_blank">View Full Roadmap</a>
+            </div>
+        </div>
+    </section>
+
     <section class="quickstart">
         <div class="container">
             <h2 class="section-title">Quick Start</h2>
@@ -259,6 +402,64 @@ let mut st = Store::new();
             </div>
             <div class="cta">
                 <a href="getting-started.html" class="btn btn-large btn-primary">View Full Documentation</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="community">
+        <div class="container">
+            <h2 class="section-title">Join the Community</h2>
+            <div class="community-grid">
+                <div class="community-card">
+                    <div class="community-stat">
+                        <span class="stat-icon">⭐</span>
+                        <span class="stat-number" data-target="0">0</span>
+                    </div>
+                    <p>GitHub Stars</p>
+                    <a href="https://github.com/Sir-Teo/Symmetrica" class="community-link" target="_blank">Star on GitHub →</a>
+                </div>
+                <div class="community-card">
+                    <div class="community-stat">
+                        <span class="stat-icon">🔀</span>
+                        <span class="stat-number" data-target="0">0</span>
+                    </div>
+                    <p>Forks</p>
+                    <a href="https://github.com/Sir-Teo/Symmetrica/fork" class="community-link" target="_blank">Fork Repository →</a>
+                </div>
+                <div class="community-card">
+                    <div class="community-stat">
+                        <span class="stat-icon">🐛</span>
+                        <span class="stat-number" data-target="0">0</span>
+                    </div>
+                    <p>Issues Resolved</p>
+                    <a href="https://github.com/Sir-Teo/Symmetrica/issues" class="community-link" target="_blank">View Issues →</a>
+                </div>
+                <div class="community-card">
+                    <div class="community-stat">
+                        <span class="stat-icon">💬</span>
+                        <span class="stat-number">Active</span>
+                    </div>
+                    <p>Community</p>
+                    <a href="https://github.com/Sir-Teo/Symmetrica/discussions" class="community-link" target="_blank">Join Discussion →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-box">
+                <h2>Ready to Get Started?</h2>
+                <p>Build powerful symbolic computation tools with Symmetrica today.</p>
+                <div class="cta-buttons">
+                    <a href="getting-started.html" class="btn btn-primary btn-large">Get Started</a>
+                    <a href="https://github.com/Sir-Teo/Symmetrica" class="btn btn-secondary btn-large" target="_blank">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 0.5rem;">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                </div>
             </div>
         </div>
     </section>

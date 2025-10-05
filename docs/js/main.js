@@ -1,3 +1,18 @@
+// Typing animation for hero
+function typeWriter(element, text, speed = 50) {
+    let i = 0;
+    element.textContent = '';
+    
+    function type() {
+        if (i < text.length) {
+            element.textContent += text.charAt(i);
+            i++;
+            setTimeout(type, speed);
+        }
+    }
+    type();
+}
+
 // Initialize syntax highlighting
 document.addEventListener('DOMContentLoaded', () => {
     hljs.highlightAll();
@@ -96,11 +111,13 @@ document.addEventListener('DOMContentLoaded', () => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const statValue = entry.target.querySelector('.stat-value');
-                const text = statValue.textContent;
-                const number = parseInt(text.replace(/\D/g, ''));
-                if (!isNaN(number)) {
-                    animateCounter(statValue, number);
-                    statsObserver.unobserve(entry.target);
+                if (statValue) {
+                    const text = statValue.textContent;
+                    const number = parseInt(text.replace(/\D/g, ''));
+                    if (!isNaN(number)) {
+                        animateCounter(statValue, number);
+                        statsObserver.unobserve(entry.target);
+                    }
                 }
             }
         });
@@ -109,6 +126,55 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.stat').forEach(stat => {
         statsObserver.observe(stat);
     });
+    
+    // Scroll reveal animations
+    const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('active');
+                revealObserver.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    });
+    
+    // Add reveal class to sections
+    document.querySelectorAll('section').forEach((section, index) => {
+        if (index > 0) { // Skip first section (hero)
+            section.classList.add('reveal');
+            revealObserver.observe(section);
+        }
+    });
+    
+    // Parallax scrolling effect for hero
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const hero = document.querySelector('.hero');
+                if (hero) {
+                    const scrolled = window.pageYOffset;
+                    const heroContent = hero.querySelector('.hero-content');
+                    const heroDemo = hero.querySelector('.hero-demo');
+                    
+                    if (heroContent && scrolled < window.innerHeight) {
+                        heroContent.style.transform = `translateY(${scrolled * 0.3}px)`;
+                        heroContent.style.opacity = 1 - (scrolled / 500);
+                    }
+                    if (heroDemo && scrolled < window.innerHeight) {
+                        heroDemo.style.transform = `translateY(${scrolled * 0.15}px)`;
+                    }
+                }
+                ticking = false;
+            });
+            ticking = true;
+        }
+    });
+    
+    // Add loading animation
+    document.body.classList.add('loaded');
 });
 
 // Add copy button styles dynamically
