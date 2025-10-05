@@ -683,7 +683,70 @@ let cols = m.columnspace();
 - Every column of A can be expressed as a linear combination of basis vectors
 - Number of basis vectors = rank = dimension of column space
 
+## LU Decomposition
+
+```rust
+pub fn lu_decompose(&self) -> Result<(MatrixQ, MatrixQ, Vec<usize>), &'static str>
+```
+
+Performs LU decomposition with partial pivoting: **PA = LU**.
+
+**Returns:**
+- `Ok((L, U, perm))` where:
+  - `L` is lower triangular with 1's on diagonal
+  - `U` is upper triangular
+  - `perm` is the permutation vector (perm[i] = row index in original matrix)
+- `Err`: If matrix is not square
+
+**Algorithm:**
+1. Initialize L as identity, U as copy of matrix
+2. For each column, find pivot (largest absolute value)
+3. Swap rows if needed (partial pivoting)
+4. Eliminate below pivot
+5. Store multipliers in L
+
+**Properties:**
+- PA = LU where P is the permutation matrix
+- More stable than Gaussian elimination without pivoting
+- Time complexity: O(n³)
+- Can handle singular matrices (will have zeros on U diagonal)
+
+**Examples:**
+
+**Basic 2×2 decomposition:**
+```rust
+// [[2, 1], [4, 3]]
+let m = MatrixQ::from_i64(2, 2, &[2, 1, 4, 3]);
+let (l, u, perm) = m.lu_decompose().unwrap();
+
+// L is lower triangular with 1's on diagonal
+// U is upper triangular
+// perm gives the row permutation
+```
+
+**Identity matrix:**
+```rust
+let m = MatrixQ::identity(3);
+let (l, u, perm) = m.lu_decompose().unwrap();
+
+assert_eq!(l, MatrixQ::identity(3));
+assert_eq!(u, MatrixQ::identity(3));
+assert_eq!(perm, vec![0, 1, 2]);  // No permutation needed
+```
+
+**Verify decomposition:**
+```rust
+let m = MatrixQ::from_i64(3, 3, &[2, 1, 1, 4, 3, 3, 8, 7, 9]);
+let (l, u, perm) = m.lu_decompose().unwrap();
+
+// Reconstruct PA from LU
+// PA[i,j] = sum_k L[i,k] * U[k,j]
+// where PA is the permuted original matrix
+```
+
 ## Linear System Solving
+
+### solve_bareiss (Cramer's Rule)
 
 ```rust
 pub fn solve_bareiss(&self, b: &[Q]) -> Result<Option<Vec<Q>>, &'static str>
@@ -752,6 +815,88 @@ let x = A.solve_bareiss(&b).unwrap().unwrap();
 assert_eq!(x.len(), 0);
 ```
 
+### solve_lu (LU Decomposition)
+
+```rust
+pub fn solve_lu(&self, b: &[Q]) -> Result<Option<Vec<Q>>, &'static str>
+```
+
+Solves the linear system `Ax = b` using **LU decomposition with partial pivoting**.
+
+**Returns:**
+- `Ok(Some(x))`: Unique solution vector
+- `Ok(None)`: Singular matrix (no unique solution)
+- `Err`: If matrix is not square or `b.len() ≠ rows`
+
+**Algorithm:**
+1. Decompose PA = LU
+2. Check if U is singular (any zero on diagonal)
+3. Permute b according to permutation: b_perm = Pb
+4. Forward substitution: solve Ly = b_perm
+5. Backward substitution: solve Ux = y
+
+**Complexity:**
+- O(n³) for decomposition
+- O(n²) for forward/backward substitution
+- **More efficient than Cramer's rule** which is O(n⁴)
+- Ideal for solving multiple systems with the same matrix A
+
+**Examples:**
+
+**Basic 2×2 system:**
+```rust
+// [[2, 1], [4, 3]] * [x, y]^T = [5, 11]^T
+// Solution: x = 2, y = 1
+let A = MatrixQ::from_i64(2, 2, &[2, 1, 4, 3]);
+let b = vec![Q(5, 1), Q(11, 1)];
+
+let x = A.solve_lu(&b).unwrap().expect("unique solution");
+assert_eq!(x, vec![Q(2, 1), Q(1, 1)]);
+```
+
+**3×3 system:**
+```rust
+let A = MatrixQ::from_i64(3, 3, &[2, 1, 1, 4, 3, 3, 8, 7, 9]);
+let b = vec![Q(4, 1), Q(10, 1), Q(24, 1)];
+
+let x = A.solve_lu(&b).unwrap().expect("unique solution");
+
+// Verify: Ax = b
+let result = matrix_vector_mul(&A, &x);
+assert_eq!(result, b);
+```
+
+**Singular system:**
+```rust
+// [[1, 2], [2, 4]] is singular (det = 0)
+let A = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+let b = vec![Q(3, 1), Q(6, 1)];
+
+let result = A.solve_lu(&b).unwrap();
+assert!(result.is_none());  // No unique solution
+```
+
+**Matrix requiring pivoting:**
+```rust
+// LU decomposition handles pivoting automatically
+let A = MatrixQ::from_i64(3, 3, &[0, 1, 2, 1, 0, 3, 4, 5, 6]);
+let b = vec![Q(5, 1), Q(7, 1), Q(27, 1)];
+
+let x = A.solve_lu(&b).unwrap().expect("unique solution");
+```
+
+**Comparison with Cramer's rule:**
+Both methods give identical results for non-singular systems:
+```rust
+let A = MatrixQ::from_i64(3, 3, &[1, 2, 3, 0, 1, 4, 5, 6, 0]);
+let b = vec![Q(14, 1), Q(8, 1), Q(27, 1)];
+
+let x_lu = A.solve_lu(&b).unwrap().expect("LU solution");
+let x_bareiss = A.solve_bareiss(&b).unwrap().expect("Bareiss solution");
+
+assert_eq!(x_lu, x_bareiss);
+```
+
 ## Storage Format
 
 **Row-major order:** Element at position `(r, c)` is stored at index `r * cols + c`.
@@ -791,7 +936,10 @@ assert!(A.solve_bareiss(&b).is_err());
 - **inverse**: O(n³) for n×n matrix (Gauss-Jordan elimination)
 - **rank**: O(min(m,n)²·max(m,n)) for m×n matrix (row reduction)
 - **nullspace**: O(min(m,n)²·max(m,n)) for m×n matrix (RREF)
+- **columnspace**: O(min(m,n)²·max(m,n)) for m×n matrix (REF)
+- **lu_decompose**: O(n³) for n×n matrix (Gaussian elimination with pivoting)
 - **solve_bareiss**: O(n⁴) due to Cramer's rule (n determinants of size n)
+- **solve_lu**: O(n³) for decomposition + O(n²) for substitution
 
 ### Space Complexity
 - **add/sub**: O(n²) for result matrix
@@ -803,13 +951,17 @@ assert!(A.solve_bareiss(&b).is_err());
 - **inverse**: O(2n²) for augmented matrix
 - **rank**: O(mn) for matrix copy during row reduction
 - **nullspace**: O(mn) for RREF computation + O(n·nullity) for basis vectors
+- **columnspace**: O(mn) for REF computation
+- **lu_decompose**: O(n²) for L and U matrices
 - **solve_bareiss**: O(n²) for temporary matrices
+- **solve_lu**: O(n²) for L, U, and permutation vector
 
 ### Practical Limits
 - **add/sub/mul**: Efficient for any reasonable size
 - **det/inverse/rank**: Efficient for n ≤ 100
-- **solve**: Usable for n ≤ 20 (Cramer's rule is slow)
-- For larger systems, use iterative methods or factorizations (not implemented)
+- **solve_lu**: Efficient for n ≤ 100 (O(n³))
+- **solve_bareiss**: Usable for n ≤ 20 (Cramer's rule is O(n⁴))
+- For very large sparse systems, specialized methods would be needed
 
 ## Numerical Stability
 
@@ -824,7 +976,7 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite (108 unit tests):
+Comprehensive test suite (122 unit tests + 2 property tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
@@ -837,6 +989,8 @@ Comprehensive test suite (108 unit tests):
 - **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, rank-nullity theorem
 - **Nullspace**: Trivial/non-trivial cases, rank-nullity theorem, verification via Ax=0
 - **Column space**: Full rank, rank-deficient, dimension equals rank, orthogonality properties
+- **LU decomposition**: 2×2, 3×3, 4×4, identity, singular, pivoting, PA=LU verification
+- **solve_lu**: Basic systems, singular systems, pivoting, comparison with Cramer's rule
 - **Error conditions**: Non-square matrices, dimension mismatches
 - **Edge cases**: Zero-size matrices
 
@@ -863,17 +1017,16 @@ Only exact rational arithmetic. For numerical work, use external libraries like 
 
 ### Missing Advanced Operations
 Still not implemented:
-- LU/QR/Cholesky decomposition
+- QR/Cholesky decomposition
 - Eigenvalues/eigenvectors
 - Singular Value Decomposition (SVD)
 
 ### Inefficient for Large Systems
-- Cramer's rule for solving is O(n⁴)
+- Cramer's rule (solve_bareiss) for solving is O(n⁴) - use solve_lu instead
 - Gauss-Jordan for inverse is O(n³)
 - Future versions should implement:
-  - Gaussian elimination with back-substitution
-  - LU decomposition (more efficient for repeated solves)
-  - Sparse matrix support
+  - Iterative methods for very large systems
+  - Sparse matrix support for large sparse systems
 
 ### No Overdetermined/Underdetermined Systems
 Only handles square systems. No least-squares or nullspace computation.
@@ -918,8 +1071,9 @@ if !det.is_zero() {
 - ✅ ~~Inversion: Compute A⁻¹ via Gauss-Jordan~~ (Implemented)
 - ✅ ~~Rank computation: Row reduction to determine rank~~ (Implemented)
 - ✅ ~~Nullspace and column space: Basis computation~~ (Implemented)
-- **Factorizations**: LU, QR, Cholesky
-- **Better solving**: Gaussian elimination instead of Cramer's rule
+- ✅ ~~LU decomposition with partial pivoting~~ (Implemented)
+- ✅ ~~Efficient solve via LU decomposition~~ (Implemented)
+- **Factorizations**: QR, Cholesky
 - **Eigenvalues**: Characteristic polynomial, power iteration
 - **Sparse matrices**: CSR/CSC formats for large sparse systems
 - **Expression integration**: Matrix elements as symbolic expressions

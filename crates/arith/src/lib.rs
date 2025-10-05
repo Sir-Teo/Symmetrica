@@ -9,6 +9,21 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Q(pub i64, pub i64);
 
+impl PartialOrd for Q {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Q {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Compare a/b with c/d by comparing a*d with b*c
+        let lhs = self.0 as i128 * other.1 as i128;
+        let rhs = other.0 as i128 * self.1 as i128;
+        lhs.cmp(&rhs)
+    }
+}
+
 impl Q {
     pub fn new(num: i64, den: i64) -> Self {
         let (n, d) = normalize_rat(num, den);
@@ -22,6 +37,9 @@ impl Q {
     }
     pub fn is_zero(&self) -> bool {
         self.0 == 0
+    }
+    pub fn abs(&self) -> Self {
+        Q(self.0.abs(), self.1)
     }
 }
 

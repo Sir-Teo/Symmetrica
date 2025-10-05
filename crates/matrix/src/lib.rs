@@ -461,6 +461,131 @@ impl MatrixQ {
         basis
     }
 
+    /// Perform LU decomposition with partial pivoting: PA = LU.
+    /// Returns (L, U, perm) where:
+    /// - L is lower triangular with 1's on diagonal
+    /// - U is upper triangular
+    /// - perm is the permutation vector (perm\[i\] = row index in original matrix)
+    ///
+    /// Returns Ok((L, U, perm)) on success, Err if matrix is not square.
+    pub fn lu_decompose(&self) -> Result<(MatrixQ, MatrixQ, Vec<usize>), &'static str> {
+        if self.rows != self.cols {
+            return Err("LU decomposition requires square matrix");
+        }
+        let n = self.rows;
+
+        // Initialize L as identity, U as copy of self
+        let mut l = MatrixQ::identity(n);
+        let mut u = self.clone();
+        let mut perm: Vec<usize> = (0..n).collect();
+
+        for k in 0..n {
+            // Find pivot (largest absolute value in column k, rows k..n)
+            let mut max_row = k;
+            let mut max_val = u.get(k, k);
+            for i in (k + 1)..n {
+                let val = u.get(i, k);
+                if val.abs() > max_val.abs() {
+                    max_val = val;
+                    max_row = i;
+                }
+            }
+
+            // Swap rows in U and perm
+            if max_row != k {
+                for j in 0..n {
+                    let temp = u.get(k, j);
+                    u.set(k, j, u.get(max_row, j));
+                    u.set(max_row, j, temp);
+                }
+                perm.swap(k, max_row);
+
+                // Also swap already-computed parts of L (columns 0..k)
+                for j in 0..k {
+                    let temp = l.get(k, j);
+                    l.set(k, j, l.get(max_row, j));
+                    l.set(max_row, j, temp);
+                }
+            }
+
+            // Check if pivot is zero (singular matrix)
+            if u.get(k, k).is_zero() {
+                // Matrix is singular, but we can continue for partial decomposition
+                continue;
+            }
+
+            // Eliminate below pivot
+            for i in (k + 1)..n {
+                let factor = div_q(u.get(i, k), u.get(k, k));
+                l.set(i, k, factor);
+
+                for j in k..n {
+                    let val = sub_q(u.get(i, j), mul_q(factor, u.get(k, j)));
+                    u.set(i, j, val);
+                }
+            }
+        }
+
+        Ok((l, u, perm))
+    }
+
+    /// Solve Ax = b using LU decomposition.
+    /// More efficient than Cramer's rule for general systems (O(n³) vs O(n⁴)).
+    ///
+    /// Returns Ok(Some(x)) if unique solution exists, Ok(None) if singular, Err on misuse.
+    pub fn solve_lu(&self, b: &[Q]) -> Result<Option<Vec<Q>>, &'static str> {
+        if self.rows != self.cols {
+            return Err("solve requires square matrix");
+        }
+        let n = self.rows;
+        if b.len() != n {
+            return Err("rhs length must equal number of rows");
+        }
+        if n == 0 {
+            return Ok(Some(vec![]));
+        }
+
+        // Decompose PA = LU
+        let (l, u, perm) = self.lu_decompose()?;
+
+        // Check if U is singular (any zero on diagonal)
+        for i in 0..n {
+            if u.get(i, i).is_zero() {
+                return Ok(None);
+            }
+        }
+
+        // Permute b according to perm: b_perm = Pb
+        let mut b_perm = vec![Q::zero(); n];
+        for i in 0..n {
+            b_perm[i] = b[perm[i]];
+        }
+
+        // Forward substitution: solve Ly = b_perm
+        let mut y = vec![Q::zero(); n];
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..n {
+            let mut sum = b_perm[i];
+            for j in 0..i {
+                sum = sub_q(sum, mul_q(l.get(i, j), y[j]));
+            }
+            y[i] = sum; // L has 1's on diagonal
+        }
+
+        // Backward substitution: solve Ux = y
+        let mut x = vec![Q::zero(); n];
+        #[allow(clippy::needless_range_loop)]
+        for i in (0..n).rev() {
+            let mut sum = y[i];
+            for j in (i + 1)..n {
+                sum = sub_q(sum, mul_q(u.get(i, j), x[j]));
+            }
+            x[i] = div_q(sum, u.get(i, i));
+        }
+
+        Ok(Some(x))
+    }
+
     /// Compute a basis for the column space (range) of the matrix.
     /// Returns a list of column vectors that span the column space.
     /// For an m×n matrix A, the column space is the span of the columns of A.
@@ -1571,5 +1696,269 @@ mod tests {
         let cols = m.columnspace();
         // Only first and third columns are non-zero and independent
         assert_eq!(cols.len(), 2);
+    }
+
+    // ========== LU Decomposition Tests ==========
+
+    #[test]
+    fn lu_decompose_2x2() {
+        // [[2, 1], [4, 3]]
+        let m = MatrixQ::from_i64(2, 2, &[2, 1, 4, 3]);
+        let (l, u, perm) = m.lu_decompose().unwrap();
+
+        // Verify L is lower triangular with 1's on diagonal
+        assert_eq!(l.get(0, 0), Q(1, 1));
+        assert_eq!(l.get(1, 1), Q(1, 1));
+        assert_eq!(l.get(0, 1), Q(0, 1));
+
+        // Verify U is upper triangular
+        assert_eq!(u.get(1, 0), Q(0, 1));
+
+        // Reconstruct PA from LU and verify
+        let mut pa = MatrixQ::new(2, 2, vec![Q::zero(); 4]);
+        for i in 0..2 {
+            for j in 0..2 {
+                let mut sum = Q::zero();
+                for k in 0..2 {
+                    sum = add_q(sum, mul_q(l.get(i, k), u.get(k, j)));
+                }
+                pa.set(i, j, sum);
+            }
+        }
+
+        // Verify PA = LU (apply permutation to original)
+        let mut m_perm = MatrixQ::new(2, 2, vec![Q::zero(); 4]);
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..2 {
+            for j in 0..2 {
+                m_perm.set(i, j, m.get(perm[i], j));
+            }
+        }
+        assert_eq!(pa, m_perm);
+    }
+
+    #[test]
+    fn lu_decompose_3x3_identity() {
+        let m = MatrixQ::identity(3);
+        let (l, u, perm) = m.lu_decompose().unwrap();
+
+        assert_eq!(l, MatrixQ::identity(3));
+        assert_eq!(u, MatrixQ::identity(3));
+        assert_eq!(perm, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn lu_decompose_3x3_general() {
+        // [[2, 1, 1], [4, 3, 3], [8, 7, 9]]
+        let m = MatrixQ::from_i64(3, 3, &[2, 1, 1, 4, 3, 3, 8, 7, 9]);
+        let (l, u, _perm) = m.lu_decompose().unwrap();
+
+        // Verify L has 1's on diagonal
+        assert_eq!(l.get(0, 0), Q(1, 1));
+        assert_eq!(l.get(1, 1), Q(1, 1));
+        assert_eq!(l.get(2, 2), Q(1, 1));
+
+        // Verify L is lower triangular
+        assert_eq!(l.get(0, 1), Q(0, 1));
+        assert_eq!(l.get(0, 2), Q(0, 1));
+        assert_eq!(l.get(1, 2), Q(0, 1));
+
+        // Verify U is upper triangular
+        assert_eq!(u.get(1, 0), Q(0, 1));
+        assert_eq!(u.get(2, 0), Q(0, 1));
+        assert_eq!(u.get(2, 1), Q(0, 1));
+    }
+
+    #[test]
+    fn lu_decompose_singular_matrix() {
+        // [[1, 2], [2, 4]] - singular
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+        let (_l, u, _perm) = m.lu_decompose().unwrap();
+
+        // Should complete but U will have a zero on diagonal
+        assert!(u.get(1, 1).is_zero() || u.get(0, 0).is_zero());
+    }
+
+    #[test]
+    fn lu_decompose_non_square_error() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        assert!(m.lu_decompose().is_err());
+    }
+
+    #[test]
+    fn lu_decompose_with_pivoting() {
+        // Matrix that requires pivoting: [[0, 1], [1, 0]]
+        let m = MatrixQ::from_i64(2, 2, &[0, 1, 1, 0]);
+        let (l, _u, perm) = m.lu_decompose().unwrap();
+
+        // Should have swapped rows
+        assert_ne!(perm, vec![0, 1]);
+
+        // Verify decomposition is correct
+        assert_eq!(l.get(0, 0), Q(1, 1));
+        assert_eq!(l.get(1, 1), Q(1, 1));
+    }
+
+    #[test]
+    fn lu_decompose_4x4() {
+        let m = MatrixQ::from_i64(4, 4, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+        let (l, u, _perm) = m.lu_decompose().unwrap();
+
+        // Verify shapes and basic properties
+        assert_eq!(l.rows, 4);
+        assert_eq!(u.rows, 4);
+
+        // L diagonal should be all 1's
+        for i in 0..4 {
+            assert_eq!(l.get(i, i), Q(1, 1));
+        }
+    }
+
+    // ========== solve_lu Tests ==========
+
+    #[test]
+    fn solve_lu_2x2() {
+        // [[2, 1], [4, 3]] * [x, y]^T = [5, 11]^T
+        // Solution: x = 2, y = 1
+        let m = MatrixQ::from_i64(2, 2, &[2, 1, 4, 3]);
+        let b = vec![Q(5, 1), Q(11, 1)];
+
+        let x = m.solve_lu(&b).unwrap().expect("should have solution");
+        assert_eq!(x, vec![Q(2, 1), Q(1, 1)]);
+    }
+
+    #[test]
+    fn solve_lu_3x3() {
+        // [[2, 1, 1], [4, 3, 3], [8, 7, 9]] * x = [4, 10, 24]^T
+        let m = MatrixQ::from_i64(3, 3, &[2, 1, 1, 4, 3, 3, 8, 7, 9]);
+        let b = vec![Q(4, 1), Q(10, 1), Q(24, 1)];
+
+        let x = m.solve_lu(&b).unwrap().expect("should have solution");
+
+        // Verify solution by substitution
+        let result = matrix_vector_mul(&m, &x);
+        assert_eq!(result, b);
+    }
+
+    #[test]
+    fn solve_lu_singular_none() {
+        // [[1, 2], [2, 4]] is singular
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+        let b = vec![Q(3, 1), Q(6, 1)];
+
+        let result = m.solve_lu(&b).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn solve_lu_identity() {
+        let m = MatrixQ::identity(3);
+        let b = vec![Q(1, 1), Q(2, 1), Q(3, 1)];
+
+        let x = m.solve_lu(&b).unwrap().expect("should have solution");
+        assert_eq!(x, b);
+    }
+
+    #[test]
+    fn solve_lu_with_pivoting() {
+        // Matrix that requires pivoting
+        let m = MatrixQ::from_i64(3, 3, &[0, 1, 2, 1, 0, 3, 4, 5, 6]);
+        let b = vec![Q(5, 1), Q(7, 1), Q(27, 1)];
+
+        let x = m.solve_lu(&b).unwrap().expect("should have solution");
+
+        // Verify by substitution
+        let result = matrix_vector_mul(&m, &x);
+        assert_eq!(result, b);
+    }
+
+    #[test]
+    fn solve_lu_matches_solve_bareiss() {
+        // Verify that LU solve gives same result as Bareiss
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 0, 1, 4, 5, 6, 0]);
+        let b = vec![Q(14, 1), Q(8, 1), Q(27, 1)];
+
+        let x_lu = m.solve_lu(&b).unwrap().expect("LU solution");
+        let x_bareiss = m.solve_bareiss(&b).unwrap().expect("Bareiss solution");
+
+        assert_eq!(x_lu, x_bareiss);
+    }
+
+    #[test]
+    fn solve_lu_rational_entries() {
+        // Matrix with rational numbers
+        let m = MatrixQ::new(2, 2, vec![Q(1, 2), Q(1, 3), Q(1, 4), Q(1, 5)]);
+        let b = vec![Q(1, 1), Q(1, 1)];
+
+        let x = m.solve_lu(&b).unwrap();
+        // If singular, None; otherwise should have solution
+        if let Some(solution) = x {
+            // Verify by substitution
+            let result = matrix_vector_mul(&m, &solution);
+            assert_eq!(result, b);
+        }
+    }
+
+    #[test]
+    fn solve_lu_zero_size() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        let b = vec![];
+
+        let x = m.solve_lu(&b).unwrap().expect("empty solution");
+        assert_eq!(x.len(), 0);
+    }
+
+    #[test]
+    fn solve_lu_non_square_error() {
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        let b = vec![Q(1, 1), Q(2, 1)];
+
+        assert!(m.solve_lu(&b).is_err());
+    }
+
+    #[test]
+    fn solve_lu_wrong_rhs_length() {
+        let m = MatrixQ::identity(3);
+        let b = vec![Q(1, 1), Q(2, 1)]; // Wrong length
+
+        assert!(m.solve_lu(&b).is_err());
+    }
+
+    #[test]
+    fn lu_reconstruct_original() {
+        // Test that PA = LU for various matrices
+        let test_matrices = vec![
+            MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]),
+            MatrixQ::from_i64(3, 3, &[2, 0, 1, 1, 1, 0, 0, 3, 1]),
+            MatrixQ::from_i64(3, 3, &[4, 3, 2, 5, 6, 7, 1, 8, 9]),
+        ];
+
+        for m in test_matrices {
+            let (l, u, perm) = m.lu_decompose().unwrap();
+
+            // Compute LU
+            let mut lu = MatrixQ::new(m.rows, m.cols, vec![Q::zero(); m.rows * m.cols]);
+            for i in 0..m.rows {
+                for j in 0..m.cols {
+                    let mut sum = Q::zero();
+                    for k in 0..m.rows {
+                        sum = add_q(sum, mul_q(l.get(i, k), u.get(k, j)));
+                    }
+                    lu.set(i, j, sum);
+                }
+            }
+
+            // Apply permutation to original to get PA
+            let mut pa = MatrixQ::new(m.rows, m.cols, vec![Q::zero(); m.rows * m.cols]);
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..m.rows {
+                for j in 0..m.cols {
+                    pa.set(i, j, m.get(perm[i], j));
+                }
+            }
+
+            // Verify PA = LU
+            assert_eq!(pa, lu, "PA should equal LU");
+        }
     }
 }
