@@ -118,6 +118,21 @@ pub fn diff(store: &mut Store, id: ExprId, var: &str) -> ExprId {
             };
             simplify(store, out)
         }
+        Op::Piecewise => {
+            // Differentiate piecewise: d/dx piecewise((c1, v1), ...) = piecewise((c1, dv1/dx), ...)
+            let children = store.get(id).children.clone();
+            let mut pairs = Vec::new();
+            for chunk in children.chunks(2) {
+                if chunk.len() == 2 {
+                    let cond = chunk[0];
+                    let val = chunk[1];
+                    let dval = diff(store, val, var);
+                    pairs.push((cond, dval));
+                }
+            }
+            let pw = store.piecewise(pairs);
+            simplify(store, pw)
+        }
     }
 }
 

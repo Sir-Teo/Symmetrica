@@ -249,6 +249,17 @@ mod python_bindings {
                         node.children.iter().map(|&c| Self::rebuild_expr(src, c, target)).collect();
                     target.func(fname, children)
                 }
+                Op::Piecewise => {
+                    let children: Vec<ExprId> =
+                        node.children.iter().map(|&c| Self::rebuild_expr(src, c, target)).collect();
+                    let mut pairs = Vec::new();
+                    for chunk in children.chunks(2) {
+                        if chunk.len() == 2 {
+                            pairs.push((chunk[0], chunk[1]));
+                        }
+                    }
+                    target.piecewise(pairs)
+                }
             }
         }
     }

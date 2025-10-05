@@ -377,6 +377,10 @@ pub fn maclaurin(store: &Store, id: ExprId, var: &str, order: usize) -> Option<S
                 _ => None,
             }
         }
+        Op::Piecewise => {
+            // Piecewise series expansion not supported - would require conditional series
+            None
+        }
     }
 }
 

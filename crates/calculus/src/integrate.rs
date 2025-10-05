@@ -234,6 +234,21 @@ pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             };
             Some(with_coeff(store, inv_a, res))
         }
+        Op::Piecewise => {
+            // Integrate piecewise: ∫ piecewise((c1, v1), ...) dx = piecewise((c1, ∫v1 dx), ...)
+            let children = store.get(id).children.clone();
+            let mut pairs = Vec::new();
+            for chunk in children.chunks(2) {
+                if chunk.len() == 2 {
+                    let cond = chunk[0];
+                    let val = chunk[1];
+                    let ival = integrate(store, val, var)?;
+                    pairs.push((cond, ival));
+                }
+            }
+            let pw = store.piecewise(pairs);
+            Some(simplify(store, pw))
+        }
     }
 }
 

@@ -147,8 +147,86 @@ fn simplify_rec(store: &mut Store, id: ExprId, _ctx: &Context) -> ExprId {
             }
             store.func(name, args)
         }
+        Op::Piecewise => {
+            let child_ids = {
+                let n = store.get(id);
+                n.children.clone()
+            };
+            // Simplify all conditions and values
+            let simplified: Vec<ExprId> =
+                child_ids.into_iter().map(|c| simplify_rec(store, c, _ctx)).collect();
+
+            // Try to collapse: if a condition is known to be true, return its value
+            for chunk in simplified.chunks(2) {
+                if chunk.len() == 2 {
+                    let cond = chunk[0];
+                    let val = chunk[1];
+
+                    // Check if condition evaluates to true
+                    if is_true_condition(store, cond, _ctx) {
+                        return val;
+                    }
+                }
+            }
+
+            // Rebuild piecewise with simplified children, filtering out false conditions
+            let mut filtered_pairs = Vec::new();
+            for chunk in simplified.chunks(2) {
+                if chunk.len() == 2 {
+                    let cond = chunk[0];
+                    let val = chunk[1];
+                    // Skip pairs with definitely false conditions
+                    if !is_false_condition(store, cond) {
+                        filtered_pairs.push((cond, val));
+                    }
+                }
+            }
+
+            if filtered_pairs.is_empty() {
+                // No valid branches - undefined
+                return store.func("Undefined", vec![]);
+            }
+            if filtered_pairs.len() == 1 {
+                // Only one branch left, check if condition is always-true placeholder
+                let (cond, val) = filtered_pairs[0];
+                if is_true_condition(store, cond, _ctx) {
+                    return val;
+                }
+            }
+            store.piecewise(filtered_pairs)
+        }
         _ => id,
     }
+}
+
+/// Check if a condition expression evaluates to true
+fn is_true_condition(store: &Store, cond: ExprId, _ctx: &Context) -> bool {
+    // Check for explicit True function
+    if let (Op::Function, Payload::Func(name)) = (&store.get(cond).op, &store.get(cond).payload) {
+        if name == "True" {
+            return true;
+        }
+    }
+    // Check for literal integer 1
+    if matches!((&store.get(cond).op, &store.get(cond).payload), (Op::Integer, Payload::Int(1))) {
+        return true;
+    }
+    false
+}
+
+/// Check if a condition expression evaluates to false
+fn is_false_condition(store: &Store, cond: ExprId) -> bool {
+    // Check for explicit False function
+    if let (Op::Function, Payload::Func(name)) = (&store.get(cond).op, &store.get(cond).payload) {
+        if name == "False" {
+            return true;
+        }
+    }
+    // Check for literal integer 0
+    if matches!((&store.get(cond).op, &store.get(cond).payload), (Op::Integer, Payload::Int(0))) {
+        return true;
+    }
+    false
 }
 
 fn is_positive_symbol(ctx: &Context, store: &Store, id: ExprId) -> bool {
@@ -674,5 +752,188 @@ mod tests {
         let ln_y = st.func("ln", vec![y]);
         let expected = st.add(vec![ln_x, ln_y]);
         assert_eq!(st.to_string(s), st.to_string(expected));
+    }
+
+    // ========== Phase I: Piecewise Tests ==========
+
+    #[test]
+    fn piecewise_simplify_true_branch() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let true_cond = st.func("True", vec![]);
+        let false_cond = st.func("False", vec![]);
+        let zero = st.int(0);
+
+        // piecewise((True, x), (False, 0))
+        let pw = st.piecewise(vec![(true_cond, x), (false_cond, zero)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should collapse to x (first true branch)
+        assert_eq!(s, x);
+    }
+
+    #[test]
+    fn piecewise_filter_false_branches() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let false_cond = st.func("False", vec![]);
+        let true_cond = st.func("True", vec![]);
+
+        // piecewise((False, x), (True, y))
+        let pw = st.piecewise(vec![(false_cond, x), (true_cond, y)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should skip false branch and return y
+        assert_eq!(s, y);
+    }
+
+    #[test]
+    fn piecewise_with_integer_conditions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let one = st.int(1);
+        let zero = st.int(0);
+
+        // piecewise((0, x), (1, y)) - 0 is false, 1 is true
+        let pw = st.piecewise(vec![(zero, x), (one, y)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should return y (1 is true)
+        assert_eq!(s, y);
+    }
+
+    #[test]
+    fn piecewise_simplify_values() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let true_cond = st.func("True", vec![]);
+
+        // Value that needs simplification: x + x
+        let val = st.add(vec![x, x]);
+        let pw = st.piecewise(vec![(true_cond, val)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should collapse to a simplified form: x + x → 2 * x
+        assert_eq!(st.to_string(s), "2 * x");
+    }
+
+    #[test]
+    fn piecewise_no_true_branch_remains_piecewise() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let cond = st.func("P", vec![x]); // Unknown condition
+
+        // piecewise((P(x), y))
+        let pw = st.piecewise(vec![(cond, y)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should remain as piecewise since condition is unknown
+        assert!(matches!(st.get(s).op, Op::Piecewise));
+    }
+
+    #[test]
+    fn piecewise_all_false_becomes_undefined() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let false_cond = st.func("False", vec![]);
+
+        // piecewise((False, x))
+        let pw = st.piecewise(vec![(false_cond, x)]);
+        let s = super::simplify(&mut st, pw);
+
+        // Should become Undefined
+        assert!(matches!(st.get(s).op, Op::Function));
+        if let Payload::Func(name) = &st.get(s).payload {
+            assert_eq!(name, "Undefined");
+        }
+    }
+
+    #[test]
+    fn piecewise_with_true_catchall_collapses() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let neg_one = st.int(-1);
+        let neg_x = st.mul(vec![neg_one, x]);
+
+        // piecewise((x >= 0, x), (True, -x))
+        let cond = st.func(">=", vec![x, zero]);
+        let true_cond = st.func("True", vec![]);
+        let pw = st.piecewise(vec![(cond, x), (true_cond, neg_x)]);
+
+        let s = super::simplify(&mut st, pw);
+
+        // With True as catch-all, it collapses to -x (since True is detected as true)
+        assert_eq!(s, neg_x);
+    }
+
+    #[test]
+    fn piecewise_abs_with_unknown_conditions_remains() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let neg_one = st.int(-1);
+        let neg_x = st.mul(vec![neg_one, x]);
+
+        // abs(x) = piecewise((x >= 0, x), (else, -x)) - using unknown "else" condition
+        let cond1 = st.func(">=", vec![x, zero]);
+        let cond2 = st.func("else", vec![]); // Unknown condition, not True
+        let abs_impl = st.piecewise(vec![(cond1, x), (cond2, neg_x)]);
+
+        let s = super::simplify(&mut st, abs_impl);
+
+        // Should remain as piecewise since conditions are unknown
+        assert!(matches!(st.get(s).op, Op::Piecewise));
+    }
+
+    #[test]
+    fn piecewise_nested_simplification() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let true_cond = st.func("True", vec![]);
+
+        // Nested: outer piecewise with inner piecewise value
+        let inner = st.piecewise(vec![(true_cond, x)]);
+        let outer = st.piecewise(vec![(true_cond, inner)]);
+
+        let s = super::simplify(&mut st, outer);
+
+        // Should fully collapse to x
+        assert_eq!(s, x);
+    }
+
+    #[test]
+    fn piecewise_propagate_assumptions_through_branches() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let half = st.rat(1, 2);
+        let sqrt_x2 = st.pow(x2, half);
+
+        let true_cond = st.func("True", vec![]);
+
+        // piecewise((True, sqrt(x^2))) with x positive
+        let pw = st.piecewise(vec![(true_cond, sqrt_x2)]);
+
+        let mut ctx = assumptions::Context::new();
+        ctx.assume("x", Prop::Positive);
+        let s = super::simplify_with(&mut st, pw, &ctx);
+
+        // Value should simplify to x, then piecewise collapses
+        assert_eq!(s, x);
+    }
+
+    #[test]
+    fn piecewise_empty_handled() {
+        let mut st = Store::new();
+        let pw = st.piecewise(vec![]);
+        let s = super::simplify(&mut st, pw);
+
+        // Empty piecewise becomes Undefined
+        assert!(matches!(st.get(s).op, Op::Function));
     }
 }

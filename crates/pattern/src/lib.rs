@@ -57,6 +57,21 @@ pub fn subst_symbol(store: &mut Store, id: ExprId, sym: &str, with_expr: ExprId)
                 .collect::<Vec<_>>();
             store.func(name, mapped)
         }
+        Op::Piecewise => {
+            let children = store.get(id).children.clone();
+            let mapped = children
+                .into_iter()
+                .map(|c| subst_symbol(store, c, sym, with_expr))
+                .collect::<Vec<_>>();
+            // Rebuild as pairs
+            let mut pairs = Vec::new();
+            for chunk in mapped.chunks(2) {
+                if chunk.len() == 2 {
+                    pairs.push((chunk[0], chunk[1]));
+                }
+            }
+            store.piecewise(pairs)
+        }
     }
 }
 

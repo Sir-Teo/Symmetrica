@@ -22,6 +22,7 @@ pub enum Op {
     Integer,
     Rational,
     Function,
+    Piecewise,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -84,6 +85,22 @@ impl Store {
     pub fn func<S: Into<String>>(&mut self, name: S, args: Vec<ExprId>) -> ExprId {
         // Functions are not canonicalized across args (order matters).
         self.intern(Op::Function, Payload::Func(name.into()), args)
+    }
+
+    /// Construct a piecewise expression from (condition, value) pairs.
+    /// Children stored as flat list: [cond1, val1, cond2, val2, ...]
+    /// Pairs are evaluated in order; first matching condition returns its value.
+    pub fn piecewise(&mut self, pairs: Vec<(ExprId, ExprId)>) -> ExprId {
+        if pairs.is_empty() {
+            // Empty piecewise is undefined; return a placeholder symbol
+            return self.func("Undefined", vec![]);
+        }
+        let mut children = Vec::with_capacity(pairs.len() * 2);
+        for (cond, val) in pairs {
+            children.push(cond);
+            children.push(val);
+        }
+        self.intern(Op::Piecewise, Payload::None, children)
     }
 
     // ---- Canonical combinators ----
@@ -248,6 +265,17 @@ impl Store {
                     let e = go(st, n.children[1], prec(&Op::Pow));
                     format!("{b}^{e}")
                 }
+                (Op::Piecewise, _) => {
+                    let mut parts = Vec::new();
+                    for chunk in n.children.chunks(2) {
+                        if chunk.len() == 2 {
+                            let cond = go(st, chunk[0], 0);
+                            let val = go(st, chunk[1], 0);
+                            parts.push(format!("({}, {})", cond, val));
+                        }
+                    }
+                    format!("piecewise({})", parts.join(", "))
+                }
                 _ => "<unknown>".into(),
             };
             if prec(&n.op) < parent_prec {
@@ -323,6 +351,7 @@ fn op_tag(op: &Op) -> u8 {
         Op::Integer => 5,
         Op::Rational => 6,
         Op::Function => 7,
+        Op::Piecewise => 8,
     }
 }
 
@@ -579,5 +608,54 @@ mod tests {
         assert_eq!(q_mul((1, 2), (2, 3)), (1, 3));
         assert_eq!(q_div((1, 2), (2, 3)), (3, 4));
         assert_eq!(rat_sub((1, 2), (1, 2)), (0, 1));
+    }
+
+    #[test]
+    fn test_piecewise_construction() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let _one = st.int(1);
+        let neg_one = st.int(-1);
+
+        // Build: piecewise((x >= 0, x), (True, -x))
+        let x_ge_0 = st.func(">=", vec![x, zero]);
+        let true_const = st.func("True", vec![]);
+        let neg_x = st.mul(vec![neg_one, x]);
+
+        let pw = st.piecewise(vec![(x_ge_0, x), (true_const, neg_x)]);
+        assert!(matches!(st.get(pw).op, Op::Piecewise));
+        assert_eq!(st.get(pw).children.len(), 4); // 2 pairs = 4 children
+    }
+
+    #[test]
+    fn test_piecewise_printing() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let zero = st.int(0);
+        let cond = st.func(">", vec![x, zero]);
+        let true_fn = st.func("True", vec![]);
+        let pw = st.piecewise(vec![(cond, x), (true_fn, zero)]);
+        let s = st.to_string(pw);
+        assert!(s.contains("piecewise"));
+    }
+
+    #[test]
+    fn test_piecewise_empty() {
+        let mut st = Store::new();
+        let pw = st.piecewise(vec![]);
+        // Should return Undefined function
+        assert!(matches!(st.get(pw).op, Op::Function));
+    }
+
+    #[test]
+    fn test_piecewise_hash_consing() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let cond = st.func("P", vec![x]);
+        let pw1 = st.piecewise(vec![(cond, x), (cond, one)]);
+        let pw2 = st.piecewise(vec![(cond, x), (cond, one)]);
+        assert_eq!(pw1, pw2); // Should be hash-consed
     }
 }
