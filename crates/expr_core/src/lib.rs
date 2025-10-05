@@ -63,6 +63,8 @@ pub struct Store {
     simplify_cache: HashMap<ExprId, ExprId>,
     /// Memoization cache for integration: (expr_id, variable_name) -> Option<integral>
     integrate_cache: HashMap<(ExprId, String), Option<ExprId>>,
+    /// Memoization cache for substitution: (expr_id, symbol, replacement) -> result
+    subst_cache: HashMap<(ExprId, String, ExprId), ExprId>,
 }
 
 impl Store {
@@ -106,11 +108,22 @@ impl Store {
         self.integrate_cache.insert((expr, var), result);
     }
 
+    /// Check if a substitution result is cached
+    pub fn get_subst_cached(&self, expr: ExprId, sym: &str, replacement: ExprId) -> Option<ExprId> {
+        self.subst_cache.get(&(expr, sym.to_string(), replacement)).copied()
+    }
+
+    /// Store a substitution result in the cache
+    pub fn cache_subst(&mut self, expr: ExprId, sym: String, replacement: ExprId, result: ExprId) {
+        self.subst_cache.insert((expr, sym, replacement), result);
+    }
+
     /// Clear all memoization caches
     pub fn clear_caches(&mut self) {
         self.diff_cache.clear();
         self.simplify_cache.clear();
         self.integrate_cache.clear();
+        self.subst_cache.clear();
     }
 
     // ---- Constructors (atoms) ----
@@ -803,5 +816,34 @@ mod tests {
         // Clear cache
         st.clear_caches();
         assert_eq!(st.get_integrate_cached(x2, "x"), None);
+    }
+
+    #[test]
+    fn test_memoization_subst_cache() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let one = st.int(1);
+        let y_plus_1 = st.add(vec![y, one]);
+
+        // Initially no cached result
+        assert_eq!(st.get_subst_cached(x, "x", y_plus_1), None);
+
+        // Cache a substitution result
+        st.cache_subst(x, "x".to_string(), y_plus_1, y_plus_1);
+
+        // Should retrieve cached result
+        assert_eq!(st.get_subst_cached(x, "x", y_plus_1), Some(y_plus_1));
+
+        // Different symbol should not be cached
+        assert_eq!(st.get_subst_cached(x, "z", y_plus_1), None);
+
+        // Different replacement should not be cached
+        let two = st.int(2);
+        assert_eq!(st.get_subst_cached(x, "x", two), None);
+
+        // Clear cache
+        st.clear_caches();
+        assert_eq!(st.get_subst_cached(x, "x", y_plus_1), None);
     }
 }

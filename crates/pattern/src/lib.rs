@@ -13,7 +13,23 @@ use expr_core::{ExprId, Op, Payload, Store};
 
 /// Substitute all occurrences of symbol `sym` with `with_expr` inside `id`.
 /// Does not recurse into `with_expr` (it is inserted as-is).
+/// Results are memoized in the store to avoid redundant computation.
 pub fn subst_symbol(store: &mut Store, id: ExprId, sym: &str, with_expr: ExprId) -> ExprId {
+    // Check memoization cache first
+    if let Some(cached) = store.get_subst_cached(id, sym, with_expr) {
+        return cached;
+    }
+
+    // Compute the substitution
+    let result = subst_symbol_impl(store, id, sym, with_expr);
+
+    // Cache the result before returning
+    store.cache_subst(id, sym.to_string(), with_expr, result);
+    result
+}
+
+/// Internal substitution implementation (without memoization)
+fn subst_symbol_impl(store: &mut Store, id: ExprId, sym: &str, with_expr: ExprId) -> ExprId {
     match store.get(id).op {
         Op::Integer | Op::Rational => id,
         Op::Symbol => match &store.get(id).payload {
@@ -124,6 +140,32 @@ mod tests {
         let out = subst_symbol(&mut st, sinx, "x", two);
         assert!(st.to_string(out).contains("sin"));
         assert!(st.to_string(out).contains("2"));
+    }
+
+    #[test]
+    fn subst_memoization() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+
+        // First substitution - computes and caches
+        let result1 = subst_symbol(&mut st, x2, "x", y);
+
+        // Second substitution - should use cache
+        let result2 = subst_symbol(&mut st, x2, "x", y);
+        assert_eq!(result1, result2);
+
+        // Different replacement - not cached
+        let z = st.sym("z");
+        let result3 = subst_symbol(&mut st, x2, "x", z);
+        assert_ne!(result1, result3);
+
+        // Clear cache and verify recomputation
+        st.clear_caches();
+        let result4 = subst_symbol(&mut st, x2, "x", y);
+        assert_eq!(result1, result4); // Same result, but recomputed
     }
 
     #[test]
