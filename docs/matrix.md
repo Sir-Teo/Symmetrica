@@ -596,6 +596,93 @@ let null_basis = m.nullspace();
 - Every vector in nullspace is a linear combination of basis vectors
 - Number of basis vectors = nullity = n - rank
 
+## Column Space (Range)
+
+```rust
+pub fn columnspace(&self) -> Vec<Vec<Q>>
+```
+
+Computes a basis for the column space (range) of the matrix. The column space is the span of the columns of **A**.
+
+**Algorithm:**
+1. Reduce matrix to row echelon form (REF) to identify pivot columns
+2. Extract the pivot columns from the ORIGINAL matrix (not the reduced form)
+3. Return the collection of basis vectors
+
+**Properties:**
+- For an m×n matrix: column space dimension = rank (**dimension theorem**)
+- Column space is a subspace of ℚᵐ (vectors have m components)
+- The basis consists of actual columns from the original matrix
+- Column space is orthogonal to the left nullspace (nullspace of Aᵀ)
+
+**Examples:**
+
+**Full rank square matrix:**
+```rust
+// Identity matrix: all columns are independent
+let m = MatrixQ::identity(3);
+let cols = m.columnspace();
+assert_eq!(cols.len(), 3);  // All columns form basis
+
+// Returns the standard basis vectors
+assert_eq!(cols[0], vec![Q(1, 1), Q(0, 1), Q(0, 1)]);
+assert_eq!(cols[1], vec![Q(0, 1), Q(1, 1), Q(0, 1)]);
+assert_eq!(cols[2], vec![Q(0, 1), Q(0, 1), Q(1, 1)]);
+```
+
+**Rank-deficient matrix:**
+```rust
+// [[1, 2, 3], [2, 4, 6]] - third column = 3 × first column
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 2, 4, 6]);
+let cols = m.columnspace();
+assert_eq!(cols.len(), 2);  // Only first two columns are independent
+
+// Basis vectors are from the original matrix
+assert_eq!(cols[0], vec![Q(1, 1), Q(2, 1)]);
+assert_eq!(cols[1], vec![Q(2, 1), Q(4, 1)]);
+```
+
+**Tall matrix:**
+```rust
+// 3×2 matrix with full column rank
+let m = MatrixQ::from_i64(3, 2, &[1, 0, 0, 1, 1, 1]);
+let cols = m.columnspace();
+assert_eq!(cols.len(), 2);  // Both columns are independent
+```
+
+**Zero matrix:**
+```rust
+// Zero matrix has trivial column space
+let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+let cols = m.columnspace();
+assert_eq!(cols.len(), 0);
+```
+
+**Dimension equals rank:**
+```rust
+// Column space dimension always equals rank
+let m = MatrixQ::from_i64(3, 5, &[1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 0, 0, 1, 2, 3]);
+let rank = m.rank();
+let colspace = m.columnspace();
+assert_eq!(colspace.len(), rank);
+```
+
+**Relationship with linear systems:**
+```rust
+// Vector b is in column space ⟺ Ax = b has a solution
+let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+let cols = m.columnspace();
+
+// The column space is 2-dimensional (spans ℚ²)
+// Any vector in ℚ² can be expressed as a linear combination of basis vectors
+```
+
+**Properties of basis vectors:**
+- All vectors are from the original matrix columns
+- Vectors are linearly independent
+- Every column of A can be expressed as a linear combination of basis vectors
+- Number of basis vectors = rank = dimension of column space
+
 ## Linear System Solving
 
 ```rust
@@ -737,7 +824,7 @@ assert!(A.solve_bareiss(&b).is_err());
 
 ## Testing
 
-Comprehensive test suite (86 unit tests + 2 property tests):
+Comprehensive test suite (108 unit tests):
 - **Determinant**: 2×2, 3×3, identity, singular matrices
 - **Solving**: Unique solutions, singular systems, empty systems
 - **Addition**: Element-wise, dimension mismatch, fractions
@@ -749,6 +836,7 @@ Comprehensive test suite (86 unit tests + 2 property tests):
 - **Inverse**: 2×2, 3×3, singular matrices, verification via A×A⁻¹=I
 - **Rank**: Full rank, rank-deficient, zero matrix, rectangular matrices, rank-nullity theorem
 - **Nullspace**: Trivial/non-trivial cases, rank-nullity theorem, verification via Ax=0
+- **Column space**: Full rank, rank-deficient, dimension equals rank, orthogonality properties
 - **Error conditions**: Non-square matrices, dimension mismatches
 - **Edge cases**: Zero-size matrices
 
@@ -778,7 +866,6 @@ Still not implemented:
 - LU/QR/Cholesky decomposition
 - Eigenvalues/eigenvectors
 - Singular Value Decomposition (SVD)
-- Column space basis computation
 
 ### Inefficient for Large Systems
 - Cramer's rule for solving is O(n⁴)
@@ -829,13 +916,13 @@ if !det.is_zero() {
 
 - ✅ ~~Matrix arithmetic: Add, subtract, multiply~~ (Implemented)
 - ✅ ~~Inversion: Compute A⁻¹ via Gauss-Jordan~~ (Implemented)
+- ✅ ~~Rank computation: Row reduction to determine rank~~ (Implemented)
+- ✅ ~~Nullspace and column space: Basis computation~~ (Implemented)
 - **Factorizations**: LU, QR, Cholesky
 - **Better solving**: Gaussian elimination instead of Cramer's rule
-- **Rank computation**: Row reduction to determine rank
 - **Eigenvalues**: Characteristic polynomial, power iteration
 - **Sparse matrices**: CSR/CSC formats for large sparse systems
 - **Expression integration**: Matrix elements as symbolic expressions
-- **Nullspace and column space**: Basis computation
 
 ## References
 

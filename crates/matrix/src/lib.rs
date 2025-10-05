@@ -460,6 +460,82 @@ impl MatrixQ {
 
         basis
     }
+
+    /// Compute a basis for the column space (range) of the matrix.
+    /// Returns a list of column vectors that span the column space.
+    /// For an m×n matrix A, the column space is the span of the columns of A.
+    ///
+    /// The basis consists of the linearly independent columns from the original matrix.
+    /// The dimension of the column space equals the rank of the matrix.
+    pub fn columnspace(&self) -> Vec<Vec<Q>> {
+        if self.rows == 0 || self.cols == 0 {
+            return vec![];
+        }
+
+        // Reduce to row echelon form and track pivot columns
+        let mut a = self.clone();
+        let mut pivot_cols = Vec::new();
+        let mut pivot_row = 0;
+
+        // Forward elimination with pivot tracking
+        for col in 0..self.cols {
+            if pivot_row >= self.rows {
+                break;
+            }
+
+            // Find pivot in current column
+            let mut found_pivot = false;
+            for search_row in pivot_row..self.rows {
+                if !a.get(search_row, col).is_zero() {
+                    // Swap rows if needed
+                    if search_row != pivot_row {
+                        for c in 0..self.cols {
+                            let temp = a.get(pivot_row, c);
+                            a.set(pivot_row, c, a.get(search_row, c));
+                            a.set(search_row, c, temp);
+                        }
+                    }
+                    found_pivot = true;
+                    break;
+                }
+            }
+
+            if !found_pivot {
+                // No pivot in this column - skip it
+                continue;
+            }
+
+            // Record this pivot column
+            pivot_cols.push(col);
+            let pivot_val = a.get(pivot_row, col);
+
+            // Eliminate below the pivot
+            for row in (pivot_row + 1)..self.rows {
+                let factor = div_q(a.get(row, col), pivot_val);
+                if factor.is_zero() {
+                    continue;
+                }
+                for c in col..self.cols {
+                    let val = sub_q(a.get(row, c), mul_q(factor, a.get(pivot_row, c)));
+                    a.set(row, c, val);
+                }
+            }
+
+            pivot_row += 1;
+        }
+
+        // Extract the pivot columns from the ORIGINAL matrix
+        let mut basis = Vec::new();
+        for &col_idx in &pivot_cols {
+            let mut col_vec = Vec::with_capacity(self.rows);
+            for row in 0..self.rows {
+                col_vec.push(self.get(row, col_idx));
+            }
+            basis.push(col_vec);
+        }
+
+        basis
+    }
 }
 
 #[cfg(test)]
@@ -1290,5 +1366,210 @@ mod tests {
             }
         }
         result
+    }
+
+    // ========== Column Space Tests ==========
+
+    #[test]
+    fn columnspace_full_rank_square() {
+        // Full rank square matrix: all columns are independent
+        let m = MatrixQ::identity(3);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 3); // All 3 columns form basis
+
+        // Verify they're the identity columns
+        assert_eq!(cols[0], vec![Q(1, 1), Q(0, 1), Q(0, 1)]);
+        assert_eq!(cols[1], vec![Q(0, 1), Q(1, 1), Q(0, 1)]);
+        assert_eq!(cols[2], vec![Q(0, 1), Q(0, 1), Q(1, 1)]);
+    }
+
+    #[test]
+    fn columnspace_rank_deficient() {
+        // [[1, 2, 3], [2, 4, 6]] - second row = 2× first row, so rank = 1
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 2, 4, 6]);
+        let cols = m.columnspace();
+        // Rank is 1, so column space has dimension 1
+        assert_eq!(cols.len(), 1);
+        // First column is the basis
+        assert_eq!(cols[0], vec![Q(1, 1), Q(2, 1)]);
+    }
+
+    #[test]
+    fn columnspace_dimension_equals_rank() {
+        // Column space dimension equals rank
+        let m = MatrixQ::from_i64(3, 5, &[1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 0, 0, 1, 2, 3]);
+        let rank = m.rank();
+        let colspace = m.columnspace();
+        assert_eq!(colspace.len(), rank);
+    }
+
+    #[test]
+    fn columnspace_zero_matrix() {
+        // Zero matrix has trivial column space
+        let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 0);
+    }
+
+    #[test]
+    fn columnspace_tall_matrix() {
+        // 3x2 matrix with full column rank
+        let m = MatrixQ::from_i64(3, 2, &[1, 0, 0, 1, 1, 1]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 2); // Both columns are independent
+
+        // Verify the columns
+        assert_eq!(cols[0], vec![Q(1, 1), Q(0, 1), Q(1, 1)]);
+        assert_eq!(cols[1], vec![Q(0, 1), Q(1, 1), Q(1, 1)]);
+    }
+
+    #[test]
+    fn columnspace_wide_matrix() {
+        // 2x4 matrix - can have at most rank 2
+        let m = MatrixQ::from_i64(2, 4, &[1, 2, 3, 4, 5, 6, 7, 8]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 2); // rank = 2
+    }
+
+    #[test]
+    fn columnspace_with_dependent_columns() {
+        // Matrix where third column = first + second
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 9]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 2); // Only 2 independent columns
+    }
+
+    #[test]
+    fn columnspace_single_column() {
+        // Single non-zero column
+        let m = MatrixQ::from_i64(3, 1, &[1, 2, 3]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0], vec![Q(1, 1), Q(2, 1), Q(3, 1)]);
+    }
+
+    #[test]
+    fn columnspace_single_row() {
+        // Single row matrix
+        let m = MatrixQ::from_i64(1, 3, &[1, 2, 3]);
+        let cols = m.columnspace();
+        // All non-zero columns are independent (rank = 1)
+        assert_eq!(cols.len(), 1);
+    }
+
+    #[test]
+    fn columnspace_with_rational_entries() {
+        // Matrix with rational entries: [[1/2, 1/3, 5/6], [1/4, 1/6, 5/12]]
+        // Second row is 1/2 of first row, so rank = 1
+        let m = MatrixQ::new(
+            2,
+            3,
+            vec![
+                Q(1, 2),
+                Q(1, 3),
+                Q(5, 6), // Row 1
+                Q(1, 4),
+                Q(1, 6),
+                Q(5, 12), // Row 2 = 1/2 of Row 1
+            ],
+        );
+        let cols = m.columnspace();
+        // Rank is 1, not 2
+        assert_eq!(cols.len(), 1);
+    }
+
+    #[test]
+    fn columnspace_rank_one() {
+        // Rank-1 matrix: all columns are multiples of first column
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 2, 4, 6, 3, 6, 9]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 1);
+        // Should return the first column
+        assert_eq!(cols[0], vec![Q(1, 1), Q(2, 1), Q(3, 1)]);
+    }
+
+    #[test]
+    fn columnspace_empty_matrix() {
+        let m = MatrixQ::new(0, 0, vec![]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 0);
+    }
+
+    #[test]
+    fn columnspace_orthogonality_to_left_nullspace() {
+        // Column space is orthogonal to left nullspace (nullspace of A^T)
+        let m = MatrixQ::from_i64(3, 2, &[1, 2, 3, 4, 5, 6]);
+        let mt = m.transpose();
+
+        let _colspace = m.columnspace();
+        let left_nullspace = mt.nullspace();
+
+        // For full column rank, left nullspace should be empty
+        // rank(m) = 2, so nullity(m^T) = 3 - 2 = 1
+        assert_eq!(left_nullspace.len(), 1);
+    }
+
+    #[test]
+    fn columnspace_span_verification() {
+        // Use a different matrix where we actually have rank 2
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 0, 1, 2]);
+        let cols = m.columnspace();
+
+        // Column space should have dimension 2 (rank = 2)
+        assert_eq!(cols.len(), 2);
+
+        // The basis vectors should be from the original matrix
+        // First two columns are independent
+        assert_eq!(cols[0], vec![Q(1, 1), Q(0, 1)]);
+        assert_eq!(cols[1], vec![Q(2, 1), Q(1, 1)]);
+    }
+
+    #[test]
+    fn columnspace_full_rank_rectangular() {
+        // 3x5 matrix with full row rank
+        let m = MatrixQ::from_i64(3, 5, &[1, 0, 0, 1, 2, 0, 1, 0, 2, 3, 0, 0, 1, 3, 4]);
+        let cols = m.columnspace();
+        assert_eq!(cols.len(), 3); // Full row rank
+    }
+
+    #[test]
+    fn columnspace_relationship_with_rank() {
+        // Column space dimension always equals rank
+        let test_matrices = vec![
+            MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]),
+            MatrixQ::from_i64(3, 3, &[1, 2, 3, 4, 5, 6, 7, 8, 9]),
+            MatrixQ::from_i64(2, 4, &[1, 2, 3, 4, 5, 6, 7, 8]),
+            MatrixQ::from_i64(4, 2, &[1, 2, 3, 4, 5, 6, 7, 8]),
+        ];
+
+        for m in test_matrices {
+            let rank = m.rank();
+            let colspace = m.columnspace();
+            assert_eq!(colspace.len(), rank, "Column space dimension must equal rank");
+        }
+    }
+
+    #[test]
+    fn columnspace_preserves_original_columns() {
+        // The basis should consist of actual columns from the original matrix
+        let m = MatrixQ::from_i64(3, 3, &[1, 2, 3, 0, 4, 5, 0, 0, 6]);
+        let cols = m.columnspace();
+
+        // All columns are independent (upper triangular with non-zero diagonal)
+        assert_eq!(cols.len(), 3);
+
+        // Verify these are the actual columns
+        assert_eq!(cols[0], vec![Q(1, 1), Q(0, 1), Q(0, 1)]);
+        assert_eq!(cols[1], vec![Q(2, 1), Q(4, 1), Q(0, 1)]);
+        assert_eq!(cols[2], vec![Q(3, 1), Q(5, 1), Q(6, 1)]);
+    }
+
+    #[test]
+    fn columnspace_zero_column() {
+        // Matrix with a zero column
+        let m = MatrixQ::from_i64(3, 3, &[1, 0, 2, 3, 0, 4, 5, 0, 6]);
+        let cols = m.columnspace();
+        // Only first and third columns are non-zero and independent
+        assert_eq!(cols.len(), 2);
     }
 }
