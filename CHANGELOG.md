@@ -17,14 +17,24 @@ This is the first release candidate for Symmetrica 1.0.0. All core features are 
 - **API Stability Guarantees**: Semantic versioning commitment documented in `API_STABILITY.md`
 - **Migration Guide**: Complete migration documentation in `MIGRATION.md`
 - **Security Policy**: Vulnerability reporting process in `SECURITY.md`
-- **Production Ready**: All 704 tests passing, 81.91% code coverage
+- **Production Ready**: All 708 tests passing, 81.91% code coverage
+- **Performance Baseline**: Established baseline metrics in `PERFORMANCE_BASELINE.md`
 
 #### Version Bump
 - All crates bumped from `0.1.0` to `1.0.0-rc.1`
 
+#### Performance Optimizations (RC Period)
+- **Integration Memoization**: Cache integration results for O(1) repeated lookups
+- **Substitution Memoization**: Cache pattern substitutions for faster rewriting
+- **Memoization Infrastructure**: Expanded caching to 4 major operations:
+  - Differentiation (existing)
+  - Simplification (existing)
+  - Integration (new)
+  - Substitution (new)
+
 #### RC Period
 - **Duration**: Minimum 4 weeks
-- **Focus**: Bug fixes only, no new features
+- **Focus**: Bug fixes and performance optimizations (non-breaking)
 - **Goal**: Community feedback and real-world validation
 
 #### Next Steps
@@ -338,7 +348,10 @@ This is the first release candidate for Symmetrica 1.0.0. All core features are 
 - [x] Migration guide for 1.0 ✅
 - [x] Complete documentation audit ✅
 - [x] 1.0.0-rc.1 release ✅
-- [ ] Performance optimization pass (optional)
+- [x] Performance optimization pass ✅
+  - Integration memoization
+  - Substitution memoization
+  - Performance baseline established
 - [ ] Community feedback period (4+ weeks)
 - [ ] 1.0.0 stable release
 
