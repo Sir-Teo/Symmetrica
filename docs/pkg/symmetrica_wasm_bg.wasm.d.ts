@@ -1,0 +1,36 @@
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_expr_free: (a: number, b: number) => void;
+export const expr_new: (a: number) => number;
+export const expr_symbol: (a: number, b: number) => number;
+export const expr_rational: (a: number, b: number) => [number, number, number];
+export const expr_add: (a: number, b: number) => [number, number, number];
+export const expr_sub: (a: number, b: number) => [number, number, number];
+export const expr_mul: (a: number, b: number) => [number, number, number];
+export const expr_div: (a: number, b: number) => [number, number, number];
+export const expr_pow: (a: number, b: number) => [number, number, number];
+export const expr_neg: (a: number) => [number, number, number];
+export const expr_simplify: (a: number) => [number, number, number];
+export const expr_diff: (a: number, b: number, c: number) => [number, number, number];
+export const expr_integrate: (a: number, b: number, c: number) => [number, number, number];
+export const expr_subs: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const expr_solve: (a: number, b: number, c: number) => [number, number, number];
+export const expr_eval: (a: number, b: any) => [number, number, number];
+export const expr_toString: (a: number) => [number, number];
+export const expr_toLatex: (a: number) => [number, number];
+export const expr_toSExpr: (a: number) => [number, number];
+export const sin: (a: number) => [number, number, number];
+export const cos: (a: number) => [number, number, number];
+export const tan: (a: number) => [number, number, number];
+export const exp: (a: number) => [number, number, number];
+export const ln: (a: number) => [number, number, number];
+export const sqrt: (a: number) => [number, number, number];
+export const __wbindgen_exn_store: (a: number) => void;
+export const __externref_table_alloc: () => number;
+export const __wbindgen_export_2: WebAssembly.Table;
+export const __wbindgen_malloc: (a: number, b: number) => number;
+export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __externref_table_dealloc: (a: number) => void;
+export const __wbindgen_free: (a: number, b: number, c: number) => void;
+export const __wbindgen_start: () => void;

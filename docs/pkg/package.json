@@ -1,0 +1,17 @@
+{
+  "name": "symmetrica-wasm",
+  "type": "module",
+  "description": "WebAssembly bindings for Symmetrica symbolic computation engine",
+  "version": "0.1.0",
+  "license": "MIT OR Apache-2.0",
+  "files": [
+    "symmetrica_wasm_bg.wasm",
+    "symmetrica_wasm.js",
+    "symmetrica_wasm.d.ts"
+  ],
+  "main": "symmetrica_wasm.js",
+  "types": "symmetrica_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
