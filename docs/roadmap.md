@@ -131,6 +131,23 @@ Symmetrica has completed its foundational phase with all core capabilities imple
 
 All foundational features implemented and tested. System is production-ready.
 
+#### Checklist (Complete)
+- [x] Expression kernel (`expr_core`): immutable DAG, hash-consing, canonical `Add/Mul/Pow`
+- [x] Rational arithmetic (`arith`): exact rationals, GCD/LCM, normalization
+- [x] Simplification (`simplify`): like-term collection, power merging, guarded log/exp
+- [x] Calculus (`calculus`): differentiation, conservative integration, limits, series
+- [x] Polynomial algebra (`polys`): univariate/multivariate basics, GCD, resultants, partial fractions
+- [x] Linear algebra (`matrix`): determinant (Bareiss), RREF, inversion, rank
+- [x] Equation solving (`solver`): linear → quartic exact solvers
+- [x] Pattern matching (`pattern`): basic substitution, wildcards, rule application
+- [x] Assumptions (`assumptions`): domains (real/positive/integer), propagation
+- [x] I/O (`io`): S-expr, JSON, LaTeX, pretty printing
+- [x] Eval (`evalf`): numeric evaluation with precision control
+- [x] Plotting (`plot`): 2D SVG plotting
+- [x] CLI (`cli`): REPL, file processing
+- [x] Bindings (`api`, `wasm`): Python (PyO3) and WebAssembly
+- [x] QA: tests (704), coverage (87.98%), fuzzing, property tests, benchmarks
+
 ---
 
 ### Phase 2: Advanced Integration (v1.1)
@@ -138,6 +155,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q1 2026 (6-8 weeks)  
 **Goal:** Expand integration beyond rational functions
+**Current Coverage Snapshot:**
+- `docs/calculus.md` shows implemented patterns: power rule, linear trig/exp, u'/u, partial fractions (distinct linear factors), integration by parts (LIATE)
+- Missing: Risch algorithm, trigonometric substitutions (Weierstrass), advanced u-substitution, hyperbolic trig, non-elementary integral handling beyond None
 
 #### Checklist
 
@@ -189,6 +209,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q2 2026 (12-16 weeks)  
 **Goal:** Comprehensive special function support
+**Current Coverage Snapshot:**
+- No `crates/special` present; no special functions (Gamma/Bessel/Hypergeometric) in current APIs
+- `evalf` provides numeric evaluation for elementary functions only; no special-function eval or series
 
 #### Checklist
 
@@ -262,6 +285,10 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q3 2026 (16-20 weeks)  
 **Goal:** Multivariate systems, transcendental equations, and ODEs
+**Current Coverage Snapshot:**
+- `solver`: linear → quartic univariate solving implemented (Cardano, Ferrari). No Lambert W or transcendental solvers
+- `polys`: univariate GCD, resultants, discriminants; multivariate sparse polynomials exist, but no Gröbner bases
+- No ODE solving framework in current codebase
 
 #### Checklist
 
@@ -342,6 +369,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q4 2026 (10-12 weeks)  
 **Goal:** Closed-form summation and product evaluation
+**Current Coverage Snapshot:**
+- No dedicated summation module; no Gosper/Zeilberger; series support limited to Maclaurin in `calculus`
 
 #### Checklist
 
@@ -390,6 +419,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q1 2027 (12-14 weeks)  
 **Goal:** Advanced simplification and rewriting
+**Current Coverage Snapshot:**
+- `simplify`: like-term collection, power merging, guarded log/exp rules via `assumptions`
+- Missing: trigonometric identities, radical denesting, logarithm branch-cut aware rules, e-graph equality saturation
 
 #### Checklist
 
@@ -437,6 +469,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q2 2027 (8-10 weeks)  
 **Goal:** Computational number theory capabilities
+**Current Coverage Snapshot:**
+- No `number_theory` crate; `arith` provides rational arithmetic only
+- No primality, factorization beyond polynomial contexts, or modular arithmetic utilities
 
 #### Checklist
 
@@ -483,6 +518,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q3 2027 (16-20 weeks)  
 **Goal:** Tensor computations and differential geometry
+**Current Coverage Snapshot:**
+- No tensor types or differential geometry utilities in current crates
 
 #### Checklist
 
@@ -530,6 +567,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q4 2027 (14-18 weeks)  
 **Goal:** Exact computation with algebraic numbers
+**Current Coverage Snapshot:**
+- No algebraic number or field extension support; all arithmetic over ℚ
 
 #### Checklist
 
@@ -574,6 +613,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q1 2028 (10-12 weeks)  
 **Goal:** Generate optimized code from symbolic expressions
+**Current Coverage Snapshot:**
+- No code generation backends in the repository; examples and CLI focus on evaluation/plotting
 
 #### Checklist
 
@@ -618,6 +659,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q2 2028 (8-10 weeks)  
 **Goal:** Enhanced user interaction and visualization
+**Current Coverage Snapshot:**
+- `wasm` crate and web playground exist; `plot` supports 2D SVG plots
+- No Jupyter kernel; advanced/3D plotting and interactive sliders not implemented
 
 #### Checklist
 
@@ -664,6 +708,9 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q3 2028 (14-16 weeks)  
 **Goal:** Mathematica-level pattern matching
+**Current Coverage Snapshot:**
+- `pattern`: basic substitution, wildcards, rule application
+- Missing: AC-matching, sequence/conditional patterns, rule strategies/priorities
 
 #### Checklist
 
@@ -708,6 +755,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q4 2028 (20-24 weeks)  
 **Goal:** Symbolic PDE solving
+**Current Coverage Snapshot:**
+- No PDE support; only basic limits/series and integrator in `calculus`
 
 #### Checklist
 
@@ -753,6 +802,8 @@ All foundational features implemented and tested. System is production-ready.
 **Status:** 🔄 Not Started  
 **Timeline:** Q1 2029 (8-10 weeks)  
 **Goal:** Symbolic probability and statistics
+**Current Coverage Snapshot:**
+- No probability distributions or random variable algebra modules present
 
 #### Checklist
 

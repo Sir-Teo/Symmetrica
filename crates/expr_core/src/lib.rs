@@ -61,7 +61,7 @@ pub struct Store {
     diff_cache: HashMap<(ExprId, String), ExprId>,
     /// Memoization cache for simplification: expr_id -> simplified_expr
     simplify_cache: HashMap<ExprId, ExprId>,
-    /// Memoization cache for integration: (expr_id, variable_name) -> Option<integral>
+    /// Memoization cache for integration: (expr_id, variable_name) -> `Option<ExprId>`
     integrate_cache: HashMap<(ExprId, String), Option<ExprId>>,
     /// Memoization cache for substitution: (expr_id, symbol, replacement) -> result
     subst_cache: HashMap<(ExprId, String, ExprId), ExprId>,
