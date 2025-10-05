@@ -301,11 +301,24 @@ fn simplify_mul(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
         factors.push(simplify_rec(store, c, ctx));
     }
 
+    // Flatten nested Mul nodes before power collection
+    // This ensures that Mul[x, Mul[2, x]] becomes [x, 2, x]
+    let mut flattened = Vec::new();
+    for f in factors {
+        if matches!(store.get(f).op, Op::Mul) {
+            // Extract children of nested Mul
+            let nested_children = store.get(f).children.clone();
+            flattened.extend(nested_children);
+        } else {
+            flattened.push(f);
+        }
+    }
+
     // Merge powers with same base: x^a * x^b -> x^(a+b)
     use std::collections::HashMap;
     let mut exp_map: HashMap<ExprId, ExprId> = HashMap::new();
     let mut passthrough: Vec<ExprId> = Vec::new();
-    for f in factors {
+    for f in flattened {
         // Skip numeric factors from power-collection (expr_core::mul already folded them)
         let (base, exp_opt) = match (&store.get(f).op, &store.get(f).payload) {
             (Op::Pow, _) => {

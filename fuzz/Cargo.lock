@@ -106,11 +106,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "matrix"
+version = "0.1.0"
+dependencies = [
+ "arith",
+ "expr_core",
+]
+
+[[package]]
 name = "polys"
 version = "0.1.0"
 dependencies = [
  "arith",
  "expr_core",
+ "matrix",
 ]
 
 [[package]]
@@ -141,6 +150,7 @@ dependencies = [
  "arith",
  "expr_core",
  "polys",
+ "simplify",
 ]
 
 [[package]]

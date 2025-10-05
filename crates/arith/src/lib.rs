@@ -77,11 +77,17 @@ pub fn normalize_rat(num: i64, den: i64) -> (i64, i64) {
 }
 /// Add two rationals (num,den)
 pub fn rat_add(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.1 + b.0 * a.1, a.1 * b.1)
+    // Use saturating arithmetic to prevent overflow panics
+    let num = a.0.saturating_mul(b.1).saturating_add(b.0.saturating_mul(a.1));
+    let den = a.1.saturating_mul(b.1);
+    normalize_rat(num, den)
 }
 /// Multiply two rationals (num,den)
 pub fn rat_mul(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {
-    normalize_rat(a.0 * b.0, a.1 * b.1)
+    // Use saturating arithmetic to prevent overflow panics
+    let num = a.0.saturating_mul(b.0);
+    let den = a.1.saturating_mul(b.1);
+    normalize_rat(num, den)
 }
 /// Subtract two rationals (num,den)
 pub fn rat_sub(a: (i64, i64), b: (i64, i64)) -> (i64, i64) {

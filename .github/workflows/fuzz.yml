@@ -1,0 +1,67 @@
+name: Fuzz Testing
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Fuzz duration in seconds per target'
+        required: false
+        default: '300'
+
+jobs:
+  fuzz:
+    name: Fuzz Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_simplify
+          - fuzz_expr_ops
+          - fuzz_sexpr_parse
+          - fuzz_diff
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz -> target"
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Run fuzz target
+        run: |
+          cd fuzz
+          DURATION=${{ github.event.inputs.duration || '180' }}
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -max_total_time=${DURATION} \
+            -seed=0 \
+            -print_final_stats=1
+        timeout-minutes: 10
+
+      - name: Check for crashes
+        if: failure()
+        run: |
+          cd fuzz
+          echo "::error::Fuzzing found crashes in ${{ matrix.target }}"
+          if [ -d "artifacts/${{ matrix.target }}" ]; then
+            echo "Artifacts found:"
+            ls -la artifacts/${{ matrix.target }}/
+          fi
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore

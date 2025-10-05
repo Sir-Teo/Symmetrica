@@ -171,9 +171,10 @@ This makes fuzzing more effective at finding unexpected bugs.
 Phase L deliverables:
 - ✅ Fuzzing on parser/simplifier/differentiation
 - ✅ Property-based testing
-- 🔲 Differential testing vs reference CAS
-- 🔲 Coverage metrics dashboard
-- 🔲 Crash-free fuzzing threshold for 1.0
+- ✅ Differential testing vs reference CAS
+- ✅ **Fuzz CI integration** (.github/workflows/fuzz.yml)
+- ✅ **Crash-free operation** (bugs fixed via fuzzing)
+- 🔲 Coverage metrics dashboard (future)
 
 ## See Also
 
