@@ -443,6 +443,139 @@ Symmetrica 1.0 provides a **solid foundation** with all core features complete. 
 
 ---
 
+## Architectural Principles for Post-1.0 Development
+
+### 1. **Incremental Complexity Management**
+
+**Problem:** Advanced CAS features can lead to exponential complexity growth.
+
+**Strategy:**
+- **Layered Architecture:** Each phase builds on previous phases without breaking abstractions
+- **Feature Flags:** Heavy algorithms (Gröbner bases, e-graphs) behind compile-time flags
+- **Graceful Degradation:** Return partial results or `None` rather than incorrect answers
+- **Complexity Budgets:** Set maximum expression size, depth, and computation time limits
+
+**Example:** Integration v2 tries simple patterns first, only invoking Risch for complex cases.
+
+### 2. **Correctness-First Development**
+
+**Problem:** Symbolic math errors are subtle and hard to detect.
+
+**Strategy:**
+- **Differential Verification:** For integration, verify `diff(integrate(f, x), x) ≈ f`
+- **Property-Based Testing:** Use proptest to verify algebraic laws (associativity, distributivity)
+- **Cross-Validation:** Compare results with SymPy/Mathematica on standard test suites
+- **Proof Obligations:** Document mathematical correctness requirements for each algorithm
+
+**Example:** Every ODE solver must verify solutions by substitution back into the original equation.
+
+### 3. **Performance by Design**
+
+**Problem:** Naive symbolic algorithms can be exponentially slow.
+
+**Strategy:**
+- **Algorithmic Selection:** Choose algorithms with best asymptotic complexity
+  - Polynomial GCD: Subresultant PRS O(n²) vs naive O(n³)
+  - Matrix determinant: Bareiss O(n³) vs cofactor expansion O(n!)
+- **Memoization Strategy:** Cache expensive computations at expression subtree level
+- **Lazy Evaluation:** Defer computation until results are actually needed
+- **Parallel Opportunities:** Identify embarrassingly parallel operations (e.g., term-wise differentiation)
+
+**Example:** Special functions use lazy series expansion—only compute terms when evaluated numerically.
+
+### 4. **Extensibility Through Composition**
+
+**Problem:** Monolithic implementations are hard to extend and maintain.
+
+**Strategy:**
+- **Trait-Based Design:** Define traits for common operations (Differentiable, Integrable, Simplifiable)
+- **Registry Pattern:** Functions, rules, and algorithms registered at runtime
+- **Visitor Pattern:** Traverse expression trees without modifying core types
+- **Plugin Architecture:** Allow third-party crates to extend functionality
+
+**Example:** Special functions registry allows adding new functions without modifying core calculus code.
+
+### 5. **Domain-Specific Optimizations**
+
+**Problem:** Generic algorithms may be inefficient for special cases.
+
+**Strategy:**
+- **Fast Paths:** Detect common patterns and use specialized algorithms
+  - Polynomial integration: Direct power rule vs general Risch
+  - Linear ODEs: Integrating factor vs general solver
+- **Canonical Forms:** Maintain expressions in forms that enable fast operations
+- **Type-Level Optimization:** Use Rust's type system to enforce invariants at compile time
+
+**Example:** Gröbner basis computation uses F4 algorithm for large systems, Buchberger for small ones.
+
+### 6. **Error Handling Philosophy**
+
+**Problem:** Symbolic computations can fail in many ways (non-elementary integrals, unsolvable equations).
+
+**Strategy:**
+- **Explicit Failure:** Return `Option<Expr>` or `Result<Expr, Error>` rather than panicking
+- **Partial Results:** Return simplified form even if full solution not found
+- **Error Context:** Provide rich error messages explaining why computation failed
+- **Timeout Guards:** Prevent infinite loops with configurable time/step limits
+
+**Example:** Integration returns `None` for non-elementary integrals rather than incorrect result.
+
+### 7. **Testing Strategy**
+
+**Problem:** Symbolic math has infinite edge cases.
+
+**Strategy:**
+- **Layered Testing:**
+  1. **Unit Tests:** Test individual functions with known inputs/outputs
+  2. **Property Tests:** Verify algebraic laws hold for random inputs
+  3. **Differential Tests:** Compare with reference implementations (SymPy, Mathematica)
+  4. **Regression Tests:** Capture bugs as test cases
+  5. **Benchmark Tests:** Ensure performance doesn't regress
+- **Coverage Goals:** Maintain >85% code coverage, 100% for critical paths
+- **Fuzzing:** Continuous fuzzing of parsers and simplifiers
+
+**Example:** Each phase includes 100+ test cases from standard textbooks and literature.
+
+### 8. **Documentation as Code**
+
+**Problem:** Complex algorithms need extensive documentation.
+
+**Strategy:**
+- **Algorithm Documentation:** Explain mathematical background and implementation choices
+- **Complexity Analysis:** Document time/space complexity for each operation
+- **Example-Driven:** Provide runnable examples for every public API
+- **Research References:** Link to papers and textbooks for algorithm details
+- **Design Rationale:** Explain why specific approaches were chosen
+
+**Example:** Special functions module includes DLMF references for each function.
+
+### 9. **Backward Compatibility**
+
+**Problem:** Breaking changes frustrate users and slow adoption.
+
+**Strategy:**
+- **Semantic Versioning:** Follow semver strictly (major.minor.patch)
+- **Deprecation Policy:** Mark APIs as deprecated for 2+ minor versions before removal
+- **API Stability:** Guarantee stability for core APIs (Store, simplify, diff, integrate)
+- **Migration Guides:** Provide clear upgrade paths for breaking changes
+
+**Example:** v1.x series maintains API compatibility; breaking changes only in v2.0.
+
+### 10. **Community-Driven Development**
+
+**Problem:** Open source projects need sustainable contribution models.
+
+**Strategy:**
+- **Clear Contribution Paths:** Well-documented phases with specific deliverables
+- **Mentorship Program:** Pair new contributors with experienced developers
+- **RFC Process:** Major design decisions go through public review
+- **Recognition:** Credit contributors in CHANGELOG and documentation
+- **Modular Ownership:** Allow contributors to own specific modules
+
+**Example:** Each phase has a clear scope, making it easy for contributors to pick up work.
+
+---
+
 ## Phase Overview & Timeline
 
 ### v1.x Series (2025-2026) - Consolidation
@@ -450,39 +583,174 @@ Symmetrica 1.0 provides a **solid foundation** with all core features complete. 
 #### Phase M: Integration v2 (v1.1 - Q1 2026, 6-8 weeks)
 **Goal:** Advanced integration techniques
 
-**Deliverables:**
-- Risch algorithm for exp/log towers
-- Trigonometric integration (Weierstrass substitution)
-- Automatic u-substitution detection
-- Integration by parts orchestrator
+**Design Considerations:**
+- **Risch Algorithm Architecture:** Implement tower-based approach with differential field extensions
+- **Heuristic Ordering:** Try simple patterns first (polynomial, rational) before invoking Risch
+- **Memoization Strategy:** Cache integration results per expression subtree
+- **Failure Handling:** Return `None` for non-elementary integrals rather than incorrect results
+
+**Implementation Steps:**
+1. **Week 1-2: Risch Foundation**
+   - Implement differential field tower representation
+   - Add logarithmic derivative computation
+   - Create tower extension detection (exp/log)
+   - Test with simple exponential integrals
+
+2. **Week 3-4: Trigonometric Integration**
+   - Implement Weierstrass (tangent half-angle) substitution
+   - Add trigonometric reduction formulas
+   - Pattern matching for `∫ sin^m(x) cos^n(x) dx`
+   - Hyperbolic function integration rules
+
+3. **Week 5-6: Substitution Detection**
+   - Automatic u-substitution heuristics
+   - Chain rule pattern recognition
+   - Inverse trig substitution detection
+   - Integration by parts orchestrator with cost model
+
+4. **Week 7-8: Testing & Optimization**
+   - 50+ integration test cases from standard tables
+   - Differential verification: `diff(integrate(f, x), x) ≈ f`
+   - Performance profiling and memoization tuning
+   - Documentation and examples
+
+**Acceptance Criteria:**
+- ✅ 50+ new integration test cases pass
+- ✅ Differential check passes for all supported classes
+- ✅ Performance: sub-second for expressions with <100 nodes
+- ✅ No false positives (incorrect integrals)
 
 **Dependencies:** polys, calculus  
-**Complexity:** Medium
+**Complexity:** Medium  
+**Risk:** Risch algorithm complexity; mitigate with incremental implementation
 
 #### Phase N: Special Functions Library (v1.2 - Q2 2026, 12-16 weeks)
 **Goal:** Comprehensive special function support
 
-**Deliverables:**
-- Gamma, Beta, Error functions with derivatives and series
-- Bessel functions (J, Y, I, K) with recurrence relations
-- Orthogonal polynomials (Legendre, Chebyshev, Hermite, Laguerre, Jacobi)
-- Hypergeometric functions (₁F₁, ₂F₁)
+**Design Considerations:**
+- **Function Registry Pattern:** Extensible registry for function metadata (derivatives, series, identities)
+- **Lazy Evaluation:** Compute series expansions only when needed
+- **Precision Tracking:** Maintain precision information through computations
+- **DLMF Compliance:** Follow Digital Library of Mathematical Functions standards
+- **Recurrence Relations:** Use stable recurrence directions to avoid numerical instability
+
+**Implementation Steps:**
+1. **Week 1-3: Infrastructure**
+   - Create `crates/special` module with function registry
+   - Design `SpecialFunction` trait with derivative, series, and evalf methods
+   - Implement function metadata system (domain, range, branch cuts)
+   - Add precision context for numerical evaluation
+
+2. **Week 4-6: Gamma/Beta/Error Functions**
+   - Gamma function: `Γ(x)` with reflection formula, duplication formula
+   - Incomplete Gamma: `Γ(x, a)` and `γ(x, a)`
+   - Digamma: `ψ(x)` with series expansion
+   - Beta function: `B(x, y)` and incomplete beta
+   - Error functions: `erf(x)`, `erfc(x)`, `erfi(x)`
+   - Exponential integrals: `Ei(x)`, `E_n(x)`
+
+3. **Week 7-10: Bessel Functions**
+   - Bessel J: `J_ν(x)` with series and asymptotic expansions
+   - Bessel Y: `Y_ν(x)` (Neumann function)
+   - Modified Bessel I: `I_ν(x)`
+   - Modified Bessel K: `K_ν(x)`
+   - Implement recurrence relations (forward/backward stability)
+   - Wronskian identities for validation
+
+4. **Week 11-13: Orthogonal Polynomials & Hypergeometric**
+   - Legendre: `P_n(x)` with Rodrigues' formula
+   - Chebyshev: `T_n(x)`, `U_n(x)` with trigonometric representation
+   - Hermite: `H_n(x)` (physicist's and probabilist's)
+   - Laguerre: `L_n(x)` and associated Laguerre
+   - Jacobi: `P_n^(α,β)(x)`
+   - Hypergeometric: `₁F₁(a; b; z)` and `₂F₁(a, b; c; z)`
+   - Transformation formulas between hypergeometric forms
+
+5. **Week 14-16: Testing & Integration**
+   - Property-based tests for recurrence relations
+   - Differential tests against SymPy/Mathematica
+   - Integration with calculus module (derivatives)
+   - Integration with evalf module (numerical evaluation)
+   - Comprehensive documentation with DLMF references
+
+**Acceptance Criteria:**
+- ✅ 50+ special functions implemented with full support
+- ✅ Symbolic differentiation rules for all functions
+- ✅ Numeric evaluation via `evalf` with configurable precision
+- ✅ Series expansions at key points (0, ∞, singularities)
+- ✅ Property tests verify recurrence relations
+- ✅ Performance: O(1) function creation, lazy series computation
 
 **New Crate:** `crates/special`  
-**Dependencies:** calculus, evalf  
-**Complexity:** High
+**Dependencies:** calculus, evalf, arith  
+**Complexity:** High  
+**Risk:** Numerical stability in recurrence relations; mitigate with stable algorithms
 
 #### Phase O: Advanced Equation Solving (v1.3 - Q3 2026, 16-20 weeks)
 **Goal:** Solve multivariate systems and transcendental equations
 
-**Deliverables:**
-- Gröbner bases (Buchberger's algorithm with optimizations)
-- Lambert W function for transcendental equations
-- First & second-order ODEs (separable, linear, Bernoulli, constant coefficients)
-- Systems of ODEs (matrix exponential method)
+**Design Considerations:**
+- **Gröbner Basis Strategy:** Implement F4 algorithm for efficiency, fallback to Buchberger
+- **Monomial Ordering:** Support lex, grlex, grevlex with automatic selection heuristics
+- **ODE Classification:** Pattern matching to identify equation type before solving
+- **Solution Representation:** Use implicit solutions when explicit forms don't exist
+- **Verification:** Always verify solutions by substitution back into original equation
 
-**Dependencies:** polys, solver, matrix  
-**Complexity:** Very High
+**Implementation Steps:**
+1. **Week 1-4: Gröbner Bases Foundation**
+   - Implement monomial ordering (lex, grlex, grevlex)
+   - Buchberger's algorithm with sugar cube optimization
+   - S-polynomial computation and reduction
+   - Criterion for detecting zero remainders
+   - Test with 2-3 variable systems
+
+2. **Week 5-7: Gröbner Optimization & Elimination**
+   - F4 algorithm for matrix-based reduction (optional, feature flag)
+   - Elimination theory via variable ordering
+   - Triangular decomposition for solving
+   - Resultant-based elimination as fallback
+   - Performance benchmarks vs. Buchberger
+
+3. **Week 8-10: Transcendental Equations**
+   - Lambert W function implementation (all branches)
+   - Pattern matching for `a·e^(bx) = c·x + d` forms
+   - Inverse trig/hyperbolic function solving
+   - Logarithmic equation solving
+   - Numeric fallback with Newton-Raphson + interval arithmetic
+
+4. **Week 11-14: First-Order ODEs**
+   - Separable equations: `dy/dx = f(x)g(y)`
+   - Linear ODEs: `y' + p(x)y = q(x)` with integrating factor
+   - Exact equations: `M(x,y)dx + N(x,y)dy = 0` with exactness test
+   - Bernoulli equations: `y' + p(x)y = q(x)y^n`
+   - Homogeneous equations with substitution
+   - Initial value problem (IVP) support
+
+5. **Week 15-17: Second-Order ODEs**
+   - Constant coefficients: characteristic equation method
+   - Cauchy-Euler equations: `x²y'' + axy' + by = 0`
+   - Reduction of order for known solution
+   - Series solutions (Frobenius method) near regular singular points
+   - Variation of parameters for non-homogeneous equations
+
+6. **Week 18-20: Systems of ODEs & Testing**
+   - Matrix exponential method: `X' = AX`
+   - Eigenvalue/eigenvector approach
+   - Phase plane analysis (optional)
+   - 100+ ODE test cases from Boyce & DiPrima, Zill
+   - Solution verification by substitution
+   - Performance profiling and optimization
+
+**Acceptance Criteria:**
+- ✅ Solve systems with 3-5 variables, degree ≤4 in <10s
+- ✅ 100+ ODE test cases pass with verified solutions
+- ✅ Correctness validated by substitution (symbolic and numeric)
+- ✅ IVP support with symbolic constants
+- ✅ Graceful failure for unsolvable cases (return implicit form)
+
+**Dependencies:** polys, solver, matrix, calculus  
+**Complexity:** Very High  
+**Risk:** Gröbner basis explosion; mitigate with degree bounds and timeouts
 
 #### Phase P: Symbolic Summation & Products (v1.4 - Q4 2026, 10-12 weeks)
 **Goal:** Closed-form summation and product evaluation
@@ -620,6 +888,116 @@ Symmetrica 1.0 provides a **solid foundation** with all core features complete. 
 
 **Dependencies:** special, calculus  
 **Complexity:** Medium
+
+---
+
+## Cross-Cutting Concerns
+
+### Performance Monitoring & Profiling
+
+**Continuous Performance Tracking:**
+- **Benchmark Suite:** Maintain comprehensive benchmarks for all operations
+- **Regression Detection:** CI fails if performance degrades >10% without justification
+- **Profiling Tools:** Regular profiling with `cargo flamegraph` and `perf`
+- **Memory Tracking:** Monitor arena allocator usage and hash-consing efficiency
+
+**Performance Targets by Phase:**
+- **Phase M (Integration):** <1s for 95% of standard integral tables
+- **Phase N (Special Functions):** O(1) function creation, lazy evaluation
+- **Phase O (Solving):** <10s for 3-5 variable Gröbner basis systems
+- **Phase Q (Simplification):** <100ms for expressions with <1000 nodes
+
+### Security & Resource Management
+
+**Resource Limits:**
+```rust
+pub struct ResourceLimits {
+    max_expression_size: usize,      // Default: 1_000_000 nodes
+    max_expression_depth: usize,     // Default: 10_000
+    max_computation_time: Duration,  // Default: 60s
+    max_memory_usage: usize,         // Default: 1GB
+}
+```
+
+**Security Considerations:**
+- **Input Validation:** Sanitize all user inputs (expressions, patterns, equations)
+- **DoS Prevention:** Timeout guards on all potentially infinite loops
+- **Memory Safety:** Leverage Rust's guarantees, minimize unsafe code
+- **Fuzzing:** Continuous fuzzing of parsers and public APIs
+
+### API Design Guidelines
+
+**Consistency Principles:**
+1. **Naming Conventions:**
+   - Functions: `snake_case` (e.g., `integrate`, `solve_univariate`)
+   - Types: `PascalCase` (e.g., `Store`, `ExprId`, `UniPoly`)
+   - Modules: `snake_case` (e.g., `calculus`, `special`)
+
+2. **Error Handling:**
+   - Use `Result<T, E>` for operations that can fail
+   - Use `Option<T>` for operations that may not have a result
+   - Never panic in library code (except for programmer errors)
+
+3. **Builder Patterns:**
+   ```rust
+   // Good: Fluent API for complex operations
+   let result = Solver::new()
+       .with_timeout(Duration::from_secs(10))
+       .with_assumptions(ctx)
+       .solve(equation, "x")?;
+   ```
+
+4. **Trait Coherence:**
+   - Define traits for common operations (Differentiable, Integrable)
+   - Implement standard traits (Debug, Clone, PartialEq) where appropriate
+   - Use trait objects for dynamic dispatch when needed
+
+### Code Quality Standards
+
+**Pre-Commit Checklist:**
+- ✅ `cargo fmt --all -- --check` (formatting)
+- ✅ `cargo clippy --workspace --all-targets -- -D warnings` (linting)
+- ✅ `cargo test --workspace --all-features` (all tests pass)
+- ✅ `cargo doc --workspace --no-deps` (documentation builds)
+- ✅ Coverage maintained >85% for modified crates
+
+**Code Review Requirements:**
+- **Two Approvals:** All PRs require 2 approving reviews
+- **Test Coverage:** New code must have tests (unit + integration)
+- **Documentation:** Public APIs must have rustdoc comments with examples
+- **Performance:** Benchmark results for performance-critical changes
+- **Breaking Changes:** Require RFC for API changes
+
+### Dependency Management
+
+**Dependency Policy:**
+- **Minimize Dependencies:** Prefer std library when possible
+- **Audit Dependencies:** Run `cargo audit` on every commit
+- **Version Pinning:** Use exact versions for critical dependencies
+- **License Compatibility:** Only MIT/Apache-2.0 compatible licenses
+- **Feature Flags:** Optional dependencies behind feature flags
+
+**Current Core Dependencies:**
+- `criterion` - Benchmarking (dev-dependency)
+- `proptest` - Property-based testing (dev-dependency)
+- `pyo3` - Python bindings (optional, feature-gated)
+- `wasm-bindgen` - WASM support (optional, feature-gated)
+
+### Internationalization & Localization
+
+**Future Considerations (v3.0+):**
+- Error messages in multiple languages
+- LaTeX output with locale-specific formatting
+- Unicode support for mathematical symbols
+- Right-to-left language support in documentation
+
+### Accessibility
+
+**Documentation Accessibility:**
+- Alt text for all diagrams and images
+- Screen reader compatible documentation
+- High contrast code examples
+- Keyboard-navigable web documentation
 
 ---
 
