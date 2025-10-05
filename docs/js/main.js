@@ -173,6 +173,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // Tab switching
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.getAttribute('data-tab');
+            const container = button.closest('.tabs-container');
+            
+            // Remove active from all buttons in this container
+            container.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Remove active from all panes in this container
+            container.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('active');
+            });
+            
+            // Add active to clicked button
+            button.classList.add('active');
+            
+            // Add active to corresponding pane
+            const targetPane = container.querySelector(`#${tabId}-tab`);
+            if (targetPane) {
+                targetPane.classList.add('active');
+                // Re-highlight code in the active pane
+                targetPane.querySelectorAll('pre code').forEach(block => {
+                    hljs.highlightElement(block);
+                });
+            }
+        });
+    });
+    
+    // Animate benchmark bars when they come into view
+    const benchmarkObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animationPlayState = 'running';
+                benchmarkObserver.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.5 });
+    
+    document.querySelectorAll('.benchmark-bar').forEach(bar => {
+        bar.style.animationPlayState = 'paused';
+        benchmarkObserver.observe(bar);
+    });
+    
     // Add loading animation
     document.body.classList.add('loaded');
 });
