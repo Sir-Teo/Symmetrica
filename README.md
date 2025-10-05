@@ -264,7 +264,7 @@ Comprehensive guides for each crate in `docs/`:
 
 ### Design Documentation
 
-- **[roadmap.md](docs/roadmap.md)**: Future development plans
+- **[roadmap.md](docs/roadmap.md)**: Development roadmap (completed v1.0 + future phases)
 - **[research.md](docs/research.md)**: Design notes and prior art
 - **[skeleton.md](docs/skeleton.md)**: Initial architecture rationale
 
