@@ -15,3 +15,7 @@ arith = { path = "../arith" }
 criterion = { version = "0.5", default-features = false, features = ["html_reports"] }
 simplify = { path = "../simplify" }
 proptest = "1.5"
+
+[[bench]]
+name = "expr_benches"
+harness = false

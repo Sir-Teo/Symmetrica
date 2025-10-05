@@ -112,3 +112,23 @@ jobs:
             -p matrix \
             -p solver \
             --out Xml --engine llvm --fail-under 80
+
+  benchmarks:
+    name: Benchmarks (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run benchmarks (quick mode)
+        run: |
+          cargo bench -p expr_core --bench expr_benches -- --quick --noplot
+          cargo bench -p simplify --bench simplify_benches -- --quick --noplot
+          cargo bench -p calculus --bench calculus_benches -- --quick --noplot
+          cargo bench -p solver --bench solver_benches -- --quick --noplot
