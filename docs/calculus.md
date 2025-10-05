@@ -208,13 +208,43 @@ Automatic partial fraction decomposition for rational functions with distinct li
 
 The integrator detects this pattern and applies `polys::partial_fractions_simple`.
 
+#### Integration by Parts
+
+For products of functions, the integrator uses the **LIATE heuristic** to choose `u` and `dv`:
+- **L**ogarithmic (highest priority for `u`)
+- **I**nverse trigonometric
+- **A**lgebraic (polynomials)
+- **T**rigonometric
+- **E**xponential (lowest priority for `u`)
+
+Formula: `∫ u dv = uv - ∫ v du`
+
+**Example:**
+```rust
+// ∫ ln(x) * x^2 dx
+let lnx = st.func("ln", vec![x]);
+let x2 = st.pow(x, st.int(2));
+let product = st.mul(vec![lnx, x2]);
+let integral = integrate(&mut st, product, "x").unwrap();
+
+// Chooses: u = ln(x), dv = x^2 dx
+// Computes: du = 1/x dx, v = x^3/3
+// Result: (x^3 * ln(x))/3 - ∫ x^3/3 * 1/x dx
+//       = (x^3 * ln(x))/3 - x^3/9
+```
+
+**Supported product patterns:**
+- `ln(x) * polynomial` → Uses integration by parts with `u = ln(x)`
+- `polynomial * trig/exp` → Chooses polynomial as `u`
+- Products where both factors depend on the variable
+
 ### Conservative Strategy
 
 Integration returns `None` when:
 - Pattern is not recognized
-- Integration by parts is needed
-- Substitution is required
-- Result involves special functions (erf, Si, etc.)
+- Advanced substitution is required (beyond linear cases)
+- Result involves special functions (erf, Si, Ci, Ei, etc.)
+- Integration by parts recursion doesn't terminate
 
 This ensures correctness over coverage.
 
@@ -366,7 +396,7 @@ let df = diff(&mut st, expr, "x");
 - Multi-argument functions not supported
 
 **Integration:**
-- No integration by parts
+- ✅ Integration by parts (LIATE heuristic for products)
 - No trigonometric substitution
 - No advanced techniques (Risch algorithm not implemented)
 - Partial fractions limited to distinct linear factors over Q
@@ -382,6 +412,7 @@ Comprehensive tests cover:
 - Power, sum, product rules
 - Chain rule for nested functions
 - Integration patterns (power rule, trig, exponential, u'/u)
+- Integration by parts (ln(x) * polynomial products)
 - Partial fractions with various denominators
 - Maclaurin series for elementary functions
 - Limits at 0 and infinity
@@ -395,10 +426,11 @@ cargo test -p calculus
 
 - Definite integration with bounds
 - Multivariate calculus (partial derivatives)
-- Integration by parts
+- ✅ ~~Integration by parts~~ (implemented with LIATE heuristic)
 - Trigonometric substitution
 - Taylor series at arbitrary points
 - Radius of convergence computation
+- Generalized substitution (u-substitution)
 - Symbolic limits (L'Hôpital's rule)
 
 ## Example: Complete Workflow
