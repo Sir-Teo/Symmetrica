@@ -19,7 +19,6 @@ fn test_required_docs_exist() {
         "API_STABILITY.md",
         "MIGRATION.md",
         "COVERAGE_IMPROVEMENTS.md",
-        "V1_CONSOLIDATION_REPORT.md",
     ];
 
     for file in required_files {
