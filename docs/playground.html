@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground - Symmetrica</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/playground.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">Σ</span>
+                <span class="brand-name">Symmetrica</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="getting-started.html">Get Started</a></li>
+                <li><a href="examples.html">Examples</a></li>
+                <li><a href="playground.html" class="active">Playground</a></li>
+                <li><a href="https://github.com/Sir-Teo/Symmetrica" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="playground-container">
+        <div class="playground-header">
+            <h1>Interactive Playground</h1>
+            <p>Try Symmetrica examples instantly</p>
+        </div>
+
+        <div class="playground-layout">
+            <aside class="examples-sidebar">
+                <h3>Examples</h3>
+                <div class="example-list">
+                    <button class="example-btn active" data-example="basic">
+                        <span class="example-icon">🔢</span>
+                        Basic Operations
+                    </button>
+                    <button class="example-btn" data-example="diff">
+                        <span class="example-icon">∂</span>
+                        Differentiation
+                    </button>
+                    <button class="example-btn" data-example="integrate">
+                        <span class="example-icon">∫</span>
+                        Integration
+                    </button>
+                    <button class="example-btn" data-example="simplify">
+                        <span class="example-icon">⚡</span>
+                        Simplification
+                    </button>
+                    <button class="example-btn" data-example="solve">
+                        <span class="example-icon">🎯</span>
+                        Equation Solving
+                    </button>
+                    <button class="example-btn" data-example="series">
+                        <span class="example-icon">∞</span>
+                        Series Expansion
+                    </button>
+                </div>
+            </aside>
+
+            <main class="playground-main">
+                <div class="code-panel">
+                    <div class="panel-header">
+                        <span>Rust Code</span>
+                        <button class="btn-copy" onclick="copyCode()">Copy</button>
+                    </div>
+                    <pre><code id="code-editor" class="language-rust" contenteditable="true">use expr_core::Store;
+use simplify::simplify;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    
+    // Build expression: x² + 3x + 1
+    let expr = st.add(vec![
+        st.pow(x, st.int(2)),
+        st.mul(vec![st.int(3), x]),
+        st.int(1),
+    ]);
+    
+    let simplified = simplify(&mut st, expr);
+    println!("{}", st.to_string(simplified));
+}</code></pre>
+                </div>
+
+                <div class="output-panel">
+                    <div class="panel-header">
+                        <span>Output</span>
+                        <span class="output-status" id="output-status">Ready</span>
+                    </div>
+                    <pre id="output"><code>1 + 3 * x + x^2</code></pre>
+                </div>
+
+                <div class="explanation-panel">
+                    <div class="panel-header">
+                        <span>Explanation</span>
+                    </div>
+                    <div class="explanation-content" id="explanation">
+                        <p>This example demonstrates basic expression building and simplification:</p>
+                        <ul>
+                            <li>Creates a <code>Store</code> to manage expressions</li>
+                            <li>Defines symbol <code>x</code></li>
+                            <li>Builds a polynomial expression</li>
+                            <li>Simplifies to canonical form</li>
+                        </ul>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div class="playground-info">
+            <div class="info-card">
+                <h3>🚀 Want to run locally?</h3>
+                <p>Install Symmetrica and run these examples on your machine:</p>
+                <pre><code class="language-bash">git clone https://github.com/Sir-Teo/Symmetrica
+cd Symmetrica
+cargo run --example basic_polynomial</code></pre>
+            </div>
+            <div class="info-card">
+                <h3>🎓 Learn More</h3>
+                <p>Check out our comprehensive guides:</p>
+                <ul>
+                    <li><a href="getting-started.html">Getting Started Guide</a></li>
+                    <li><a href="examples.html">More Examples</a></li>
+                    <li><a href="https://github.com/Sir-Teo/Symmetrica/tree/main/docs">API Documentation</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Symmetrica Contributors. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/playground.js"></script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started - Symmetrica</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/docs.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">Σ</span>
+                <span class="brand-name">Symmetrica</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="getting-started.html" class="active">Get Started</a></li>
+                <li><a href="examples.html">Examples</a></li>
+                <li><a href="playground.html">Playground</a></li>
+                <li><a href="https://github.com/Sir-Teo/Symmetrica" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar">
+            <nav class="docs-nav">
+                <h3>Getting Started</h3>
+                <ul>
+                    <li><a href="#installation">Installation</a></li>
+                    <li><a href="#quick-start">Quick Start</a></li>
+                    <li><a href="#basic-concepts">Basic Concepts</a></li>
+                    <li><a href="#modules">Module Overview</a></li>
+                </ul>
+                <h3>Core Modules</h3>
+                <ul>
+                    <li><a href="#expr-core">expr_core</a></li>
+                    <li><a href="#simplify">simplify</a></li>
+                    <li><a href="#calculus">calculus</a></li>
+                    <li><a href="#polys">polys</a></li>
+                    <li><a href="#solver">solver</a></li>
+                </ul>
+                <h3>Advanced</h3>
+                <ul>
+                    <li><a href="#pattern">Pattern Matching</a></li>
+                    <li><a href="#assumptions">Assumptions</a></li>
+                    <li><a href="#matrix">Linear Algebra</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="docs-content">
+            <section id="installation">
+                <h1>Getting Started with Symmetrica</h1>
+                <p class="lead">Learn how to install and use Symmetrica in your Rust projects.</p>
+
+                <h2>Installation</h2>
+                <p>Symmetrica requires Rust 1.70 or later. If you don't have Rust installed:</p>
+                
+                <pre><code class="language-bash">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></pre>
+
+                <h3>Adding to Your Project</h3>
+                <p>Add the crates you need to your <code>Cargo.toml</code>:</p>
+                
+                <pre><code class="language-toml">[dependencies]
+expr_core = { git = "https://github.com/Sir-Teo/Symmetrica" }
+simplify = { git = "https://github.com/Sir-Teo/Symmetrica" }
+calculus = { git = "https://github.com/Sir-Teo/Symmetrica" }
+solver = { git = "https://github.com/Sir-Teo/Symmetrica" }
+polys = { git = "https://github.com/Sir-Teo/Symmetrica" }</code></pre>
+
+                <div class="info-box">
+                    <strong>Note:</strong> Symmetrica is modular. Only include the crates you need!
+                </div>
+            </section>
+
+            <section id="quick-start">
+                <h2>Quick Start</h2>
+                <p>Here's a simple example to get you started:</p>
+
+                <pre><code class="language-rust">use expr_core::Store;
+use simplify::simplify;
+use calculus::diff;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    
+    // Build expression: x² + 3x + 1
+    let expr = st.add(vec![
+        st.pow(x, st.int(2)),
+        st.mul(vec![st.int(3), x]),
+        st.int(1),
+    ]);
+    
+    // Simplify
+    let simplified = simplify(&mut st, expr);
+    println!("Expression: {}", st.to_string(simplified));
+    
+    // Differentiate
+    let derivative = diff(&mut st, expr, "x");
+    let result = simplify(&mut st, derivative);
+    println!("Derivative: {}", st.to_string(result));
+}
+// Output:
+// Expression: 1 + 3 * x + x^2
+// Derivative: 3 + 2 * x</code></pre>
+            </section>
+
+            <section id="basic-concepts">
+                <h2>Basic Concepts</h2>
+
+                <h3>The Store</h3>
+                <p>The <code>Store</code> is the core data structure that manages all expressions:</p>
+                <pre><code class="language-rust">let mut st = Store::new();</code></pre>
+                <p>All expressions are created through the store, which ensures hash-consing and structural sharing.</p>
+
+                <h3>Expression IDs</h3>
+                <p>Expressions are represented as <code>ExprId</code>, which is a lightweight handle:</p>
+                <pre><code class="language-rust">let x: ExprId = st.sym("x");
+let two: ExprId = st.int(2);
+let expr: ExprId = st.pow(x, two);</code></pre>
+
+                <h3>Immutability</h3>
+                <p>All expressions are immutable. Operations create new expressions:</p>
+                <pre><code class="language-rust">let a = st.add(vec![x, y]);  // Creates new expression
+let b = st.mul(vec![a, z]);  // 'a' is unchanged</code></pre>
+
+                <h3>Canonical Forms</h3>
+                <p>Expressions are automatically normalized:</p>
+                <pre><code class="language-rust">let a = st.add(vec![x, y]);
+let b = st.add(vec![y, x]);
+assert_eq!(a, b);  // Order doesn't matter for Add/Mul</code></pre>
+            </section>
+
+            <section id="modules">
+                <h2>Module Overview</h2>
+
+                <div class="module-card">
+                    <h3 id="expr-core">expr_core</h3>
+                    <p>The foundation of Symmetrica. Provides the expression kernel with hash-consing.</p>
+                    <pre><code class="language-rust">use expr_core::Store;
+
+let mut st = Store::new();
+let x = st.sym("x");           // Symbol
+let n = st.int(42);            // Integer
+let r = st.rat(1, 3);          // Rational
+let sum = st.add(vec![x, n]);  // Addition
+let prod = st.mul(vec![x, r]); // Multiplication
+let pow = st.pow(x, st.int(2)); // Power</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="simplify">simplify</h3>
+                    <p>Algebraic simplification with assumption-aware transformations.</p>
+                    <pre><code class="language-rust">use simplify::simplify;
+use assumptions::{Context, Prop};
+
+let mut st = Store::new();
+let x = st.sym("x");
+
+// Basic simplification
+let expr = st.add(vec![x, x]);
+let result = simplify(&mut st, expr);
+// → 2 * x
+
+// With assumptions
+let mut ctx = Context::new();
+ctx.assume("x", Prop::Positive);
+let expr = st.func("ln", vec![st.func("exp", vec![x])]);
+let result = simplify_with(&mut st, expr, &ctx);
+// → x (when x > 0)</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="calculus">calculus</h3>
+                    <p>Differentiation, integration, series expansion, and limits.</p>
+                    <pre><code class="language-rust">use calculus::{diff, integrate, maclaurin};
+
+// Differentiation
+let expr = st.pow(x, st.int(3));
+let derivative = diff(&mut st, expr, "x");
+// → 3 * x^2
+
+// Integration
+let expr = st.pow(x, st.int(2));
+let integral = integrate(&mut st, expr, "x").unwrap();
+// → (1/3) * x^3
+
+// Series expansion
+let expr = st.func("exp", vec![x]);
+let series = maclaurin(&st, expr, "x", 5).unwrap();
+// → 1 + x + x²/2 + x³/6 + x⁴/24 + x⁵/120</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="polys">polys</h3>
+                    <p>Polynomial operations: GCD, factorization, partial fractions.</p>
+                    <pre><code class="language-rust">use polys::{expr_to_unipoly, factor, partial_fractions_simple};
+
+// Convert expression to polynomial
+let poly = expr_to_unipoly(&st, expr, "x").unwrap();
+
+// Factor polynomial
+let factors = factor(&st, expr, "x").unwrap();
+
+// Partial fractions
+let num = st.add(vec![st.mul(vec![st.int(2), x]), st.int(3)]);
+let den = st.add(vec![
+    st.pow(x, st.int(2)),
+    st.mul(vec![st.int(3), x]),
+    st.int(2)
+]);
+let result = partial_fractions_simple(&mut st, num, den, "x");
+// → A/(x+1) + B/(x+2)</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="solver">solver</h3>
+                    <p>Equation solving for polynomials up to degree 4.</p>
+                    <pre><code class="language-rust">use solver::solve_univariate;
+
+// Solve x² + 3x + 2 = 0
+let eq = st.add(vec![
+    st.pow(x, st.int(2)),
+    st.mul(vec![st.int(3), x]),
+    st.int(2)
+]);
+
+let roots = solve_univariate(&mut st, eq, "x").unwrap();
+for root in roots {
+    println!("x = {}", st.to_string(root));
+}
+// Output: x = -1, x = -2</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="pattern">pattern</h3>
+                    <p>Pattern matching and rewriting with AC-aware matching.</p>
+                    <pre><code class="language-rust">use pattern::{subst_symbol, ac::match_expr};
+
+// Substitution
+let expr = st.pow(x, st.int(2));
+let y = st.sym("y");
+let result = subst_symbol(&mut st, expr, "x", y);
+// → y^2
+
+// Pattern matching
+use pattern::ac::Pat;
+let pattern = Pat::Add(vec![
+    Pat::Any("a".into()),
+    Pat::Integer(0)
+]);
+// Matches: x + 0, 0 + x, etc.</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="assumptions">assumptions</h3>
+                    <p>Tri-valued logic for domain-aware transformations.</p>
+                    <pre><code class="language-rust">use assumptions::{Context, Prop, Truth};
+
+let mut ctx = Context::new();
+ctx.assume("x", Prop::Positive);
+ctx.assume("x", Prop::Real);
+
+// Query assumptions
+match ctx.has("x", Prop::Positive) {
+    Truth::True => println!("x is positive"),
+    Truth::False => println!("x is not positive"),
+    Truth::Unknown => println!("unknown"),
+}
+
+// Scoped assumptions
+ctx.push();  // New scope
+ctx.assume("y", Prop::Integer);
+ctx.pop();   // y assumption removed</code></pre>
+                </div>
+
+                <div class="module-card">
+                    <h3 id="matrix">matrix</h3>
+                    <p>Exact linear algebra over rationals.</p>
+                    <pre><code class="language-rust">use matrix::{Matrix, determinant, solve_system};
+
+let mut st = Store::new();
+
+// Create matrix
+let mat = Matrix::from_rows(vec![
+    vec![st.int(1), st.int(2)],
+    vec![st.int(3), st.int(4)]
+]);
+
+// Determinant
+let det = determinant(&mut st, &mat);
+// → -2
+
+// Solve linear system
+let b = vec![st.int(5), st.int(6)];
+let solution = solve_system(&mut st, &mat, &b).unwrap();</code></pre>
+                </div>
+            </section>
+
+            <section id="next-steps">
+                <h2>Next Steps</h2>
+                <div class="next-grid">
+                    <a href="examples.html" class="next-card">
+                        <h3>📚 Examples</h3>
+                        <p>Explore comprehensive examples and use cases</p>
+                    </a>
+                    <a href="playground.html" class="next-card">
+                        <h3>🎮 Playground</h3>
+                        <p>Try Symmetrica in your browser</p>
+                    </a>
+                    <a href="https://github.com/Sir-Teo/Symmetrica/tree/main/docs" class="next-card">
+                        <h3>📖 API Docs</h3>
+                        <p>Detailed API documentation</p>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Symmetrica Contributors. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

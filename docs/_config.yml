@@ -1,0 +1,35 @@
+# GitHub Pages Configuration for Symmetrica
+
+# Site settings
+title: Symmetrica
+description: A lightweight, embeddable symbolic computation engine (CAS) in Rust
+baseurl: "" # Leave empty for user/organization pages
+url: "https://sir-teo.github.io/Symmetrica"
+
+# Build settings
+markdown: kramdown
+theme: null
+plugins: []
+
+# Exclude from processing
+exclude:
+  - README.md
+  - LICENSE
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor
+
+# Include files
+include:
+  - _config.yml
+
+# Collections
+collections: []
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
