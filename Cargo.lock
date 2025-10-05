@@ -392,6 +392,7 @@ name = "matrix"
 version = "0.1.0"
 dependencies = [
  "arith",
+ "criterion",
  "expr_core",
  "proptest",
 ]
