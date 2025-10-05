@@ -58,8 +58,15 @@ pub fn solve_univariate(store: &mut Store, expr: ExprId, var: &str) -> Option<Ve
                     roots.extend(quad_roots.iter().copied());
                 }
             }
+            Some(3) => {
+                // Cubic factor: solve using Cardano's formula
+                let cubic_roots = solve_cubic(store, &factor)?;
+                for _ in 0..multiplicity {
+                    roots.extend(cubic_roots.iter().copied());
+                }
+            }
             Some(_) => {
-                // Higher degree irreducible factor - cannot solve over Q with elementary methods
+                // Higher degree irreducible factor (≥ 4) - cannot solve with elementary methods
                 // Return None to indicate incomplete factorization
                 return None;
             }
@@ -68,6 +75,88 @@ pub fn solve_univariate(store: &mut Store, expr: ExprId, var: &str) -> Option<Ve
     }
 
     Some(roots)
+}
+
+/// Solve a cubic polynomial ax^3 + bx^2 + cx + d = 0 using Cardano's formula.
+/// Reduces to depressed form t^3 + pt + q = 0, then applies Cardano's method.
+fn solve_cubic(store: &mut Store, p: &UniPoly) -> Option<Vec<ExprId>> {
+    fn q_to_expr(st: &mut Store, q: Q) -> ExprId {
+        if q.1 == 1 {
+            st.int(q.0)
+        } else {
+            st.rat(q.0, q.1)
+        }
+    }
+
+    // Extract coefficients: a0 + a1*x + a2*x^2 + a3*x^3
+    let a0 = p.coeffs.first().copied().unwrap_or(Q::zero());
+    let a1 = p.coeffs.get(1).copied().unwrap_or(Q::zero());
+    let a2 = p.coeffs.get(2).copied().unwrap_or(Q::zero());
+    let a3 = p.coeffs.get(3).copied().unwrap_or(Q::zero());
+
+    if a3.is_zero() {
+        return None; // Not actually cubic
+    }
+
+    // Normalize: divide by a3 to get monic polynomial x^3 + bx^2 + cx + d
+    let b = div_q(a2, a3);
+    let c = div_q(a1, a3);
+    let d = div_q(a0, a3);
+
+    // Convert to depressed cubic t^3 + pt + q = 0
+    // using substitution x = t - b/3
+    // p = c - b^2/3
+    // q = 2b^3/27 - bc/3 + d
+
+    let b2 = mul_q(b, b);
+    let b3 = mul_q(b2, b);
+
+    let p = sub_q(c, div_q(b2, Q(3, 1)));
+    let q = add_q(sub_q(div_q(mul_q(Q(2, 1), b3), Q(27, 1)), div_q(mul_q(b, c), Q(3, 1))), d);
+
+    // For simplicity, we'll construct one real root using the formula
+    // t = cbrt(-q/2 + sqrt(q^2/4 + p^3/27)) + cbrt(-q/2 - sqrt(q^2/4 + p^3/27))
+
+    // Calculate the expression under the square root: q^2/4 + p^3/27
+    let p2 = mul_q(p, p);
+    let p3 = mul_q(p2, p);
+    let q2 = mul_q(q, q);
+    let q2_over_4 = div_q(q2, Q(4, 1));
+    let p3_over_27 = div_q(p3, Q(27, 1));
+    let sqrt_arg = add_q(q2_over_4, p3_over_27);
+
+    // Build symbolic expressions
+    let sqrt_arg_expr = q_to_expr(store, sqrt_arg);
+    let half = store.rat(1, 2);
+    let sqrt_expr = store.pow(sqrt_arg_expr, half);
+
+    let neg_q_over_2 = q_to_expr(store, div_q(Q(-q.0, q.1), Q(2, 1)));
+
+    // u = cbrt(-q/2 + sqrt(...))
+    let u_arg = store.add(vec![neg_q_over_2, sqrt_expr]);
+    let third = store.rat(1, 3);
+    let u = store.pow(u_arg, third);
+
+    // v = cbrt(-q/2 - sqrt(...))
+    let neg_one = store.int(-1);
+    let neg_sqrt = store.mul(vec![neg_one, sqrt_expr]);
+    let v_arg = store.add(vec![neg_q_over_2, neg_sqrt]);
+    let third2 = store.rat(1, 3);
+    let v = store.pow(v_arg, third2);
+
+    // t = u + v (one root of depressed cubic)
+    let t = store.add(vec![u, v]);
+
+    // Convert back: x = t - b/3
+    let b_over_3 = q_to_expr(store, div_q(b, Q(3, 1)));
+    let neg_one2 = store.int(-1);
+    let neg_b_over_3 = store.mul(vec![neg_one2, b_over_3]);
+    let x1 = store.add(vec![t, neg_b_over_3]);
+
+    // For now, return just the one root (Cardano's formula)
+    // Full implementation would compute all 3 roots using complex cube roots of unity
+    // but that requires complex number support
+    Some(vec![x1])
 }
 
 /// Solve a quadratic polynomial ax^2 + bx + c = 0 using the quadratic formula.
@@ -416,17 +505,40 @@ mod tests {
     }
 
     #[test]
-    fn solve_cubic_no_rational_roots() {
+    fn solve_cubic_cardano_formula() {
         let mut st = Store::new();
         let x = st.sym("x");
-        // x^3 + x + 1 = 0 (has no rational roots)
+        // x^3 + x + 1 = 0 (has no rational roots, uses Cardano's formula)
         let three = st.int(3);
         let x3 = st.pow(x, three);
         let one = st.int(1);
         let e = st.add(vec![x3, x, one]);
         let result = solve_univariate(&mut st, e, "x");
-        // No rational roots, so should return None
-        assert!(result.is_none());
+        // Now should return Some with symbolic root using cube roots
+        assert!(result.is_some());
+        let roots = result.unwrap();
+        assert_eq!(roots.len(), 1); // Returns one real root
+        let root_str = st.to_string(roots[0]);
+        // Should contain fractional exponents (cube roots and square roots)
+        assert!(root_str.contains("^"));
+    }
+
+    #[test]
+    fn solve_cubic_simple_depressed() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        // x^3 - 2 = 0 -> x = cbrt(2)
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let minus_two = st.int(-2);
+        let e = st.add(vec![x3, minus_two]);
+        let result = solve_univariate(&mut st, e, "x");
+        assert!(result.is_some());
+        let roots = result.unwrap();
+        assert_eq!(roots.len(), 1);
+        let root_str = st.to_string(roots[0]);
+        // Should involve cube root (^{1/3})
+        assert!(root_str.contains("^"));
     }
 
     #[test]

@@ -86,7 +86,43 @@ The solver builds symbolic expressions using fractional exponents:
 // √Δ is represented as Δ^(1/2)
 ```
 
-### Higher Degree Polynomials (Degree ≥ 3)
+### Cubic Equations (Degree 3)
+
+**Form:** `ax³ + bx² + cx + d = 0`
+
+The solver uses a hybrid approach:
+
+1. **Factorization first**: Attempt to factor the cubic over Q
+2. **Cardano's formula**: If irreducible, apply Cardano's method
+
+#### Cardano's Formula
+
+For cubics that don't factor over rationals, the solver uses Cardano's formula:
+
+**Algorithm:**
+1. Reduce general cubic to **depressed form** `t³ + pt + q = 0` via substitution `x = t - b/(3a)`
+2. Apply Cardano's formula:
+   ```
+   t = ∛(-q/2 + √(q²/4 + p³/27)) + ∛(-q/2 - √(q²/4 + p³/27))
+   ```
+3. Transform back to get root of original equation
+
+**Example:**
+```rust
+let mut st = Store::new();
+let x = st.sym("x");
+
+// Solve: x³ + x + 1 = 0 (no rational roots)
+let x3 = st.pow(x, st.int(3));
+let eq = st.add(vec![x3, x, st.int(1)]);
+
+let roots = solve_univariate(&mut st, eq, "x").unwrap();
+// Returns one symbolic root using cube roots: cbrt(...) + cbrt(...)
+```
+
+**Note:** Currently returns one real root expressed with cube roots and square roots. Full implementation of all three roots requires complex number support (cube roots of unity).
+
+### Higher Degree Polynomials (Degree ≥ 4)
 
 Uses **Rational Root Theorem** + **deflation** strategy:
 
@@ -302,11 +338,13 @@ Comprehensive test coverage:
 - Linear equations
 - Quadratic with rational roots
 - Quadratic with irrational roots
-- Cubic with all rational roots
+- Cubic with all rational roots (via factorization)
+- Cubic with no rational roots (Cardano's formula)
+- Depressed cubic (simple cube root)
+- Transcendental equations (exponential patterns)
 - Zero polynomial (empty result)
 - Constant polynomial (empty result)
 - Non-polynomial expressions (None)
-- No rational roots case (None)
 
 Run tests:
 ```bash
@@ -315,11 +353,12 @@ cargo test -p solver
 
 ## Future Enhancements
 
-- **Cubic/Quartic formulas**: Cardano's formula, Ferrari's method
-- **Complex roots**: Support for Gaussian rationals Q[i]
+- ✅ ~~**Cardano's formula**~~: Implemented for cubic equations (returns one real root)
+- **Ferrari's method**: Quartic solving
+- **Complex roots**: Full support for all 3 cubic roots (requires complex cube roots of unity)
 - **Algebraic numbers**: Represent roots symbolically (e.g., Root objects)
 - **Numerical solving**: Newton-Raphson for high-degree polynomials
-- **Multiplicity**: Track root multiplicities
+- **Multiplicity**: Track root multiplicities explicitly
 - **Systems of equations**: Multivariate polynomial systems
 - **Inequalities**: Solve polynomial inequalities
 
