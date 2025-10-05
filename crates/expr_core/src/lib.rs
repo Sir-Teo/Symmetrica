@@ -61,6 +61,8 @@ pub struct Store {
     diff_cache: HashMap<(ExprId, String), ExprId>,
     /// Memoization cache for simplification: expr_id -> simplified_expr
     simplify_cache: HashMap<ExprId, ExprId>,
+    /// Memoization cache for integration: (expr_id, variable_name) -> Option<integral>
+    integrate_cache: HashMap<(ExprId, String), Option<ExprId>>,
 }
 
 impl Store {
@@ -94,10 +96,21 @@ impl Store {
         self.simplify_cache.insert(expr, result);
     }
 
+    /// Check if an integration result is cached
+    pub fn get_integrate_cached(&self, expr: ExprId, var: &str) -> Option<Option<ExprId>> {
+        self.integrate_cache.get(&(expr, var.to_string())).copied()
+    }
+
+    /// Store an integration result in the cache
+    pub fn cache_integrate(&mut self, expr: ExprId, var: String, result: Option<ExprId>) {
+        self.integrate_cache.insert((expr, var), result);
+    }
+
     /// Clear all memoization caches
     pub fn clear_caches(&mut self) {
         self.diff_cache.clear();
         self.simplify_cache.clear();
+        self.integrate_cache.clear();
     }
 
     // ---- Constructors (atoms) ----
@@ -755,5 +768,40 @@ mod tests {
         assert_eq!(st.get_diff_cached(x, "y"), Some(dy_result));
         assert_eq!(st.get_diff_cached(y, "x"), Some(dy_result));
         assert_eq!(st.get_diff_cached(y, "y"), Some(dx_result));
+    }
+
+    #[test]
+    fn test_memoization_integrate_cache() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let one_third = st.rat(1, 3);
+        let three = st.int(3);
+        let x3 = st.pow(x, three);
+        let x3_div_3 = st.mul(vec![one_third, x3]);
+
+        // Initially no cached result
+        assert_eq!(st.get_integrate_cached(x2, "x"), None);
+
+        // Cache a successful integration
+        st.cache_integrate(x2, "x".to_string(), Some(x3_div_3));
+
+        // Should retrieve cached result
+        assert_eq!(st.get_integrate_cached(x2, "x"), Some(Some(x3_div_3)));
+
+        // Cache a failed integration (None result)
+        let unknown = st.func("unknown", vec![x]);
+        st.cache_integrate(unknown, "x".to_string(), None);
+
+        // Should retrieve cached None
+        assert_eq!(st.get_integrate_cached(unknown, "x"), Some(None));
+
+        // Different variable should not be cached
+        assert_eq!(st.get_integrate_cached(x2, "y"), None);
+
+        // Clear cache
+        st.clear_caches();
+        assert_eq!(st.get_integrate_cached(x2, "x"), None);
     }
 }

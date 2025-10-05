@@ -8,6 +8,21 @@ use simplify::simplify;
 
 /// Try to integrate expression w.r.t. `var`. Returns None if rule not supported.
 pub fn integrate(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    // Check memoization cache first
+    if let Some(cached) = store.get_integrate_cached(id, var) {
+        return cached;
+    }
+
+    // Compute the integral
+    let result = integrate_impl(store, id, var);
+
+    // Cache the result before returning
+    store.cache_integrate(id, var.to_string(), result);
+    result
+}
+
+/// Internal integration implementation (without memoization)
+fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
     // helper: does expr depend on var?
     fn depends_on_var(st: &Store, id: ExprId, var: &str) -> bool {
         match (&st.get(id).op, &st.get(id).payload) {
@@ -875,6 +890,36 @@ mod tests {
         if let Some(r) = res {
             assert!(st.to_string(r).contains("piecewise"));
         }
+    }
+
+    #[test]
+    fn integrate_memoization() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+
+        // First integration - computes and caches
+        let result1 = integrate(&mut st, x2, "x");
+        assert!(result1.is_some());
+
+        // Second integration - should use cache
+        let result2 = integrate(&mut st, x2, "x");
+        assert_eq!(result1, result2);
+
+        // Integration of unsupported expression - caches None
+        let unknown = st.func("unknown", vec![x]);
+        let result3 = integrate(&mut st, unknown, "x");
+        assert!(result3.is_none());
+
+        // Second call should also return None from cache
+        let result4 = integrate(&mut st, unknown, "x");
+        assert_eq!(result3, result4);
+
+        // Clear cache and verify
+        st.clear_caches();
+        let result5 = integrate(&mut st, x2, "x");
+        assert_eq!(result1, result5); // Same result, but recomputed
     }
 
     #[test]
