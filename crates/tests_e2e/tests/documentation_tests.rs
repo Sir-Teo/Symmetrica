@@ -17,6 +17,7 @@ fn test_required_docs_exist() {
         "LICENSE-APACHE",
         "SECURITY.md",
         "API_STABILITY.md",
+        "MIGRATION.md",
         "COVERAGE_IMPROVEMENTS.md",
         "V1_CONSOLIDATION_REPORT.md",
     ];
@@ -176,6 +177,38 @@ fn test_module_docs_exist() {
         let path = docs_dir.join(doc);
         assert!(path.exists(), "Required module documentation missing: docs/{}", doc);
     }
+}
+
+/// Test that MIGRATION.md contains required sections
+#[test]
+fn test_migration_guide_completeness() {
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+
+    let migration_path = workspace_root.join("MIGRATION.md");
+    let content = std::fs::read_to_string(&migration_path)
+        .expect("MIGRATION.md should exist and be readable");
+
+    // Required sections for a complete migration guide
+    let required_sections = vec![
+        "Migration Guide",
+        "What's New in 1.0.0",
+        "API Changes",
+        "Migration Checklist",
+        "Troubleshooting",
+    ];
+
+    for section in required_sections {
+        assert!(content.contains(section), "MIGRATION.md missing required section: {}", section);
+    }
+
+    // Should mention version numbers
+    assert!(
+        content.contains("0.1") && content.contains("1.0"),
+        "MIGRATION.md should reference both 0.1.x and 1.0.0 versions"
+    );
+
+    // Should have code examples
+    assert!(content.contains("```rust"), "MIGRATION.md should include Rust code examples");
 }
 
 /// Test that GitHub templates exist
