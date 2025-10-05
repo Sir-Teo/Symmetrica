@@ -457,4 +457,116 @@ mod tests {
         let parsed = from_json(&mut st2, &s).expect("parse");
         assert_eq!(st.to_string(neg_rat), st2.to_string(parsed));
     }
+
+    #[test]
+    fn json_symbol_with_escape() {
+        let mut st = Store::new();
+        let sym = st.sym("test\"quote");
+        let s = to_json(&st, sym);
+        assert!(s.contains("test\\\"quote"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(sym), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_symbol_with_backslash() {
+        let mut st = Store::new();
+        let sym = st.sym("test\\backslash");
+        let s = to_json(&st, sym);
+        assert!(s.contains("test\\\\backslash"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(sym), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_empty_add() {
+        let mut st = Store::new();
+        let empty_add = st.add(vec![]); // Store converts to 0
+        let s = to_json(&st, empty_add);
+        assert!(s.contains("Integer"));
+        assert!(s.contains("0"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(empty_add), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_empty_mul() {
+        let mut st = Store::new();
+        let empty_mul = st.mul(vec![]); // Store converts to 1
+        let s = to_json(&st, empty_mul);
+        assert!(s.contains("Integer"));
+        assert!(s.contains("1"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(empty_mul), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_function_no_args() {
+        let mut st = Store::new();
+        let f = st.func("foo", vec![]);
+        let s = to_json(&st, f);
+        assert!(s.contains("\"name\": \"foo\""));
+        assert!(s.contains("\"args\": []"));
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(f), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_parse_errors_comprehensive() {
+        let mut st = Store::new();
+
+        assert!(from_json(&mut st, "").is_err());
+        assert!(from_json(&mut st, "{").is_err());
+        assert!(from_json(&mut st, "{\"Unknown\": 123}").is_err());
+        assert!(from_json(&mut st, "{\"Integer\": \"not_a_number\"}").is_err());
+        assert!(from_json(&mut st, "{\"Add\": \"not_an_array\"}").is_err());
+        assert!(from_json(&mut st, "{\"Mul\": 123}").is_err());
+        assert!(from_json(&mut st, "{\"Pow\": {}}").is_err());
+        assert!(from_json(&mut st, "{\"Pow\": {\"base\": {\"Integer\": 1}}}").is_err());
+        assert!(from_json(&mut st, "{\"Function\": {}}").is_err());
+        assert!(from_json(&mut st, "{\"Function\": {\"name\": \"f\"}}").is_err());
+        assert!(from_json(&mut st, "{\"Rational\": {}}").is_err());
+        assert!(from_json(&mut st, "{\"Rational\": {\"num\": 1}}").is_err());
+    }
+
+    #[test]
+    fn json_complex_nested() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let three = st.int(3);
+
+        // ((x + y)^2) * 3
+        let sum = st.add(vec![x, y]);
+        let pow = st.pow(sum, two);
+        let expr = st.mul(vec![pow, three]);
+
+        let s = to_json(&st, expr);
+        let mut st2 = Store::new();
+        let parsed = from_json(&mut st2, &s).expect("parse");
+
+        assert_eq!(st.to_string(expr), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn json_rational_with_spaces() {
+        let mut st = Store::new();
+        let json = r#"{ "Rational" :  { "num"  : 3  ,  "den" :  5  } }"#;
+        let parsed = from_json(&mut st, json).expect("parse");
+        assert_eq!(st.to_string(parsed), "3/5");
+    }
+
+    #[test]
+    fn json_array_trailing_comma_rejected() {
+        let mut st = Store::new();
+        let json = r#"{"Add": [{"Integer": 1}, {"Integer": 2},]}"#;
+        // Most JSON parsers reject trailing commas
+        assert!(from_json(&mut st, json).is_err());
+    }
 }

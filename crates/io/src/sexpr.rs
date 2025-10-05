@@ -429,4 +429,119 @@ mod tests {
         let expected = st.add(vec![one, two]);
         assert_eq!(st.to_string(parsed), st.to_string(expected));
     }
+
+    #[test]
+    fn sexpr_empty_add() {
+        let mut st = Store::new();
+        let empty_add = st.add(vec![]); // Store converts this to (Int 0)
+        let s = to_sexpr(&st, empty_add);
+        assert_eq!(s, "(Int 0)");
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(empty_add), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_empty_mul() {
+        let mut st = Store::new();
+        let empty_mul = st.mul(vec![]); // Store converts this to (Int 1)
+        let s = to_sexpr(&st, empty_mul);
+        assert_eq!(s, "(Int 1)");
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(empty_mul), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_function_foo_no_args() {
+        let mut st = Store::new();
+        let f = st.func("foo", vec![]);
+        let s = to_sexpr(&st, f);
+        assert!(s.contains("Fn foo"));
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(f), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_symbol_with_spaces() {
+        let mut st = Store::new();
+        let sym = st.sym("hello world");
+        let s = to_sexpr(&st, sym);
+        assert!(s.contains("\"hello world\""));
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(sym), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_symbol_with_quote() {
+        let mut st = Store::new();
+        let sym = st.sym("test\"quote");
+        let s = to_sexpr(&st, sym);
+        assert!(s.contains("\\\""));
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(sym), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_parse_errors_comprehensive() {
+        let mut st = Store::new();
+
+        assert!(from_sexpr(&mut st, "").is_err());
+        assert!(from_sexpr(&mut st, "(").is_err());
+        assert!(from_sexpr(&mut st, "( Int )").is_err());
+        assert!(from_sexpr(&mut st, "( Int not_a_number )").is_err());
+        assert!(from_sexpr(&mut st, "( Rat 1 )").is_err());
+        assert!(from_sexpr(&mut st, "( Rat not_num not_num )").is_err());
+        assert!(from_sexpr(&mut st, "( Unknown )").is_err());
+        assert!(from_sexpr(&mut st, "( + )").is_ok()); // Empty add is ok
+        assert!(from_sexpr(&mut st, "( Fn )").is_err());
+        assert!(from_sexpr(&mut st, "( ^ (Int 1) )").is_err()); // Needs 2 args
+    }
+
+    #[test]
+    fn sexpr_negative_numbers() {
+        let mut st = Store::new();
+        let neg_int = st.int(-42);
+        let s = to_sexpr(&st, neg_int);
+        assert!(s.contains("-42"));
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+        assert_eq!(st.to_string(neg_int), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_complex_nested() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let three = st.int(3);
+
+        // sin((x + y)^2) * 3
+        let sum = st.add(vec![x, y]);
+        let pow = st.pow(sum, two);
+        let sin = st.func("sin", vec![pow]);
+        let expr = st.mul(vec![sin, three]);
+
+        let s = to_sexpr(&st, expr);
+        let mut st2 = Store::new();
+        let parsed = from_sexpr(&mut st2, &s).expect("parse");
+
+        assert_eq!(st.to_string(expr), st2.to_string(parsed));
+    }
+
+    #[test]
+    fn sexpr_unclosed_paren() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "( + (Int 1) (Int 2)").is_err());
+    }
+
+    #[test]
+    fn sexpr_unclosed_quote() {
+        let mut st = Store::new();
+        assert!(from_sexpr(&mut st, "(Sym \"unclosed").is_err());
+    }
 }

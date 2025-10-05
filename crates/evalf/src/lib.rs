@@ -574,4 +574,241 @@ mod tests {
         let ctx = EvalContext::new();
         assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::UnknownFunction(_))));
     }
+
+    #[test]
+    fn eval_asin() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let expr = st.func("asin", vec![half]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - std::f64::consts::FRAC_PI_6).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_asin_domain_error() {
+        let mut st = Store::new();
+        let two = st.int(2);
+        let expr = st.func("asin", vec![two]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_arcsin_alias() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let expr = st.func("arcsin", vec![zero]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn eval_acos() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let expr = st.func("acos", vec![zero]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - std::f64::consts::FRAC_PI_2).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_acos_domain_error() {
+        let mut st = Store::new();
+        let neg_two = st.int(-2);
+        let expr = st.func("acos", vec![neg_two]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_arccos_alias() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("arccos", vec![one]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn eval_atan() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("atan", vec![one]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_arctan_alias() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let expr = st.func("arctan", vec![zero]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn eval_tanh() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let expr = st.func("tanh", vec![zero]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn eval_log_alias() {
+        let mut st = Store::new();
+        let e = st.rat(271828, 100000); // Approx e
+        let expr = st.func("log", vec![e]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn eval_log10() {
+        let mut st = Store::new();
+        let hundred = st.int(100);
+        let expr = st.func("log10", vec![hundred]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 2.0);
+    }
+
+    #[test]
+    fn eval_log10_domain_error() {
+        let mut st = Store::new();
+        let neg_one = st.int(-1);
+        let expr = st.func("log10", vec![neg_one]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_log2() {
+        let mut st = Store::new();
+        let eight = st.int(8);
+        let expr = st.func("log2", vec![eight]);
+        let ctx = EvalContext::new();
+        assert_eq!(eval(&st, expr, &ctx).unwrap(), 3.0);
+    }
+
+    #[test]
+    fn eval_log2_domain_error() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let expr = st.func("log2", vec![zero]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_atan2() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let zero = st.int(0);
+        let expr = st.func("atan2", vec![one, zero]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - std::f64::consts::FRAC_PI_2).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_arctan2_alias() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("arctan2", vec![one, one]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, expr, &ctx).unwrap();
+        assert!((result - std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_min_insufficient_args() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("min", vec![one]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_max_insufficient_args() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("max", vec![one]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_context_get_none() {
+        let ctx = EvalContext::new();
+        assert_eq!(ctx.get("nonexistent"), None);
+    }
+
+    #[test]
+    fn eval_context_clear() {
+        let mut ctx = EvalContext::new();
+        ctx.bind("x", 5.0);
+        assert_eq!(ctx.get("x"), Some(5.0));
+        ctx.clear();
+        assert_eq!(ctx.get("x"), None);
+    }
+
+    #[test]
+    fn eval_error_display() {
+        let err1 = EvalError::UnboundVariable("x".to_string());
+        assert_eq!(err1.to_string(), "unbound variable: x");
+
+        let err2 = EvalError::UnknownFunction("foo".to_string());
+        assert_eq!(err2.to_string(), "unknown function: foo");
+
+        let err3 = EvalError::DomainError("test message".to_string());
+        assert_eq!(err3.to_string(), "domain error: test message");
+
+        let err4 = EvalError::NonFinite;
+        assert_eq!(err4.to_string(), "result is non-finite");
+    }
+
+    #[test]
+    fn eval_non_finite_infinity() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let expr = st.func("exp", vec![x]);
+        let mut ctx = EvalContext::new();
+        ctx.bind("x", 1000.0); // Very large number
+                               // exp(1000) results in infinity
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::NonFinite)));
+    }
+
+    #[test]
+    fn eval_arity_check_sin() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let two = st.int(2);
+        let expr = st.func("sin", vec![one, two]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_arity_check_exp() {
+        let mut st = Store::new();
+        let expr = st.func("exp", vec![]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    #[test]
+    fn eval_arity_check_atan2() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let expr = st.func("atan2", vec![one]);
+        let ctx = EvalContext::new();
+        assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
 }
