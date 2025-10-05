@@ -5,6 +5,7 @@
 
 #![deny(warnings)]
 
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 use calculus::{diff, integrate};
@@ -14,6 +15,28 @@ use io::{to_latex, to_sexpr};
 use pattern::subst_symbol;
 use simplify::simplify;
 use solver::solve_univariate;
+
+// Resource limits (can be tuned). For tests we use a smaller limit to keep
+// the suite fast and deterministic.
+#[cfg(not(test))]
+const MAX_NODES: usize = 10_000;
+#[cfg(test)]
+const MAX_NODES: usize = 512;
+
+/// Count the number of unique nodes reachable from the given expression id.
+fn expr_size_of(store: &Store, root: ExprId) -> usize {
+    let mut visited: HashSet<ExprId> = HashSet::new();
+    let mut stack: Vec<ExprId> = vec![root];
+    while let Some(id) = stack.pop() {
+        if visited.insert(id) {
+            let node = store.get(id);
+            for &child in &node.children {
+                stack.push(child);
+            }
+        }
+    }
+    visited.len()
+}
 
 /// A symbolic expression for WebAssembly
 #[wasm_bindgen]
@@ -56,8 +79,8 @@ impl Expr {
         let mut store = Store::new();
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let id2 = Self::rebuild_expr(&other.store, other.id, &mut store);
-        Self::check_size(&store)?;
         let id = store.add(vec![id1, id2]);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -66,10 +89,10 @@ impl Expr {
         let mut store = Store::new();
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let id2 = Self::rebuild_expr(&other.store, other.id, &mut store);
-        Self::check_size(&store)?;
         let neg_one = store.int(-1);
         let neg_id2 = store.mul(vec![neg_one, id2]);
         let id = store.add(vec![id1, neg_id2]);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -78,8 +101,8 @@ impl Expr {
         let mut store = Store::new();
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let id2 = Self::rebuild_expr(&other.store, other.id, &mut store);
-        Self::check_size(&store)?;
         let id = store.mul(vec![id1, id2]);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -88,10 +111,10 @@ impl Expr {
         let mut store = Store::new();
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let id2 = Self::rebuild_expr(&other.store, other.id, &mut store);
-        Self::check_size(&store)?;
         let neg_one = store.int(-1);
         let inv_id2 = store.pow(id2, neg_one);
         let id = store.mul(vec![id1, inv_id2]);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -100,8 +123,8 @@ impl Expr {
         let mut store = Store::new();
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let id2 = Self::rebuild_expr(&other.store, other.id, &mut store);
-        Self::check_size(&store)?;
         let id = store.pow(id1, id2);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -111,6 +134,7 @@ impl Expr {
         let id1 = Self::rebuild_expr(&self.store, self.id, &mut store);
         let neg_one = store.int(-1);
         let id = store.mul(vec![neg_one, id1]);
+        Self::check_size(&store, id)?;
         Ok(Expr { store, id })
     }
 
@@ -118,8 +142,8 @@ impl Expr {
     pub fn simplify(&self) -> Result<Expr, JsValue> {
         let mut store = Store::new();
         let id = Self::rebuild_expr(&self.store, self.id, &mut store);
-        Self::check_size(&store)?;
         let simplified = simplify(&mut store, id);
+        Self::check_size(&store, simplified)?;
         Ok(Expr { store, id: simplified })
     }
 
@@ -127,9 +151,9 @@ impl Expr {
     pub fn diff(&self, var: &str) -> Result<Expr, JsValue> {
         let mut store = Store::new();
         let id = Self::rebuild_expr(&self.store, self.id, &mut store);
-        Self::check_size(&store)?;
         let deriv = diff(&mut store, id, var);
         let simplified = simplify(&mut store, deriv);
+        Self::check_size(&store, simplified)?;
         Ok(Expr { store, id: simplified })
     }
 
@@ -137,10 +161,10 @@ impl Expr {
     pub fn integrate(&self, var: &str) -> Result<Expr, JsValue> {
         let mut store = Store::new();
         let id = Self::rebuild_expr(&self.store, self.id, &mut store);
-        Self::check_size(&store)?;
         match integrate(&mut store, id, var) {
             Some(integral) => {
                 let simplified = simplify(&mut store, integral);
+                Self::check_size(&store, simplified)?;
                 Ok(Expr { store, id: simplified })
             }
             None => Err(JsValue::from_str("Integration failed: unsupported integral")),
@@ -152,9 +176,9 @@ impl Expr {
         let mut store = Store::new();
         let id = Self::rebuild_expr(&self.store, self.id, &mut store);
         let val_id = Self::rebuild_expr(&val.store, val.id, &mut store);
-        Self::check_size(&store)?;
         let subst = subst_symbol(&mut store, id, var, val_id);
         let simplified = simplify(&mut store, subst);
+        Self::check_size(&store, simplified)?;
         Ok(Expr { store, id: simplified })
     }
 
@@ -162,7 +186,7 @@ impl Expr {
     pub fn solve(&self, var: &str) -> Result<JsValue, JsValue> {
         let mut store = Store::new();
         let id = Self::rebuild_expr(&self.store, self.id, &mut store);
-        Self::check_size(&store)?;
+        Self::check_size(&store, id)?;
         match solve_univariate(&mut store, id, var) {
             Some(roots) => {
                 let solutions: Vec<String> =
@@ -261,11 +285,13 @@ impl Expr {
 
     /// Resource guard: check expression tree size
     /// Note: Simplified implementation - checks if expressions are reasonable
-    fn check_size(_store: &Store) -> Result<(), JsValue> {
-        // For now, size checking is disabled as it requires tracking
-        // the specific expression ID being checked
-        // Future enhancement: implement proper resource tracking
-        Ok(())
+    fn check_size(store: &Store, id: ExprId) -> Result<(), JsValue> {
+        let size = expr_size_of(store, id);
+        if size > MAX_NODES {
+            Err(JsValue::from_str("Expression too large: exceeded MAX_NODES"))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -274,8 +300,8 @@ impl Expr {
 pub fn sin(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let id = store.func("sin".to_string(), vec![arg]);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -283,8 +309,8 @@ pub fn sin(x: &Expr) -> Result<Expr, JsValue> {
 pub fn cos(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let id = store.func("cos".to_string(), vec![arg]);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -292,8 +318,8 @@ pub fn cos(x: &Expr) -> Result<Expr, JsValue> {
 pub fn tan(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let id = store.func("tan".to_string(), vec![arg]);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -301,8 +327,8 @@ pub fn tan(x: &Expr) -> Result<Expr, JsValue> {
 pub fn exp(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let id = store.func("exp".to_string(), vec![arg]);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -310,8 +336,8 @@ pub fn exp(x: &Expr) -> Result<Expr, JsValue> {
 pub fn ln(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let id = store.func("ln".to_string(), vec![arg]);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -319,9 +345,9 @@ pub fn ln(x: &Expr) -> Result<Expr, JsValue> {
 pub fn sqrt(x: &Expr) -> Result<Expr, JsValue> {
     let mut store = Store::new();
     let arg = Expr::rebuild_expr(&x.store, x.id, &mut store);
-    Expr::check_size(&store)?;
     let half = store.rat(1, 2);
     let id = store.pow(arg, half);
+    Expr::check_size(&store, id)?;
     Ok(Expr { store, id })
 }
 
@@ -359,5 +385,17 @@ mod tests {
         let deriv = x2.diff("x").unwrap();
         let result = deriv.to_string_js();
         assert!(result.contains("2") && result.contains("x"));
+    }
+
+    // Non-wasm unit test for the size counter (executes on native with rlib)
+    #[test]
+    fn expr_size_counts_nodes() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let one = st.int(1);
+        let expr = st.add(vec![x2, one]);
+        assert_eq!(expr_size_of(&st, expr), 5);
     }
 }
