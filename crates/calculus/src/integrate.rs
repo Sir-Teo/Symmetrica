@@ -1,7 +1,7 @@
 //! Integration rules (v1, conservative + Phase J: integration by parts).
 
 use crate::diff::diff;
-use arith::{q_div, q_mul, Q};
+use arith::{q_div, q_mul, q_sub, Q};
 use expr_core::{ExprId, Op, Payload, Store};
 use polys::{expr_to_unipoly, partial_fractions_simple, UniPoly};
 use simplify::simplify;
@@ -1184,10 +1184,126 @@ fn try_weierstrass_substitution(st: &mut Store, id: ExprId, var: &str) -> Option
                 let result = st.mul(vec![neg_one, cot]);
                 return Some(simplify(st, result));
             }
+
+            // General pattern: a + b*cos(x) or a + b*sin(x)
+            if let Some(res) = try_general_weierstrass(st, term1, term2, var) {
+                return Some(res);
+            }
         }
     }
 
     None
+}
+
+/// Try general Weierstrass for patterns like ∫ 1/(a + b cos(x)) dx or ∫ 1/(a + b sin(x)) dx
+/// Uses: ∫ 1/(a + b cos x) dx = (2/√(a²-b²)) arctan((a tan(x/2) - b) / √(a²-b²))  for a² > b²
+fn try_general_weierstrass(
+    st: &mut Store,
+    term1: ExprId,
+    term2: ExprId,
+    var: &str,
+) -> Option<ExprId> {
+    // Extract a and b*cos(x) or b*sin(x)
+    let (a_val, trig_term) = if matches!(
+        (&st.get(term1).op, &st.get(term1).payload),
+        (Op::Integer, _) | (Op::Rational, _)
+    ) {
+        (term1, term2)
+    } else if matches!(
+        (&st.get(term2).op, &st.get(term2).payload),
+        (Op::Integer, _) | (Op::Rational, _)
+    ) {
+        (term2, term1)
+    } else {
+        return None;
+    };
+
+    // Extract a as rational
+    let a = match (&st.get(a_val).op, &st.get(a_val).payload) {
+        (Op::Integer, Payload::Int(n)) => (*n, 1i64),
+        (Op::Rational, Payload::Rat(p, q)) => (*p, *q),
+        _ => return None,
+    };
+
+    // Extract b and trig function from b*cos(x) or b*sin(x) or -b*cos(x)
+    let (b, trig_fn) = extract_coeff_and_trig(st, trig_term, var)?;
+
+    if trig_fn != "cos" && trig_fn != "sin" {
+        return None;
+    }
+
+    // Compute a² - b²
+    let a_sq = q_mul(a, a);
+    let b_sq = q_mul(b, b);
+    let discriminant = q_sub(a_sq, b_sq);
+
+    // Only handle a² > b² case (discriminant > 0)
+    if discriminant.0 * discriminant.1 <= 0 {
+        return None;
+    }
+
+    // For simplicity, only handle integer/rational cases where √(a²-b²) is rational or simple
+    // Result: (2/√(a²-b²)) arctan((a tan(x/2) - b) / √(a²-b²))
+    // This is complex, so for now return None for general case beyond special cases already handled
+    // TODO: Implement full symbolic sqrt and arctan support
+    None
+}
+
+/// Extract coefficient and trig function from expressions like b*cos(x), b*sin(x), -b*cos(x), etc.
+/// Returns ((b_num, b_den), "cos"|"sin")
+fn extract_coeff_and_trig(st: &Store, id: ExprId, var: &str) -> Option<((i64, i64), String)> {
+    match &st.get(id).op {
+        Op::Function => {
+            // Direct trig function: cos(x) or sin(x) => coefficient is (1, 1)
+            if let Payload::Func(fname) = &st.get(id).payload {
+                if (fname == "cos" || fname == "sin") && st.get(id).children.len() == 1 {
+                    let arg = st.get(id).children[0];
+                    if matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                    {
+                        return Some(((1, 1), fname.clone()));
+                    }
+                }
+            }
+            None
+        }
+        Op::Mul => {
+            // b * cos(x) or b * sin(x)
+            let children = &st.get(id).children;
+            let mut coeff = (1i64, 1i64);
+            let mut trig_fn: Option<String> = None;
+
+            for &child in children {
+                match (&st.get(child).op, &st.get(child).payload) {
+                    (Op::Integer, Payload::Int(n)) => {
+                        coeff = q_mul(coeff, (*n, 1));
+                    }
+                    (Op::Rational, Payload::Rat(p, q)) => {
+                        coeff = q_mul(coeff, (*p, *q));
+                    }
+                    (Op::Function, Payload::Func(fname)) => {
+                        if (fname == "cos" || fname == "sin") && st.get(child).children.len() == 1 {
+                            let arg = st.get(child).children[0];
+                            if matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                            {
+                                if trig_fn.is_some() {
+                                    return None; // Multiple trig functions
+                                }
+                                trig_fn = Some(fname.clone());
+                            } else {
+                                return None;
+                            }
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+
+            trig_fn.map(|fname| (coeff, fname))
+        }
+        _ => None,
+    }
 }
 
 // Helper: check if expression is cos(var)
