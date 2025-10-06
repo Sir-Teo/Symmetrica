@@ -183,18 +183,76 @@ x^5: 1/120`,
     }
 };
 
+// Generate runnable JS code for an example using the WASM API
+function getJsCodeForExample(exampleKey) {
+    switch (exampleKey) {
+        case 'basic':
+            return `// Basic polynomial simplification
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const three_x = new Symmetrica.Expr(3).mul(x);
+const one = new Symmetrica.Expr(1);
+const expr = x2.add(three_x).add(one);
+const simplified = expr.simplify();
+print(simplified.toString());`;
+        case 'diff':
+            return `// Differentiate sin(x^2) w.r.t. x
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const sin_x2 = Symmetrica.sin(x2);
+const derivative = sin_x2.diff('x');
+print(derivative.toString());`;
+        case 'integrate':
+            return `// Integrate x^2 dx
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const integral = x2.integrate('x');
+print(integral.toString());`;
+        case 'simplify':
+            return `// Simplify ln(x*y)
+const x = Symmetrica.Expr.symbol('x');
+const y = Symmetrica.Expr.symbol('y');
+const prod = x.mul(y);
+const ln_prod = Symmetrica.ln(prod);
+const simplified = ln_prod.simplify();
+print(simplified.toString());`;
+        case 'solve':
+            return `// Solve x^2 + 3x + 2 = 0
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const three_x = new Symmetrica.Expr(3).mul(x);
+const two = new Symmetrica.Expr(2);
+const eq = x2.add(three_x).add(two);
+const roots = eq.solve('x');
+print('Roots: ' + JSON.stringify(roots));`;
+        case 'series':
+            return `// Series expansion (Maclaurin) is not yet exposed in the WASM API.
+print('Series example is not runnable in the browser yet.');`;
+        default:
+            return `print('Example not implemented');`;
+    }
+}
+
 // Load example
 function loadExample(exampleKey) {
     const example = examples[exampleKey];
     if (!example) return;
     
-    // Update code
-    const codeEditor = document.getElementById('code-editor');
-    // Reset classes and set fresh content before highlighting
-    codeEditor.className = 'language-rust';
-    codeEditor.textContent = example.code;
-    // Defer highlight to next frame to ensure DOM updates applied
-    requestAnimationFrame(() => hljs.highlightElement(codeEditor));
+    // Update Rust reference code
+    const codeEditorRust = document.getElementById('code-editor-rust');
+    if (codeEditorRust) {
+        codeEditorRust.className = 'language-rust';
+        codeEditorRust.textContent = example.code;
+        requestAnimationFrame(() => hljs.highlightElement(codeEditorRust));
+    }
+
+    // Update runnable JS code
+    const codeEditorJs = document.getElementById('code-editor-js');
+    if (codeEditorJs) {
+        codeEditorJs.className = 'language-js';
+        codeEditorJs.textContent = getJsCodeForExample(exampleKey);
+        requestAnimationFrame(() => hljs.highlightElement(codeEditorJs));
+    }
     
     // Update output
     const output = document.getElementById('output');
@@ -213,7 +271,13 @@ function loadExample(exampleKey) {
 
 // Copy code
 function copyCode() {
-    const code = document.getElementById('code-editor').textContent;
+    // Determine active tab in the playground editor
+    const activeTab = document.querySelector('.tabs-container .tab-button.active');
+    const isJs = activeTab && activeTab.getAttribute('data-tab') === 'js';
+    const editorEl = isJs
+        ? document.getElementById('code-editor-js')
+        : (document.getElementById('code-editor-rust') || document.getElementById('code-editor'));
+    const code = editorEl ? editorEl.textContent : '';
     navigator.clipboard.writeText(code).then(() => {
         const btn = document.querySelector('.btn-copy');
         const originalText = btn.textContent;
@@ -235,6 +299,55 @@ function extractNumbers(code) {
     return numbers;
 }
 
+// Append output helper
+function printToOutput(line) {
+    const output = document.getElementById('output');
+    if (!output) return;
+    const cur = output.textContent || '';
+    const s = String(line);
+    output.textContent = cur ? cur + '\n' + s : s;
+}
+
+// Execute user-provided JavaScript using the WASM API
+async function runUserJS() {
+    const status = document.getElementById('output-status');
+    const output = document.getElementById('output');
+    const codeEl = document.getElementById('code-editor-js');
+    if (!codeEl) return;
+    const code = codeEl.textContent;
+
+    // Reset output
+    output.textContent = '';
+    status.textContent = 'Running...';
+
+    const Sym = window.Symmetrica;
+    const print = (msg) => printToOutput(msg);
+    const logLike = (...args) => {
+        try {
+            const parts = args.map(a => {
+                if (typeof a === 'string') return a;
+                try { return JSON.stringify(a); } catch { return String(a); }
+            });
+            print(parts.join(' '));
+        } catch (e) {
+            print(String(args.join(' ')));
+        }
+    };
+
+    try {
+        const fn = new Function('Symmetrica', 'print', 'console', code);
+        const maybe = fn(Sym, print, { log: logLike, warn: logLike, error: logLike });
+        if (maybe && typeof maybe.then === 'function') {
+            await maybe;
+        }
+        status.textContent = 'Success';
+    } catch (e) {
+        print('Error: ' + (e && e.message ? e.message : String(e)));
+        status.textContent = 'Error';
+        console.error('User code error:', e);
+    }
+}
+
 // Run example with WASM
 function runExample() {
     const status = document.getElementById('output-status');
@@ -246,15 +359,24 @@ function runExample() {
         return;
     }
     
+    // If JS tab is active, execute user JS code (actual code execution)
+    const activeTab = document.querySelector('.tabs-container .tab-button.active');
+    const isJs = activeTab && activeTab.getAttribute('data-tab') === 'js';
+    if (isJs) {
+        runUserJS();
+        return;
+    }
+
     status.textContent = 'Running...';
-    
+
     try {
         const Sym = window.Symmetrica;
         
         // Get active example and code from editor
         const activeBtn = document.querySelector('.example-btn.active');
         let exampleKey = activeBtn ? activeBtn.getAttribute('data-example') : 'basic';
-        const code = document.getElementById('code-editor').textContent;
+        const rustEditor = document.getElementById('code-editor-rust') || document.getElementById('code-editor');
+        const code = rustEditor ? rustEditor.textContent : '';
 
         // Try to infer the example from the pasted code (helps when user copies another snippet)
         const c = code;
@@ -370,14 +492,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Avoid double-highlighting here; main site script already highlights static blocks.
-    // Ensure the editor starts highlighted once.
-    const editor = document.getElementById('code-editor');
-    if (editor && !editor.classList.contains('hljs')) {
-        // Ensure language class is present so highlight.js knows what to do
-        if (!Array.from(editor.classList).some(c => c.startsWith('language-'))) {
-            editor.classList.add('language-rust');
+    // Highlight both editors if present
+    const jsEd = document.getElementById('code-editor-js');
+    if (jsEd && !jsEd.classList.contains('hljs')) {
+        if (!Array.from(jsEd.classList).some(c => c.startsWith('language-'))) {
+            jsEd.classList.add('language-js');
         }
-        hljs.highlightElement(editor);
+        hljs.highlightElement(jsEd);
+    }
+
+    const rustEd = document.getElementById('code-editor-rust');
+    if (rustEd && !rustEd.classList.contains('hljs')) {
+        if (!Array.from(rustEd.classList).some(c => c.startsWith('language-'))) {
+            rustEd.classList.add('language-rust');
+        }
+        hljs.highlightElement(rustEd);
     }
 });

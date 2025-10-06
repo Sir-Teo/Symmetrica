@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/playground.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <!-- Preload WASM module and binary for faster startup -->
+    <link rel="modulepreload" href="./pkg/symmetrica_wasm.js?v=play-2">
+    <link rel="preload" as="fetch" href="./pkg/symmetrica_wasm_bg.wasm?v=play-2" type="application/wasm" crossorigin>
 </head>
 <body>
     <nav class="navbar">
@@ -65,13 +68,33 @@
             <main class="playground-main">
                 <div class="code-panel">
                     <div class="panel-header">
-                        <span>Rust Code</span>
+                        <span>Code</span>
                         <div>
                             <button class="btn-run" onclick="runExample()">▶ Run</button>
                             <button class="btn-copy" onclick="copyCode()">Copy</button>
                         </div>
                     </div>
-                    <pre><code id="code-editor" class="language-rust" contenteditable="true">use expr_core::Store;
+                    <div class="tabs-container">
+                        <div class="tab-buttons" style="padding: 0.5rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg-dark);">
+                            <button class="tab-button active" data-tab="js">JavaScript (runnable)</button>
+                            <button class="tab-button" data-tab="rust">Rust (reference)</button>
+                        </div>
+                        <div class="tab-pane active" id="js-tab">
+                            <pre><code id="code-editor-js" class="language-js" contenteditable="true">// This code runs in your browser using the Symmetrica WASM API.
+// Use print(...) or console.log(...) to write to the Output panel.
+// Example: basic polynomial simplification
+
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const three_x = new Symmetrica.Expr(3).mul(x);
+const one = new Symmetrica.Expr(1);
+const expr = x2.add(three_x).add(one);
+const simplified = expr.simplify();
+print(simplified.toString());
+</code></pre>
+                        </div>
+                        <div class="tab-pane" id="rust-tab">
+                            <pre><code id="code-editor-rust" class="language-rust" contenteditable="false">use expr_core::Store;
 use simplify::simplify;
 
 fn main() {
@@ -88,6 +111,8 @@ fn main() {
     let simplified = simplify(&mut st, expr);
     println!("{}", st.to_string(simplified));
 }</code></pre>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="output-panel">
@@ -144,16 +169,19 @@ cargo run --example basic_polynomial</code></pre>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/main.js?v=play-2"></script>
     
     <!-- Initialize WASM before playground -->
     <script type="module">
-        import init, * as Symmetrica from './pkg/symmetrica_wasm.js';
+        import init, * as Symmetrica from './pkg/symmetrica_wasm.js?v=play-2';
         
         (async () => {
             try {
-                await init();
+                // Pass a versioned URL so the .wasm also bypasses caches
+                const wasmUrl = new URL('./pkg/symmetrica_wasm_bg.wasm?v=play-2', import.meta.url);
+                await init(wasmUrl);
                 window.Symmetrica = Symmetrica;
                 window.SYM_WASM_READY = true;
                 const el = document.getElementById('output-status');
@@ -167,6 +195,6 @@ cargo run --example basic_polynomial</code></pre>
         })();
     </script>
     
-    <script src="js/playground.js"></script>
+    <script src="js/playground.js?v=play-2"></script>
 </body>
 </html>
