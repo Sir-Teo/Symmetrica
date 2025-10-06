@@ -1,10 +1,15 @@
 //! Calculus v1 (minimal): structural differentiation for Add/Mul/Pow.
 mod diff;
 mod integrate;
+mod risch;
 mod series;
 
 pub use diff::diff;
 pub use integrate::integrate;
+pub use risch::{
+    detect_extension, is_exponential, is_logarithm, logarithmic_derivative, ExtensionType,
+    TowerElement,
+};
 pub use series::{limit_poly, maclaurin, LimitPoint, LimitResult, Series};
 
 #[cfg(test)]
@@ -378,5 +383,76 @@ mod tests {
         // Result should contain both x and ln
         assert!(s.contains("ln"));
         assert!(s.contains("x"));
+    }
+
+    // ========== Hyperbolic Function Tests (v1.1) ==========
+
+    #[test]
+    fn diff_hyperbolic_functions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+
+        // d/dx sinh(x) = cosh(x)
+        let sinhx = st.func("sinh", vec![x]);
+        let d_sinh = diff(&mut st, sinhx, "x");
+        let coshx = st.func("cosh", vec![x]);
+        assert_eq!(st.to_string(d_sinh), st.to_string(coshx));
+
+        // d/dx cosh(x) = sinh(x)
+        let coshx2 = st.func("cosh", vec![x]);
+        let d_cosh = diff(&mut st, coshx2, "x");
+        let sinhx2 = st.func("sinh", vec![x]);
+        assert_eq!(st.to_string(d_cosh), st.to_string(sinhx2));
+
+        // d/dx tanh(x) = 1 - tanh^2(x)
+        let tanhx = st.func("tanh", vec![x]);
+        let d_tanh = diff(&mut st, tanhx, "x");
+        let result = st.to_string(d_tanh);
+        assert!(result.contains("tanh"));
+    }
+
+    #[test]
+    fn integrate_hyperbolic_functions() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+
+        // ∫ sinh(x) dx = cosh(x)
+        let sinhx = st.func("sinh", vec![x]);
+        let i_sinh = integrate(&mut st, sinhx, "x").expect("sinh integrable");
+        let coshx = st.func("cosh", vec![x]);
+        assert_eq!(st.to_string(i_sinh), st.to_string(coshx));
+
+        // ∫ cosh(x) dx = sinh(x)
+        let coshx2 = st.func("cosh", vec![x]);
+        let i_cosh = integrate(&mut st, coshx2, "x").expect("cosh integrable");
+        let sinhx2 = st.func("sinh", vec![x]);
+        assert_eq!(st.to_string(i_cosh), st.to_string(sinhx2));
+
+        // ∫ tanh(x) dx = ln(cosh(x))
+        let tanhx = st.func("tanh", vec![x]);
+        let i_tanh = integrate(&mut st, tanhx, "x").expect("tanh integrable");
+        let result = st.to_string(i_tanh);
+        assert!(result.contains("ln"));
+        assert!(result.contains("cosh"));
+    }
+
+    #[test]
+    fn integrate_hyperbolic_differential_check() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+
+        // Verify sinh: d/dx(∫ sinh(x) dx) = sinh(x)
+        let sinhx = st.func("sinh", vec![x]);
+        let integral = integrate(&mut st, sinhx, "x").expect("sinh");
+        let derivative = diff(&mut st, integral, "x");
+        let simplified = simplify::simplify(&mut st, derivative);
+        assert_eq!(st.get(simplified).digest, st.get(sinhx).digest);
+
+        // Verify cosh: d/dx(∫ cosh(x) dx) = cosh(x)
+        let coshx = st.func("cosh", vec![x]);
+        let integral2 = integrate(&mut st, coshx, "x").expect("cosh");
+        let derivative2 = diff(&mut st, integral2, "x");
+        let simplified2 = simplify::simplify(&mut st, derivative2);
+        assert_eq!(st.get(simplified2).digest, st.get(coshx).digest);
     }
 }

@@ -81,6 +81,13 @@ d/dx sin(u) = cos(u) * u'
 d/dx cos(u) = -sin(u) * u'
 ```
 
+#### Hyperbolic Functions (v1.1)
+```rust
+d/dx sinh(u) = cosh(u) * u'
+d/dx cosh(u) = sinh(u) * u'
+d/dx tanh(u) = (1 - tanh^2(u)) * u'
+```
+
 #### Exponential and Logarithm
 ```rust
 d/dx exp(u) = exp(u) * u'
@@ -183,6 +190,27 @@ let integral = integrate(&mut st, exp_3x, "x").unwrap();
 // Result: (1/3) * exp(3x)
 ```
 
+#### Hyperbolic Functions (v1.1)
+```rust
+∫ sinh(ax + b) dx = (1/a) * cosh(ax + b)
+∫ cosh(ax + b) dx = (1/a) * sinh(ax + b)
+∫ tanh(ax + b) dx = (1/a) * ln(cosh(ax + b))
+```
+
+**Examples:**
+```rust
+// ∫ sinh(x) dx = cosh(x)
+let sinhx = st.func("sinh", vec![x]);
+let integral = integrate(&mut st, sinhx, "x").unwrap();
+// Result: cosh(x)
+
+// ∫ tanh(2x) dx = (1/2) * ln(cosh(2x))
+let two_x = st.mul(vec![st.int(2), x]);
+let tanh_2x = st.func("tanh", vec![two_x]);
+let integral = integrate(&mut st, tanh_2x, "x").unwrap();
+// Result: (1/2) * ln(cosh(2x))
+```
+
 #### Logarithmic Integral (u'/u pattern)
 ```rust
 ∫ u'/u dx = ln(u)
@@ -237,6 +265,164 @@ let integral = integrate(&mut st, product, "x").unwrap();
 - `ln(x) * polynomial` → Uses integration by parts with `u = ln(x)`
 - `polynomial * trig/exp` → Chooses polynomial as `u`
 - Products where both factors depend on the variable
+
+#### Trigonometric Power Patterns (v1.1)
+
+**sin(x) * cos(x):**
+```rust
+∫ sin(x) cos(x) dx = -cos(2x)/4
+```
+
+Using the identity `sin(x)cos(x) = sin(2x)/2`:
+```rust
+let sinx = st.func("sin", vec![x]);
+let cosx = st.func("cos", vec![x]);
+let prod = st.mul(vec![sinx, cosx]);
+let integral = integrate(&mut st, prod, "x").unwrap();
+// Result: -cos(2x)/4
+```
+
+**sin^2(x) using double-angle formula:**
+```rust
+∫ sin^2(x) dx = x/2 - sin(2x)/4
+```
+
+Using the identity `sin^2(x) = (1 - cos(2x))/2`:
+```rust
+let sinx = st.func("sin", vec![x]);
+let two = st.int(2);
+let sin2 = st.pow(sinx, two);
+let integral = integrate(&mut st, sin2, "x").unwrap();
+// Result: x/2 - sin(2x)/4
+```
+
+**cos^2(x) using double-angle formula:**
+```rust
+∫ cos^2(x) dx = x/2 + sin(2x)/4
+```
+
+Using the identity `cos^2(x) = (1 + cos(2x))/2`:
+```rust
+let cosx = st.func("cos", vec![x]);
+let two = st.int(2);
+let cos2 = st.pow(cosx, two);
+let integral = integrate(&mut st, cos2, "x").unwrap();
+// Result: x/2 + sin(2x)/4
+```
+
+#### U-Substitution Pattern Detection (v1.1)
+
+Automatically detects and applies u-substitution for patterns of the form `∫ f(g(x)) * g'(x) dx`:
+
+**Power rule with composite functions:**
+```rust
+∫ u^n * u' dx = u^(n+1) / (n+1) + C
+```
+
+**Example: ∫ 2x(x² + 1)⁵ dx**
+```rust
+let x = st.sym("x");
+let two = st.int(2);
+let two_x = st.mul(vec![two, x]); // u' = 2x
+
+let x2 = st.pow(x, two);
+let one = st.int(1);
+let u = st.add(vec![x2, one]); // u = x² + 1
+let five = st.int(5);
+let u5 = st.pow(u, five); // u⁵
+
+let integrand = st.mul(vec![two_x, u5]);
+let result = integrate(&mut st, integrand, "x").unwrap();
+// Result: (x² + 1)⁶ / 6
+```
+
+The engine automatically:
+1. Identifies u^n patterns in products
+2. Computes du/dx for the base u
+3. Checks if remaining factors match c * du for some constant c
+4. Applies the power rule with the adjusted coefficient
+
+**Supported patterns:**
+- `∫ 2x(x² + a)^n dx` where du = 2x dx
+- `∫ 3x²(x³ + b)^n dx` where du = 3x² dx
+- Any `∫ c * f'(x) * [f(x)]^n dx` pattern with rational coefficients
+
+#### Risch Algorithm Foundation (v1.1)
+
+The Risch algorithm is a decision procedure for symbolic integration of elementary functions. v1.1 introduces foundational components:
+
+**Differential Field Towers:**
+- Tower extension detection for exp/log structures
+- Classification of expressions as base field, exponential, or logarithmic extensions
+- Support for analyzing nested function structures
+
+**Logarithmic Derivative:**
+```rust
+∫ f'/f dx = ln(f) + C
+```
+
+The logarithmic derivative `d/dx(ln(f)) = f'/f` is computed automatically for integration patterns.
+
+**Example: Detect tower structure**
+```rust
+let expx = st.func("exp", vec![x]);
+let ext = detect_extension(&st, expx, "x");
+// Returns ExtensionType::Exponential(x)
+
+let lnx = st.func("ln", vec![x]);
+let ext = detect_extension(&st, lnx, "x");
+// Returns ExtensionType::Logarithmic(x)
+```
+
+**Enhanced Exponential Integration:**
+The Risch foundation enables cleaner integration of exponentials:
+- `∫ exp(x) dx = exp(x)`
+- `∫ exp(ax) dx = (1/a) exp(ax)`
+- `∫ exp(ax + b) dx = (1/a) exp(ax + b)`
+
+These patterns are now handled through the Risch framework with proper tower analysis.
+
+#### Weierstrass Substitution (v1.1)
+
+The Weierstrass substitution (tangent half-angle substitution) handles rational trigonometric integrals using `t = tan(x/2)`:
+
+**Transformation Formulas:**
+- `sin(x) = 2t/(1+t²)`
+- `cos(x) = (1-t²)/(1+t²)`
+- `dx = 2/(1+t²) dt`
+
+**Supported Patterns:**
+
+**∫ 1/(1 + cos(x)) dx:**
+```rust
+let one = st.int(1);
+let cosx = st.func("cos", vec![x]);
+let denom = st.add(vec![one, cosx]);
+let neg_one = st.int(-1);
+let integrand = st.pow(denom, neg_one); // (1 + cos(x))^(-1)
+
+let result = integrate(&mut st, integrand, "x").unwrap();
+// Result: tan(x/2)
+```
+
+**∫ 1/(1 - cos(x)) dx:**
+```rust
+let one = st.int(1);
+let cosx = st.func("cos", vec![x]);
+let neg_one = st.int(-1);
+let neg_cosx = st.mul(vec![neg_one, cosx]);
+let denom = st.add(vec![one, neg_cosx]); // 1 - cos(x)
+let integrand = st.pow(denom, neg_one);
+
+let result = integrate(&mut st, integrand, "x").unwrap();
+// Result: -cot(x/2)
+```
+
+**Key Results:**
+- `∫ 1/(1 + cos(x)) dx = tan(x/2) + C`
+- `∫ 1/(1 - cos(x)) dx = -cot(x/2) + C`
+
+These integrals are automatically recognized and integrated using the Weierstrass framework.
 
 ### Conservative Strategy
 
@@ -397,9 +583,13 @@ let df = diff(&mut st, expr, "x");
 
 **Integration:**
 - ✅ Integration by parts (LIATE heuristic for products)
-- No trigonometric substitution
-- No advanced techniques (Risch algorithm not implemented)
+- ✅ Hyperbolic functions (sinh, cosh, tanh) - v1.1
+- ✅ Trigonometric power patterns (sin²(x), cos²(x), sin(x)cos(x)) - v1.1
+- ✅ U-substitution for composite functions (f(g(x)) * g'(x)) - v1.1
+- No advanced trigonometric substitution (Weierstrass)
+- No advanced techniques (Risch algorithm not fully implemented)
 - Partial fractions limited to distinct linear factors over Q
+- Rational exponents not yet supported in power rule
 
 **Series:**
 - No Laurent series (negative powers)

@@ -129,6 +129,28 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                     let inv = store.pow(u, minus_one);
                     store.mul(vec![du, inv])
                 }
+                "sinh" => {
+                    // (sinh u)' = cosh(u) * u'
+                    let cosh_u = store.func("cosh", vec![u]);
+                    store.mul(vec![cosh_u, du])
+                }
+                "cosh" => {
+                    // (cosh u)' = sinh(u) * u'
+                    let sinh_u = store.func("sinh", vec![u]);
+                    store.mul(vec![sinh_u, du])
+                }
+                "tanh" => {
+                    // (tanh u)' = sech^2(u) * u' = (1 - tanh^2(u)) * u'
+                    // Using 1 - tanh^2(u) for simplicity
+                    let tanh_u = store.func("tanh", vec![u]);
+                    let two = store.int(2);
+                    let tanh2 = store.pow(tanh_u, two);
+                    let one = store.int(1);
+                    let neg_one = store.int(-1);
+                    let neg_tanh2 = store.mul(vec![neg_one, tanh2]);
+                    let bracket = store.add(vec![one, neg_tanh2]);
+                    store.mul(vec![bracket, du])
+                }
                 _ => store.int(0),
             };
             simplify(store, out)
@@ -358,5 +380,65 @@ mod tests {
         // d/dx(x^2 * sin(x)) = 2x*sin(x) + x^2*cos(x)
         let result = st.to_string(d);
         assert!(result.contains("sin") || result.contains("cos"));
+    }
+
+    #[test]
+    fn diff_sinh() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinhx = st.func("sinh", vec![x]);
+        let d = diff(&mut st, sinhx, "x");
+        // d/dx(sinh(x)) = cosh(x)
+        let coshx = st.func("cosh", vec![x]);
+        assert_eq!(st.to_string(d), st.to_string(coshx));
+    }
+
+    #[test]
+    fn diff_cosh() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let coshx = st.func("cosh", vec![x]);
+        let d = diff(&mut st, coshx, "x");
+        // d/dx(cosh(x)) = sinh(x)
+        let sinhx = st.func("sinh", vec![x]);
+        assert_eq!(st.to_string(d), st.to_string(sinhx));
+    }
+
+    #[test]
+    fn diff_tanh() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let tanhx = st.func("tanh", vec![x]);
+        let d = diff(&mut st, tanhx, "x");
+        // d/dx(tanh(x)) = 1 - tanh^2(x)
+        let result = st.to_string(d);
+        assert!(result.contains("tanh"));
+    }
+
+    #[test]
+    fn diff_sinh_chain_rule() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let sinh_x2 = st.func("sinh", vec![x2]);
+        let d = diff(&mut st, sinh_x2, "x");
+        // d/dx(sinh(x^2)) = cosh(x^2) * 2x
+        let result = st.to_string(d);
+        assert!(result.contains("cosh"));
+        assert!(result.contains("2"));
+    }
+
+    #[test]
+    fn diff_cosh_chain_rule() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let cosh_x2 = st.func("cosh", vec![x2]);
+        let d = diff(&mut st, cosh_x2, "x");
+        // d/dx(cosh(x^2)) = sinh(x^2) * 2x
+        let result = st.to_string(d);
+        assert!(result.contains("sinh"));
     }
 }
