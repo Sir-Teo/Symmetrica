@@ -225,10 +225,10 @@ mod tests {
         let three = st.int(3);
         let two = st.int(2);
         let ratio = st.rat(3, 2);
-        
+
         assert_eq!(try_eval_float(&st, three), Some(3.0));
         assert_eq!(try_eval_float(&st, ratio), Some(1.5));
-        
+
         let sum = st.add(vec![two, three]);
         assert_eq!(try_eval_float(&st, sum), Some(5.0));
     }

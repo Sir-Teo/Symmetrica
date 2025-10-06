@@ -1,9 +1,10 @@
 //! Calculus v1 (minimal): structural differentiation for Add/Mul/Pow.
-//! Phase 3: definite integrals, constant evaluation, and special functions framework
+//! Phase 3: definite integrals, limit evaluation, constant folding, and special functions
 mod definite;
 mod diff;
 mod evaluate;
 mod integrate;
+mod limit;
 mod risch;
 mod series;
 
@@ -11,6 +12,7 @@ pub use definite::{definite_integrate, Bound, DefiniteResult};
 pub use diff::diff;
 pub use evaluate::{fold_constants, try_eval_constant, try_eval_float};
 pub use integrate::integrate;
+pub use limit::{limit, LimitPoint as LimitPointCalc, LimitResult as LimitResultCalc};
 pub use risch::{
     build_tower, detect_extension, is_exponential, is_logarithm, logarithmic_derivative,
     try_integrate_logarithmic, ExtensionType, TowerElement,
