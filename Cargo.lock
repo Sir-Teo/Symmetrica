@@ -801,6 +801,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "summation"
+version = "1.4.0"
+dependencies = [
+ "arith",
+ "calculus",
+ "criterion",
+ "expr_core",
+ "polys",
+ "proptest",
+ "simplify",
+]
+
+[[package]]
 name = "symmetrica-wasm"
 version = "1.0.0-rc.1"
 dependencies = [
