@@ -192,6 +192,10 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             if let Some(res) = try_trig_power_general(store, id, var) {
                 return Some(res);
             }
+            // Even-power single trig functions like sin^(2k)(x) or cos^(2k)(x)
+            if let Some(res) = try_trig_even_power_single(store, id, var) {
+                return Some(res);
+            }
             // Try Weierstrass substitution for rational trig integrals (1/(1+cos(x)))
             if let Some(res) = try_weierstrass_substitution(store, id, var) {
                 return Some(res);
@@ -844,6 +848,93 @@ fn try_trig_power_general(st: &mut Store, id: ExprId, var: &str) -> Option<ExprI
     }
 
     // Even-even not handled here
+    None
+}
+
+/// Integrate single-function even powers: sin^(2k)(x) or cos^(2k)(x)
+/// Uses reduction formulas:
+/// ∫ sin^n(x) dx = -cos(x) sin^{n-1}(x)/n + (n-1)/n ∫ sin^{n-2}(x) dx
+/// ∫ cos^n(x) dx =  sin(x) cos^{n-1}(x)/n + (n-1)/n ∫ cos^{n-2}(x) dx
+fn try_trig_even_power_single(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    if st.get(id).op != Op::Pow {
+        return None;
+    }
+
+    let base = st.get(id).children[0];
+    let exp = st.get(id).children[1];
+    let n = match (&st.get(exp).op, &st.get(exp).payload) {
+        (Op::Integer, Payload::Int(k)) if *k >= 2 && (*k % 2 == 0) => *k,
+        _ => return None,
+    };
+
+    // Helpers: detect sin(var) or cos(var)
+    fn is_sin_var(st: &Store, id: ExprId, var: &str) -> bool {
+        if let (Op::Function, Payload::Func(fname)) = (&st.get(id).op, &st.get(id).payload) {
+            if fname == "sin" && st.get(id).children.len() == 1 {
+                let arg = st.get(id).children[0];
+                return matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var);
+            }
+        }
+        false
+    }
+    fn is_cos_var(st: &Store, id: ExprId, var: &str) -> bool {
+        if let (Op::Function, Payload::Func(fname)) = (&st.get(id).op, &st.get(id).payload) {
+            if fname == "cos" && st.get(id).children.len() == 1 {
+                let arg = st.get(id).children[0];
+                return matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var);
+            }
+        }
+        false
+    }
+
+    let x = st.sym(var);
+    if is_sin_var(st, base, var) {
+        // Recursive helper
+        fn integrate_sin_even(st: &mut Store, x: ExprId, n: i64) -> Option<ExprId> {
+            if n == 0 {
+                // ∫ 1 dx = x
+                return Some(x);
+            }
+            // term1 = (-1/n) * cos(x) * sin(x)^(n-1)
+            let cosx = st.func("cos", vec![x]);
+            let sinx = st.func("sin", vec![x]);
+            let exp_e = st.int(n - 1);
+            let sin_pow = st.pow(sinx, exp_e);
+            let c1 = st.rat(-1, n);
+            let term1 = st.mul(vec![c1, cosx, sin_pow]);
+            // term2 = ((n-1)/n) * ∫ sin^(n-2)(x) dx
+            let inner = integrate_sin_even(st, x, n - 2)?;
+            let c2 = st.rat(n - 1, n);
+            let term2 = st.mul(vec![c2, inner]);
+            let sum = st.add(vec![term1, term2]);
+            Some(simplify(st, sum))
+        }
+        return integrate_sin_even(st, x, n);
+    }
+    if is_cos_var(st, base, var) {
+        // Recursive helper
+        fn integrate_cos_even(st: &mut Store, x: ExprId, n: i64) -> Option<ExprId> {
+            if n == 0 {
+                // ∫ 1 dx = x
+                return Some(x);
+            }
+            // term1 = (1/n) * sin(x) * cos(x)^(n-1)
+            let sinx = st.func("sin", vec![x]);
+            let cosx = st.func("cos", vec![x]);
+            let exp_e = st.int(n - 1);
+            let cos_pow = st.pow(cosx, exp_e);
+            let c1 = st.rat(1, n);
+            let term1 = st.mul(vec![c1, sinx, cos_pow]);
+            // term2 = ((n-1)/n) * ∫ cos^(n-2)(x) dx
+            let inner = integrate_cos_even(st, x, n - 2)?;
+            let c2 = st.rat(n - 1, n);
+            let term2 = st.mul(vec![c2, inner]);
+            let sum = st.add(vec![term1, term2]);
+            Some(simplify(st, sum))
+        }
+        return integrate_cos_even(st, x, n);
+    }
+
     None
 }
 
