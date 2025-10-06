@@ -2,8 +2,8 @@
 
 **Last Updated:** 2025-10-06  
 **Status:** Phase 2 & 3 Complete ✅ | Phase 4 In Progress 🚀  
-**Coverage:** 84.47% (2590/3066 lines) +0.36%  
-**Tests:** 189 passing (100% pass rate) +16 tests
+**Coverage:** 84.55% (2615/3093 lines) +0.43%  
+**Tests:** 195 passing (100% pass rate) +22 tests
 
 ---
 
@@ -126,20 +126,28 @@ d/dx atan(x) = 1/(1+x²)
 - **Special values:** atan(0) → 0
 - **Tests:** 2 tests, domain considerations documented
 
-##### 4. Pythagorean Identity ⭐ NEW!
+##### 4. Pythagorean Identity ⭐
 - **Basic form:** sin²x + cos²x → 1
 - **Order independent:** cos²x + sin²x → 1
 - **Any argument:** sin²(2x) + cos²(2x) → 1
 - **With extra terms:** 3 + sin²x + cos²x → 4
 - **Different args preserved:** sin²x + cos²y → (not simplified)
 - **Tests:** 6 comprehensive tests
-- **Coverage:** `symbolic_simplify.rs` at 85.3% (87/102 lines)
+
+##### 5. Double-Angle Formula ⭐ NEW!
+- **Basic form:** 2sin(x)cos(x) → sin(2x)
+- **Order independent:** cos(x)·sin(x)·2 → sin(2x)
+- **Any argument:** 2sin(x/2)cos(x/2) → sin(x)
+- **With coefficients:** Preserves other factors
+- **Different args preserved:** 2sin(x)cos(y) → (not simplified)
+- **Tests:** 6 comprehensive tests
+- **Coverage:** `symbolic_simplify.rs` at 86.8% (112/129 lines)
 
 #### Test Coverage
-- **Total tests:** 16 (was 10, +6 for Pythagorean identity)
+- **Total tests:** 22 (was 16, +6 for double-angle)
 - **Pass rate:** 100%
-- **Module coverage:** 85.3%
-- **Example file:** `examples/symbolic_simplification.rs` (12 demonstrations)
+- **Module coverage:** 86.8% (+1.5%)
+- **Example file:** `examples/symbolic_simplification.rs` (15 demonstrations)
 
 #### Architecture
 
@@ -283,13 +291,14 @@ Expression → Op detection → Pattern matching → Result
 
 ## 🔮 Phase 4: Future Enhancements
 
-### High Priority ✅ (In Progress)
+### High Priority ✅ (In Progress - 50% Complete)
 1. **Symbolic simplification engine** ✅ PARTIALLY COMPLETE
    - ✅ √4 → 2, √9 → 3 (perfect squares)
    - ✅ ln(e^x) → x, e^(ln x) → x (exp/log identities)
    - ✅ atan(tan x) → x (inverse trig)
    - ✅ sin²x + cos²x → 1 (Pythagorean identity)
-   - 🔄 TODO: Double-angle formulas (sin(2x), cos(2x))
+   - ✅ 2sin(x)cos(x) → sin(2x) (double-angle formula)
+   - 🔄 TODO: cos²x - sin²x → cos(2x) (double-angle cosine)
    - 🔄 TODO: More Pythagorean variants (1 + tan²x = sec²x)
 
 2. **More inverse trig functions** 🔄 TODO
@@ -359,6 +368,8 @@ Expression → Op detection → Pattern matching → Result
 ### Phase 4 (In Progress)
 7. **7a31d5b**: Phase 4 START - symbolic simplification module + comprehensive progress doc
 8. **9d105c5**: Pythagorean identity simplification (sin²x + cos²x → 1) + examples; 84.47% coverage
+9. **1153c2c**: Examples + documentation update for Pythagorean identity; 189 tests
+10. **[PENDING]**: Double-angle formula (2sin(x)cos(x) → sin(2x)); 195 tests, 84.55% coverage
 
 ---
 

@@ -17,7 +17,7 @@ fn main() {
         let four = st.int(4);
         let sqrt_four = st.func("sqrt", vec![four]);
         println!("Before: {}", st.to_string(sqrt_four));
-        
+
         let result = simplify_calculus(&mut st, sqrt_four);
         println!("After:  {}", st.to_string(result));
         println!("✓ √4 → 2");
@@ -28,7 +28,7 @@ fn main() {
         let nine = st.int(9);
         let sqrt_nine = st.func("sqrt", vec![nine]);
         println!("\nBefore: {}", st.to_string(sqrt_nine));
-        
+
         let result = simplify_calculus(&mut st, sqrt_nine);
         println!("After:  {}", st.to_string(result));
         println!("✓ √9 → 3");
@@ -39,7 +39,7 @@ fn main() {
         let ratio = st.rat(4, 9);
         let sqrt_ratio = st.func("sqrt", vec![ratio]);
         println!("\nBefore: {}", st.to_string(sqrt_ratio));
-        
+
         let result = simplify_calculus(&mut st, sqrt_ratio);
         println!("After:  {}", st.to_string(result));
         println!("✓ √(4/9) → 2/3");
@@ -54,7 +54,7 @@ fn main() {
         let exp_x = st.func("exp", vec![x]);
         let ln_exp_x = st.func("ln", vec![exp_x]);
         println!("Before: {}", st.to_string(ln_exp_x));
-        
+
         let result = simplify_calculus(&mut st, ln_exp_x);
         println!("After:  {}", st.to_string(result));
         println!("✓ ln(e^x) → x");
@@ -66,7 +66,7 @@ fn main() {
         let ln_x = st.func("ln", vec![x]);
         let exp_ln_x = st.func("exp", vec![ln_x]);
         println!("\nBefore: {}", st.to_string(exp_ln_x));
-        
+
         let result = simplify_calculus(&mut st, exp_ln_x);
         println!("After:  {}", st.to_string(result));
         println!("✓ e^(ln x) → x");
@@ -77,7 +77,7 @@ fn main() {
         let zero = st.int(0);
         let exp_zero = st.func("exp", vec![zero]);
         println!("\nBefore: {}", st.to_string(exp_zero));
-        
+
         let result = simplify_calculus(&mut st, exp_zero);
         println!("After:  {}", st.to_string(result));
         println!("✓ e^0 → 1");
@@ -92,7 +92,7 @@ fn main() {
         let tan_x = st.func("tan", vec![x]);
         let atan_tan_x = st.func("atan", vec![tan_x]);
         println!("Before: {}", st.to_string(atan_tan_x));
-        
+
         let result = simplify_calculus(&mut st, atan_tan_x);
         println!("After:  {}", st.to_string(result));
         println!("✓ atan(tan x) → x");
@@ -103,7 +103,7 @@ fn main() {
         let zero = st.int(0);
         let atan_zero = st.func("atan", vec![zero]);
         println!("\nBefore: {}", st.to_string(atan_zero));
-        
+
         let result = simplify_calculus(&mut st, atan_zero);
         println!("After:  {}", st.to_string(result));
         println!("✓ atan(0) → 0");
@@ -122,7 +122,7 @@ fn main() {
         let cos2 = st.pow(cosx, two);
         let sum = st.add(vec![sin2, cos2]);
         println!("Before: {}", st.to_string(sum));
-        
+
         let result = simplify_calculus(&mut st, sum);
         println!("After:  {}", st.to_string(result));
         println!("✓ sin²(x) + cos²(x) → 1");
@@ -138,7 +138,7 @@ fn main() {
         let cos2 = st.pow(cosx, two);
         let sum = st.add(vec![cos2, sin2]); // Order doesn't matter
         println!("\nBefore: {}", st.to_string(sum));
-        
+
         let result = simplify_calculus(&mut st, sum);
         println!("After:  {}", st.to_string(result));
         println!("✓ cos²(x) + sin²(x) → 1 (order independent)");
@@ -156,7 +156,7 @@ fn main() {
         let cos2 = st.pow(cos_2x, two_exp);
         let sum = st.add(vec![sin2, cos2]);
         println!("\nBefore: {}", st.to_string(sum));
-        
+
         let result = simplify_calculus(&mut st, sum);
         println!("After:  {}", st.to_string(result));
         println!("✓ sin²(2x) + cos²(2x) → 1 (works with any argument)");
@@ -173,7 +173,7 @@ fn main() {
         let cos2 = st.pow(cosx, two);
         let sum = st.add(vec![three, sin2, cos2]);
         println!("\nBefore: {}", st.to_string(sum));
-        
+
         let result = simplify_calculus(&mut st, sum);
         println!("After:  {}", st.to_string(result));
         println!("✓ 3 + sin²(x) + cos²(x) → 4 (combines with other terms)");
@@ -191,7 +191,7 @@ fn main() {
         let sqrt_four = st.func("sqrt", vec![four]);
         let product = st.mul(vec![exp_ln_x, sqrt_four]);
         println!("Before: {}", st.to_string(product));
-        
+
         let result = simplify_calculus(&mut st, product);
         println!("After:  {}", st.to_string(result));
         println!("✓ e^(ln x) · √4 → 2x");
@@ -206,15 +206,62 @@ fn main() {
         let sin2 = st.pow(sinx, two);
         let cos2 = st.pow(cosx, two);
         let sum_trig = st.add(vec![sin2, cos2]);
-        
+
         let nine = st.int(9);
         let sqrt_nine = st.func("sqrt", vec![nine]);
         let product = st.mul(vec![sum_trig, sqrt_nine]);
         println!("\nBefore: {}", st.to_string(product));
-        
+
         let result = simplify_calculus(&mut st, product);
         println!("After:  {}", st.to_string(result));
         println!("✓ (sin²x + cos²x) · √9 → 3");
+    }
+
+    // Example 6: Double-angle formula (NEW!)
+    println!("\n\n🎯 Example 6: Double-Angle Formula (NEW!)");
+    println!("{}", "-".repeat(60));
+    {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![two, sinx, cosx]);
+        println!("Before: {}", st.to_string(product));
+        
+        let result = simplify_calculus(&mut st, product);
+        println!("After:  {}", st.to_string(result));
+        println!("✓ 2sin(x)cos(x) → sin(2x)");
+    }
+
+    {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        // Reverse order
+        let product = st.mul(vec![cosx, sinx, two]);
+        println!("\nBefore: {}", st.to_string(product));
+        
+        let result = simplify_calculus(&mut st, product);
+        println!("After:  {}", st.to_string(result));
+        println!("✓ cos(x) · sin(x) · 2 → sin(2x) (order independent)");
+    }
+
+    {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![three, two, sinx, cosx]);
+        println!("\nBefore: {}", st.to_string(product));
+        
+        let result = simplify_calculus(&mut st, product);
+        println!("After:  {}", st.to_string(result));
+        println!("✓ 3 · 2sin(x)cos(x) → 3sin(2x)");
     }
 
     println!("\n{}", "=".repeat(60));
@@ -224,6 +271,7 @@ fn main() {
     println!("  • Exponential/logarithmic inverse cancellation");
     println!("  • Inverse trigonometric simplification");
     println!("  • Pythagorean identity: sin²x + cos²x → 1");
+    println!("  • Double-angle formula: 2sin(x)cos(x) → sin(2x)");
     println!("  • Recursive simplification of nested expressions");
     println!("  • Argument-independent pattern matching");
 }

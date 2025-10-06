@@ -253,18 +253,79 @@ fn is_trig_squared(store: &Store, expr: ExprId) -> Option<(String, ExprId)> {
     Some((fname, arg))
 }
 
-/// Simplifies multiplication (future: trigonometric identities)
+/// Simplifies multiplication: 2sin(x)cos(x) → sin(2x), etc.
 fn simplify_mul(store: &mut Store, expr: ExprId) -> ExprId {
-    // For now, recursively simplify children
+    // First recursively simplify children
     let children = store.get(expr).children.clone();
     let simplified_children: Vec<ExprId> =
         children.iter().map(|&c| apply_calculus_rules(store, c)).collect();
+
+    // Try to detect double-angle pattern: 2sin(x)cos(x) → sin(2x)
+    if let Some(result) = try_double_angle_sin(store, &simplified_children) {
+        return result;
+    }
 
     if simplified_children.iter().zip(children.iter()).any(|(a, b)| a != b) {
         store.mul(simplified_children)
     } else {
         expr
     }
+}
+
+/// Detects and simplifies 2sin(x)cos(x) → sin(2x)
+fn try_double_angle_sin(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for pattern: 2 * sin(arg) * cos(arg)
+    // or any permutation thereof
+
+    let mut has_two = false;
+    let mut sin_arg: Option<ExprId> = None;
+    let mut cos_arg: Option<ExprId> = None;
+    let mut other_factors = Vec::new();
+
+    for &child in children {
+        match (&store.get(child).op, &store.get(child).payload) {
+            (Op::Integer, Payload::Int(2)) => {
+                has_two = true;
+            }
+            (Op::Function, Payload::Func(fname)) => {
+                if store.get(child).children.len() == 1 {
+                    let arg = store.get(child).children[0];
+                    if fname == "sin" && sin_arg.is_none() {
+                        sin_arg = Some(arg);
+                    } else if fname == "cos" && cos_arg.is_none() {
+                        cos_arg = Some(arg);
+                    } else {
+                        other_factors.push(child);
+                    }
+                } else {
+                    other_factors.push(child);
+                }
+            }
+            _ => other_factors.push(child),
+        }
+    }
+
+    // Check if we have 2 * sin(arg) * cos(arg) with matching args
+    if has_two {
+        if let (Some(s_arg), Some(c_arg)) = (sin_arg, cos_arg) {
+            if s_arg == c_arg {
+                // Found 2sin(x)cos(x)!
+                // Create sin(2x)
+                let two = store.int(2);
+                let two_arg = store.mul(vec![two, s_arg]);
+                let sin_2arg = store.func("sin", vec![two_arg]);
+
+                if other_factors.is_empty() {
+                    return Some(sin_2arg);
+                }
+
+                other_factors.push(sin_2arg);
+                return Some(store.mul(other_factors));
+            }
+        }
+    }
+
+    None
 }
 
 /// Simplifies powers: x^1 → x, x^0 → 1 (already in general simplifier)
@@ -560,5 +621,130 @@ mod tests {
 
         // Should NOT simplify
         assert_eq!(st.get(result).op, Op::Add);
+    }
+
+    #[test]
+    fn test_double_angle_sin_basic() {
+        // 2sin(x)cos(x) → sin(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![two, sinx, cosx]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should simplify to sin(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+        assert!(result_str.contains("2"));
+
+        // Verify it's sin(2*x) pattern
+        assert_eq!(st.get(result).op, Op::Function);
+        if let Payload::Func(fname) = &st.get(result).payload {
+            assert_eq!(fname, "sin");
+        }
+    }
+
+    #[test]
+    fn test_double_angle_sin_reversed_order() {
+        // cos(x) * sin(x) * 2 → sin(2x) (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![cosx, sinx, two]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should simplify to sin(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+        assert!(result_str.contains("2"));
+    }
+
+    #[test]
+    fn test_double_angle_sin_complex_arg() {
+        // 2sin(x/2)cos(x/2) → sin(x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let half = st.rat(1, 2);
+        let x_half = st.mul(vec![x, half]);
+        let sin_x_half = st.func("sin", vec![x_half]);
+        let cos_x_half = st.func("cos", vec![x_half]);
+        let product = st.mul(vec![two, sin_x_half, cos_x_half]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should contain sin(x) after simplification
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+    }
+
+    #[test]
+    fn test_double_angle_sin_with_coefficient() {
+        // 3 * 2sin(x)cos(x) → 3sin(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let three = st.int(3);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![three, two, sinx, cosx]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should simplify to 3*sin(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+        // After simplification, should have sin(2x) with coefficient
+        assert_eq!(st.get(result).op, Op::Mul);
+
+        // Verify it contains the double-angle pattern
+        let children = &st.get(result).children;
+        let has_sin_func = children.iter().any(|&c| {
+            matches!((&st.get(c).op, &st.get(c).payload), (Op::Function, Payload::Func(fname)) if fname == "sin")
+        });
+        assert!(has_sin_func, "Result should contain sin function");
+    }
+
+    #[test]
+    fn test_double_angle_sin_different_args_no_simplify() {
+        // 2sin(x)cos(y) should NOT simplify (different arguments)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosy = st.func("cos", vec![y]);
+        let product = st.mul(vec![two, sinx, cosy]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should NOT simplify to sin(2x) or sin(2y)
+        // Should remain as multiplication
+        assert_eq!(st.get(result).op, Op::Mul);
+        let result_str = st.to_string(result);
+        // Should still contain both sin and cos separately
+        assert!(result_str.contains("sin"));
+        assert!(result_str.contains("cos"));
+    }
+
+    #[test]
+    fn test_no_double_angle_without_two() {
+        // sin(x)cos(x) should NOT simplify to sin(2x) without the 2
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let product = st.mul(vec![sinx, cosx]);
+
+        let result = simplify_calculus(&mut st, product);
+
+        // Should NOT simplify (no factor of 2)
+        assert_eq!(st.get(result).op, Op::Mul);
     }
 }
