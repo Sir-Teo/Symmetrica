@@ -249,6 +249,12 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
                 return Some(res);
             }
 
+            // Try standalone inverse trig/log functions that need integration by parts
+            // These are treated as f(x) · 1, where f(x) becomes u and dv = dx
+            if let Some(res) = try_standalone_inverse_functions(store, id, var) {
+                return Some(res);
+            }
+
             // exp(ax+b), sin(ax+b), cos(ax+b)
             let (fname, u) = {
                 let n = store.get(id);
@@ -319,6 +325,73 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             let pw = store.piecewise(pairs);
             Some(simplify(store, pw))
         }
+    }
+}
+
+/// Integrates standalone inverse functions (ln, atan, etc.) using integration by parts
+/// Treats f(x) as f(x) · 1, where u = f(x) and dv = dx
+fn try_standalone_inverse_functions(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    if st.get(id).op != Op::Function {
+        return None;
+    }
+
+    let fname = match &st.get(id).payload {
+        Payload::Func(s) => s.clone(),
+        _ => return None,
+    };
+
+    if st.get(id).children.len() != 1 {
+        return None;
+    }
+
+    let arg = st.get(id).children[0];
+
+    // Check if arg is just the variable
+    if !matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+    {
+        return None;
+    }
+
+    match fname.as_str() {
+        "ln" | "log" => {
+            // ∫ ln(x) dx = x·ln(x) - x
+            // Using integration by parts: u = ln(x), dv = dx
+            // du = 1/x dx, v = x
+            // ∫ ln(x) dx = x·ln(x) - ∫ x · (1/x) dx = x·ln(x) - x
+            let x = st.sym(var);
+            let ln_x = st.func("ln", vec![x]);
+            let x_ln_x = st.mul(vec![x, ln_x]);
+            let neg_one = st.int(-1);
+            let neg_x = st.mul(vec![neg_one, x]);
+            let result = st.add(vec![x_ln_x, neg_x]);
+            Some(simplify(st, result))
+        }
+        "atan" | "arctan" => {
+            // ∫ atan(x) dx = x·atan(x) - (1/2)ln(1+x²)
+            // Using integration by parts: u = atan(x), dv = dx
+            // du = 1/(1+x²) dx, v = x
+            // ∫ atan(x) dx = x·atan(x) - ∫ x/(1+x²) dx
+            // The integral ∫ x/(1+x²) dx = (1/2)ln(1+x²) by u-substitution (u = 1+x²)
+            let x = st.sym(var);
+            let atan_x = st.func("atan", vec![x]);
+            let x_atan_x = st.mul(vec![x, atan_x]);
+
+            // Create (1/2)ln(1+x²)
+            let one = st.int(1);
+            let two = st.int(2);
+            let x_sq = st.pow(x, two);
+            let one_plus_x_sq = st.add(vec![one, x_sq]);
+            let ln_term = st.func("ln", vec![one_plus_x_sq]);
+            let half = st.rat(1, 2);
+            let half_ln = st.mul(vec![half, ln_term]);
+
+            // Subtract: x·atan(x) - (1/2)ln(1+x²)
+            let neg_one = st.int(-1);
+            let neg_half_ln = st.mul(vec![neg_one, half_ln]);
+            let result = st.add(vec![x_atan_x, neg_half_ln]);
+            Some(simplify(st, result))
+        }
+        _ => None,
     }
 }
 
