@@ -115,7 +115,11 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             if let Some(res) = try_u_substitution(store, id, var) {
                 return Some(res);
             }
-            // Try trigonometric power patterns (sin^m * cos^n)
+            // Try generalized sin^m(x) * cos^n(x) (handles odd exponents)
+            if let Some(res) = try_trig_power_general(store, id, var) {
+                return Some(res);
+            }
+            // Try basic trig product pattern (sin(x) * cos(x))
             if let Some(res) = try_trig_power_pattern(store, id, var) {
                 return Some(res);
             }
@@ -184,6 +188,10 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             }
         }
         Op::Pow => {
+            // Single-power trig patterns like sin^m(x) or cos^n(x)
+            if let Some(res) = try_trig_power_general(store, id, var) {
+                return Some(res);
+            }
             // Try Weierstrass substitution for rational trig integrals (1/(1+cos(x)))
             if let Some(res) = try_weierstrass_substitution(store, id, var) {
                 return Some(res);
@@ -614,6 +622,228 @@ fn try_u_substitution(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
         }
     }
 
+    None
+}
+
+/// General sin^m(x) * cos^n(x) integration for odd exponents (m or n).
+fn try_trig_power_general(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    // Helpers to recognize sin(var) and cos(var)
+    fn is_sin_of_var(st: &Store, id: ExprId, var: &str) -> bool {
+        if let (Op::Function, Payload::Func(fname)) = (&st.get(id).op, &st.get(id).payload) {
+            if fname == "sin" && st.get(id).children.len() == 1 {
+                let arg = st.get(id).children[0];
+                return matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var);
+            }
+        }
+        false
+    }
+
+    fn is_cos_of_var(st: &Store, id: ExprId, var: &str) -> bool {
+        if let (Op::Function, Payload::Func(fname)) = (&st.get(id).op, &st.get(id).payload) {
+            if fname == "cos" && st.get(id).children.len() == 1 {
+                let arg = st.get(id).children[0];
+                return matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var);
+            }
+        }
+        false
+    }
+
+    // Binomial coefficient C(n, k) computed safely using i128 and cast back to i64
+    fn binom_u64(n: u64, k: u64) -> Option<i64> {
+        if k > n {
+            return Some(0);
+        }
+        let k = std::cmp::min(k, n - k);
+        let mut num: i128 = 1;
+        let mut den: i128 = 1;
+        fn gcd_i128(mut a: i128, mut b: i128) -> i128 {
+            if a < 0 {
+                a = -a;
+            }
+            if b < 0 {
+                b = -b;
+            }
+            while b != 0 {
+                let r = a % b;
+                a = b;
+                b = r;
+            }
+            if a == 0 {
+                1
+            } else {
+                a
+            }
+        }
+        for i in 1..=k {
+            num = num.saturating_mul((n - k + i) as i128);
+            den = den.saturating_mul(i as i128);
+            // Reduce by gcd periodically to avoid overflow
+            let g = gcd_i128(num, den);
+            if g > 1 {
+                num /= g;
+                den /= g;
+            }
+        }
+        // Final division (should divide exactly)
+        if den == 0 {
+            return None;
+        }
+        let val = num / den;
+        if val <= i64::MAX as i128 && val >= i64::MIN as i128 {
+            Some(val as i64)
+        } else {
+            None
+        }
+    }
+
+    // Accumulate numeric coefficient and exponents m (sin) and n (cos)
+    let mut coeff: (i64, i64) = (1, 1);
+    let mut m: i64 = 0; // power of sin(x)
+    let mut n: i64 = 0; // power of cos(x)
+
+    // Local function to fold a single factor into (coeff, m, n)
+    fn fold_factor(
+        st: &Store,
+        f: ExprId,
+        var: &str,
+        coeff: &mut (i64, i64),
+        m: &mut i64,
+        n: &mut i64,
+    ) -> bool {
+        match (&st.get(f).op, &st.get(f).payload) {
+            (Op::Integer, Payload::Int(k)) => {
+                *coeff = q_mul(*coeff, (*k, 1));
+                true
+            }
+            (Op::Rational, Payload::Rat(a, b)) => {
+                *coeff = q_mul(*coeff, (*a, *b));
+                true
+            }
+            (Op::Function, Payload::Func(_)) => {
+                if is_sin_of_var(st, f, var) {
+                    *m += 1;
+                    true
+                } else if is_cos_of_var(st, f, var) {
+                    *n += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            (Op::Pow, _) => {
+                let base = st.get(f).children[0];
+                let exp = st.get(f).children[1];
+                if let (Op::Integer, Payload::Int(k)) = (&st.get(exp).op, &st.get(exp).payload) {
+                    if *k < 0 {
+                        return false;
+                    }
+                    if is_sin_of_var(st, base, var) {
+                        *m += *k;
+                        true
+                    } else if is_cos_of_var(st, base, var) {
+                        *n += *k;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    let parsed_ok = match st.get(id).op {
+        Op::Mul => {
+            let mut ok = true;
+            for &c in &st.get(id).children.clone() {
+                ok &= fold_factor(st, c, var, &mut coeff, &mut m, &mut n);
+                if !ok {
+                    break;
+                }
+            }
+            ok
+        }
+        _ => fold_factor(st, id, var, &mut coeff, &mut m, &mut n),
+    };
+
+    if !parsed_ok {
+        return None;
+    }
+    if m == 0 && n == 0 {
+        return None;
+    }
+
+    // If sin power is odd: u = cos(x), du = -sin(x) dx
+    if m % 2 != 0 {
+        let k = (m - 1) / 2;
+        let x = st.sym(var);
+        let cosx = st.func("cos", vec![x]);
+        let mut terms: Vec<ExprId> = Vec::new();
+        for j in 0..=k {
+            let bin = binom_u64(k as u64, j as u64)?;
+            // Coefficient: (-1)^{j+1} * bin / (n + 2j + 1)
+            let sign: i64 = if (j % 2) == 0 { -1 } else { 1 };
+            let mut term_c = q_mul(coeff, (sign * bin, 1));
+            let denom = n + 2 * j + 1;
+            if denom == 0 {
+                return None;
+            }
+            term_c = q_div(term_c, (denom, 1));
+
+            let exp_e = st.int(n + 2 * j + 1);
+            let pow_u = st.pow(cosx, exp_e);
+            let term = if term_c == (1, 1) {
+                pow_u
+            } else if term_c.1 == 1 {
+                let c_int = st.int(term_c.0);
+                st.mul(vec![c_int, pow_u])
+            } else {
+                let c_rat = st.rat(term_c.0, term_c.1);
+                st.mul(vec![c_rat, pow_u])
+            };
+            terms.push(term);
+        }
+        let sum = st.add(terms);
+        return Some(simplify(st, sum));
+    }
+
+    // If cos power is odd: u = sin(x), du = cos(x) dx
+    if n % 2 != 0 {
+        let l = (n - 1) / 2;
+        let x = st.sym(var);
+        let sinx = st.func("sin", vec![x]);
+        let mut terms: Vec<ExprId> = Vec::new();
+        for j in 0..=l {
+            let bin = binom_u64(l as u64, j as u64)?;
+            // Coefficient: (-1)^j * bin / (m + 2j + 1)
+            let sign: i64 = if (j % 2) == 0 { 1 } else { -1 };
+            let mut term_c = q_mul(coeff, (sign * bin, 1));
+            let denom = m + 2 * j + 1;
+            if denom == 0 {
+                return None;
+            }
+            term_c = q_div(term_c, (denom, 1));
+
+            let exp_e = st.int(m + 2 * j + 1);
+            let pow_u = st.pow(sinx, exp_e);
+            let term = if term_c == (1, 1) {
+                pow_u
+            } else if term_c.1 == 1 {
+                let c_int = st.int(term_c.0);
+                st.mul(vec![c_int, pow_u])
+            } else {
+                let c_rat = st.rat(term_c.0, term_c.1);
+                st.mul(vec![c_rat, pow_u])
+            };
+            terms.push(term);
+        }
+        let sum = st.add(terms);
+        return Some(simplify(st, sum));
+    }
+
+    // Even-even not handled here
     None
 }
 

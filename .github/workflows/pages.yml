@@ -41,6 +41,15 @@ jobs:
           mkdir -p site
           rsync -av --exclude 'pkg' docs/ site/
 
+      - name: Create .nojekyll
+        run: touch site/.nojekyll
+
+      - name: Stamp cache-busting version
+        run: sed -i "s/play-1/${GITHUB_SHA}/g" site/playground.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
