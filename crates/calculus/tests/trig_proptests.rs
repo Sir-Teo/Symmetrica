@@ -29,7 +29,7 @@ proptest! {
         // Integration should succeed for even powers
         let integral = integrate(&mut st, sin_n, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for sin^{}(x)", n);
-        
+
         // Result should be differentiable without panic
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
@@ -47,7 +47,7 @@ proptest! {
         // Integration should succeed for even powers
         let integral = integrate(&mut st, cos_n, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for cos^{}(x)", n);
-        
+
         // Result should be differentiable without panic
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
@@ -71,7 +71,7 @@ proptest! {
 
         let integral = integrate(&mut st, product, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for sin^{}(x) * cos^{}(x)", m, n);
-        
+
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
     }
@@ -94,7 +94,7 @@ proptest! {
 
         let integral = integrate(&mut st, product, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for sin^{}(x) * cos^{}(x)", m, n);
-        
+
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
     }
@@ -117,7 +117,7 @@ proptest! {
 
         let integral = integrate(&mut st, product, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for sin^{}(x) * cos^{}(x)", m, n);
-        
+
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
     }
@@ -130,7 +130,7 @@ proptest! {
         c_den in 1i64..=5i64
     ) {
         prop_assume!(c_num != 0); // Skip zero coefficient
-        
+
         let mut st = Store::new();
         let x = st.sym("x");
         let sinx = st.func("sin", vec![x]);
@@ -141,7 +141,7 @@ proptest! {
 
         let integral = integrate(&mut st, expr, "x");
         prop_assert!(integral.is_some(), "Integration should succeed for {} * sin^{}(x)", format!("{}/{}", c_num, c_den), n);
-        
+
         let integral_id = integral.unwrap();
         let _derivative = diff(&mut st, integral_id, "x");
     }

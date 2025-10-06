@@ -1,14 +1,17 @@
 //! Calculus v1 (minimal): structural differentiation for Add/Mul/Pow.
+//! Phase 3: definite integrals and special functions framework
+mod definite;
 mod diff;
 mod integrate;
 mod risch;
 mod series;
 
+pub use definite::{definite_integrate, Bound, DefiniteResult};
 pub use diff::diff;
 pub use integrate::integrate;
 pub use risch::{
-    detect_extension, is_exponential, is_logarithm, logarithmic_derivative, ExtensionType,
-    TowerElement,
+    build_tower, detect_extension, is_exponential, is_logarithm, logarithmic_derivative,
+    try_integrate_logarithmic, ExtensionType, TowerElement,
 };
 pub use series::{limit_poly, maclaurin, LimitPoint, LimitResult, Series};
 

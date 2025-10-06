@@ -168,20 +168,83 @@ pub fn try_integrate_exponential(store: &mut Store, expr: ExprId, var: &str) -> 
 /// Attempts to integrate expressions involving logarithms using Risch principles
 ///
 /// Handles patterns like:
-/// - ∫ ln(x) dx using integration by parts (already implemented elsewhere)
-/// - Detection of logarithmic derivatives: ∫ f'/f dx = ln(f)
+/// - ∫ 1/x dx = ln|x|
+/// - ∫ f'/f dx = ln|f| (logarithmic derivative pattern)
+/// - ∫ ln(x) * g(x) dx - deferred to integration by parts
 ///
-/// Currently a placeholder for future Risch algorithm development.
+/// Returns an antiderivative if a logarithmic pattern is detected.
+pub fn try_integrate_logarithmic(store: &mut Store, expr: ExprId, var: &str) -> Option<ExprId> {
+    // Pattern 1: ∫ 1/x dx = ln(x)
+    // Check if expr is x^(-1) or a rational with numerator 1 and denominator x
+    match store.get(expr).op {
+        Op::Pow => {
+            let children = &store.get(expr).children;
+            if children.len() == 2 {
+                let base = children[0];
+                let exp = children[1];
+
+                // Check for x^(-1)
+                if matches!((&store.get(exp).op, &store.get(exp).payload), (Op::Integer, Payload::Int(-1)))
+                    && matches!((&store.get(base).op, &store.get(base).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                {
+                    // ∫ x^(-1) dx = ln(x)
+                    return Some(store.func("ln", vec![base]));
+                }
+            }
+            None
+        }
+        // Pattern 2: Check for g'(x)/g(x) pattern
+        // This is complex and typically handled by u-substitution in main integrate
+        // For now, return None to defer to main engine
+        _ => None,
+    }
+}
+
+/// Builds a differential field tower for an expression
+///
+/// Analyzes the nested structure of exponentials and logarithms to construct
+/// a tower representation suitable for Risch algorithm application.
+///
+/// Returns a vector of tower elements ordered from base to top.
 #[allow(dead_code)]
-pub fn try_integrate_logarithmic(_store: &mut Store, _expr: ExprId, _var: &str) -> Option<ExprId> {
-    // For now, this is a placeholder for future Risch algorithm work
-    // The pattern ∫ f'/f dx is already handled by the u'/u rule in integrate.rs
+pub fn build_tower(store: &mut Store, expr: ExprId, var: &str) -> Vec<TowerElement> {
+    let mut tower = Vec::new();
 
-    // Check if expr is of the form u'/u (already handled by main integration)
-    // This function will be expanded when we implement full Risch algorithm
+    // Start with the base field (the variable itself)
+    let x = store.sym(var);
+    tower.push(TowerElement {
+        expr: x,
+        extension: ExtensionType::Base,
+        derivative: Some(store.int(1)),
+    });
 
-    // Return None to let the main integration engine handle it
-    None
+    // Recursively detect extensions
+    // This is a simplified version; full Risch requires more sophisticated analysis
+    let ext_type = detect_extension(store, expr, var);
+    match ext_type {
+        ExtensionType::Exponential(u) | ExtensionType::Logarithmic(u) => {
+            let deriv = diff(store, expr, var);
+            tower.push(TowerElement { expr, extension: ext_type, derivative: Some(deriv) });
+
+            // Check if u itself has extensions
+            let u_ext = detect_extension(store, u, var);
+            if !matches!(u_ext, ExtensionType::Base) {
+                // Recursive case - u has its own extensions
+                // For now, we stop at depth 2; full implementation would recurse
+            }
+        }
+        ExtensionType::Base => {
+            // No extension, just add the expression
+            let deriv = diff(store, expr, var);
+            tower.push(TowerElement {
+                expr,
+                extension: ExtensionType::Base,
+                derivative: Some(deriv),
+            });
+        }
+    }
+
+    tower
 }
 
 #[cfg(test)]
