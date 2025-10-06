@@ -184,8 +184,10 @@ pub fn try_integrate_logarithmic(store: &mut Store, expr: ExprId, var: &str) -> 
                 let exp = children[1];
 
                 // Check for x^(-1)
-                if matches!((&store.get(exp).op, &store.get(exp).payload), (Op::Integer, Payload::Int(-1)))
-                    && matches!((&store.get(base).op, &store.get(base).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                if matches!(
+                    (&store.get(exp).op, &store.get(exp).payload),
+                    (Op::Integer, Payload::Int(-1))
+                ) && matches!((&store.get(base).op, &store.get(base).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
                 {
                     // ∫ x^(-1) dx = ln(x)
                     return Some(store.func("ln", vec![base]));

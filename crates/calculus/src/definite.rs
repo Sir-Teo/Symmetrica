@@ -10,6 +10,7 @@
 //! - Improper integral detection
 //! - Numerical fallback hooks (future)
 
+use crate::evaluate::fold_constants;
 use crate::integrate::integrate;
 use expr_core::{ExprId, Op, Payload, Store};
 use simplify::simplify;
@@ -67,7 +68,10 @@ pub fn definite_integrate(
             let result = store.add(vec![f_upper, neg_f_lower]);
             let simplified = simplify(store, result);
 
-            Some(DefiniteResult::Symbolic(simplified))
+            // Apply constant folding to evaluate concrete values
+            let folded = fold_constants(store, simplified);
+
+            Some(DefiniteResult::Symbolic(folded))
         }
         (Bound::Finite(a), Bound::PosInfinity) => {
             // ∫[a,∞) f(x) dx = lim[t→∞] F(t) - F(a)
@@ -103,10 +107,8 @@ fn substitute(store: &mut Store, expr: ExprId, var: &str, value: ExprId) -> Expr
         _ => {
             // Recursively substitute in children
             let old_children = store.get(expr).children.clone();
-            let children: Vec<ExprId> = old_children
-                .iter()
-                .map(|&child| substitute(store, child, var, value))
-                .collect();
+            let children: Vec<ExprId> =
+                old_children.iter().map(|&child| substitute(store, child, var, value)).collect();
 
             // Rebuild expression with substituted children
             match &store.get(expr).op {
@@ -148,28 +150,23 @@ pub fn is_improper(lower: &Bound, upper: &Bound) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evaluate::try_eval_constant;
 
     #[test]
     fn test_definite_integral_polynomial() {
-        // ∫[0,1] x dx = 1/2
+        // ∫[0,1] x dx = [x²/2] from 0 to 1 = 1/2
         let mut st = Store::new();
         let x = st.sym("x");
         let zero = st.int(0);
         let one = st.int(1);
 
-        let result = definite_integrate(
-            &mut st,
-            x,
-            "x",
-            Bound::Finite(zero),
-            Bound::Finite(one),
-        );
+        let result = definite_integrate(&mut st, x, "x", Bound::Finite(zero), Bound::Finite(one));
 
         assert!(result.is_some());
-        if let Some(DefiniteResult::Symbolic(_res)) = result {
-            // Successfully computed symbolic result
-            // Note: Full constant evaluation (e.g., 1/2 * 1² - 1/2 * 0² = 1/2)
-            // requires constant folding beyond current simplifier scope
+        if let Some(DefiniteResult::Symbolic(res)) = result {
+            // With constant folding, should evaluate to 1/2
+            let value = try_eval_constant(&st, res);
+            assert_eq!(value, Some((1, 2)));
         } else {
             panic!("Expected symbolic result");
         }
@@ -177,24 +174,19 @@ mod tests {
 
     #[test]
     fn test_definite_integral_with_substitution() {
-        // ∫[1,2] x dx = [x²/2] from 1 to 2 = 2²/2 - 1²/2 = 3/2
+        // ∫[1,2] x dx = [x²/2] from 1 to 2 = 2 - 1/2 = 3/2
         let mut st = Store::new();
         let x = st.sym("x");
         let one = st.int(1);
         let two = st.int(2);
 
-        let result = definite_integrate(
-            &mut st,
-            x,
-            "x",
-            Bound::Finite(one),
-            Bound::Finite(two),
-        );
+        let result = definite_integrate(&mut st, x, "x", Bound::Finite(one), Bound::Finite(two));
 
         assert!(result.is_some());
-        if let Some(DefiniteResult::Symbolic(_res)) = result {
-            // Successfully computed symbolic result
-            // Note: Full constant evaluation requires constant folding
+        if let Some(DefiniteResult::Symbolic(res)) = result {
+            // With constant folding, should evaluate to 3/2
+            let value = try_eval_constant(&st, res);
+            assert_eq!(value, Some((3, 2)));
         } else {
             panic!("Expected symbolic result");
         }
@@ -241,7 +233,13 @@ mod tests {
         let children = &st.get(result).children;
         assert_eq!(children.len(), 2);
         // Base should be 3, exponent should be 2
-        assert!(matches!((&st.get(children[0]).op, &st.get(children[0]).payload), (Op::Integer, Payload::Int(3))));
-        assert!(matches!((&st.get(children[1]).op, &st.get(children[1]).payload), (Op::Integer, Payload::Int(2))));
+        assert!(matches!(
+            (&st.get(children[0]).op, &st.get(children[0]).payload),
+            (Op::Integer, Payload::Int(3))
+        ));
+        assert!(matches!(
+            (&st.get(children[1]).op, &st.get(children[1]).payload),
+            (Op::Integer, Payload::Int(2))
+        ));
     }
 }
