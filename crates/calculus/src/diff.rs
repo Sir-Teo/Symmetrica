@@ -151,6 +151,32 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                     let bracket = store.add(vec![one, neg_tanh2]);
                     store.mul(vec![bracket, du])
                 }
+                "sqrt" => {
+                    // (√u)' = u' / (2√u) = u' * (1/2) * u^(-1/2)
+                    let half = store.rat(1, 2);
+                    let neg_half = store.rat(-1, 2);
+                    let u_neg_half = store.pow(u, neg_half);
+                    store.mul(vec![half, du, u_neg_half])
+                }
+                "tan" => {
+                    // (tan u)' = sec²(u) * u' = (1 + tan²(u)) * u'
+                    let tan_u = store.func("tan", vec![u]);
+                    let two = store.int(2);
+                    let tan2 = store.pow(tan_u, two);
+                    let one = store.int(1);
+                    let bracket = store.add(vec![one, tan2]);
+                    store.mul(vec![bracket, du])
+                }
+                "atan" | "arctan" => {
+                    // (atan u)' = u' / (1 + u²)
+                    let two = store.int(2);
+                    let u_sq = store.pow(u, two);
+                    let one = store.int(1);
+                    let one_plus_u_sq = store.add(vec![one, u_sq]);
+                    let minus_one = store.int(-1);
+                    let inv_denom = store.pow(one_plus_u_sq, minus_one);
+                    store.mul(vec![du, inv_denom])
+                }
                 _ => store.int(0),
             };
             simplify(store, out)

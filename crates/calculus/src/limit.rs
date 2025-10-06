@@ -249,7 +249,7 @@ fn pow_limit(base: LimitResult, exp: LimitResult) -> LimitResult {
         (LimitResult::Finite((b_n, b_d)), LimitResult::Finite((e_n, e_d))) => {
             // Both finite - would need numerical evaluation
             // For now, only handle integer exponents
-            if e_d == 1 && e_n >= 0 && e_n <= 10 {
+            if e_d == 1 && (0..=10).contains(&e_n) {
                 // Small positive integer exponent
                 let mut result = (1i64, 1i64);
                 for _ in 0..e_n {

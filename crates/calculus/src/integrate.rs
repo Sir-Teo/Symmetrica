@@ -1242,11 +1242,56 @@ fn try_general_weierstrass(
         return None;
     }
 
-    // For simplicity, only handle integer/rational cases where √(a²-b²) is rational or simple
-    // Result: (2/√(a²-b²)) arctan((a tan(x/2) - b) / √(a²-b²))
-    // This is complex, so for now return None for general case beyond special cases already handled
-    // TODO: Implement full symbolic sqrt and arctan support
-    None
+    // Implement full Weierstrass for a + b*cos(x) or a + b*sin(x)
+    // Result: (2/√(a²-b²)) arctan((a tan(x/2) - b) / √(a²-b²))  for cos
+    //         (2/√(a²-b²)) arctan((a - b*cot(x/2)) / √(a²-b²))  for sin (transform needed)
+
+    // For now, implement the cos case fully
+    if trig_fn == "cos" {
+        // Create √(a²-b²)
+        let disc_expr = if discriminant.1 == 1 {
+            st.int(discriminant.0)
+        } else {
+            st.rat(discriminant.0, discriminant.1)
+        };
+        let sqrt_disc = st.func("sqrt", vec![disc_expr]);
+
+        // Create tan(x/2): use identity tan(x/2) = sin(x)/(1 + cos(x)) for numerically stable form
+        // But for symbolic work, just represent it directly
+        let x = st.sym(var);
+        let two = st.int(2);
+        let half_rat = st.rat(1, 2);
+        let half_x = st.mul(vec![half_rat, x]);
+        let tan_half_x = st.func("tan", vec![half_x]);
+
+        // Create a*tan(x/2) - b
+        let a_expr = if a.1 == 1 { st.int(a.0) } else { st.rat(a.0, a.1) };
+        let a_tan = st.mul(vec![a_expr, tan_half_x]);
+
+        let b_expr = if b.1 == 1 { st.int(b.0) } else { st.rat(b.0, b.1) };
+        let neg_one_val = st.int(-1);
+        let neg_b = st.mul(vec![neg_one_val, b_expr]);
+        let numerator = st.add(vec![a_tan, neg_b]);
+
+        // Create (a*tan(x/2) - b) / √(a²-b²)
+        let neg_one = st.int(-1);
+        let inv_sqrt = st.pow(sqrt_disc, neg_one);
+        let atan_arg = st.mul(vec![numerator, inv_sqrt]);
+
+        // Create arctan(...)
+        let atan_expr = st.func("atan", vec![atan_arg]);
+
+        // Create 2/√(a²-b²)
+        let coeff = st.mul(vec![two, inv_sqrt]);
+
+        // Final result: (2/√(a²-b²)) * arctan(...)
+        let result = st.mul(vec![coeff, atan_expr]);
+        Some(simplify(st, result))
+    } else {
+        // sin case requires transformation or different formula
+        // For now, return None (can be added later)
+        None
+    }
 }
 
 /// Extract coefficient and trig function from expressions like b*cos(x), b*sin(x), -b*cos(x), etc.
