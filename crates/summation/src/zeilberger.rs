@@ -65,6 +65,65 @@ pub fn zeilberger_recurrence(
                         inhom_term: Some(rhs),
                     });
                 }
+
+                // Binomial times geometric: F(n,k) = binom(n,k) * r^k with r independent of n,k
+                if let Op::Mul = store.get(term).op {
+                    let ch = store.get(term).children.clone();
+                    // locate binom(n,k)
+                    let mut bin_idx: Option<usize> = None;
+                    let mut pow_idx: Option<usize> = None;
+                    for (i, &c) in ch.iter().enumerate() {
+                        match store.get(c).op {
+                            Op::Function => {
+                                if let Payload::Func(ref fname) = store.get(c).payload {
+                                    if fname == "binom" || fname == "C" {
+                                        bin_idx = Some(i);
+                                    }
+                                }
+                            }
+                            Op::Pow => {
+                                pow_idx = Some(i);
+                            }
+                            _ => {}
+                        }
+                    }
+                    if let (Some(bi), Some(pi)) = (bin_idx, pow_idx) {
+                        let bin = ch[bi];
+                        let pow = ch[pi];
+                        let bch = store.get(bin).children.clone();
+                        let pch = store.get(pow).children.clone();
+                        if bch.len() == 2 && pch.len() == 2 {
+                            let n_arg = bch[0];
+                            let k_arg = bch[1];
+                            let r = pch[0];
+                            let e = pch[1];
+                            let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload),
+                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                            let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload),
+                    (Op::Symbol, Payload::Sym(s)) if s == param_var);
+                            let e_ok = matches!((&store.get(e).op, &store.get(e).payload),
+                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                            if k_ok
+                                && n_ok
+                                && e_ok
+                                && !depends_on_var(store, r, sum_var)
+                                && !depends_on_var(store, r, param_var)
+                            {
+                                // S(n+1) - (1 + r) S(n) = 0
+                                let one = store.int(1);
+                                let a1 = one; // S(n+1)
+                                let one_plus_r = store.add(vec![one, r]);
+                                let neg_one = store.int(-1);
+                                let a0 = store.mul(vec![neg_one, one_plus_r]);
+                                return Some(Certificate {
+                                    rational_cert: store.int(0),
+                                    coefficients: vec![a0, a1],
+                                    inhom_term: None,
+                                });
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -91,7 +150,7 @@ pub fn zeilberger_recurrence(
                     let one = store.int(1);
                     let neg_two = store.int(-2);
                     let a0 = neg_two; // coefficient for S(n)
-                    let a1 = one;     // coefficient for S(n+1)
+                    let a1 = one; // coefficient for S(n+1)
                     return Some(Certificate {
                         rational_cert: store.int(0),
                         coefficients: vec![a0, a1],
