@@ -9,7 +9,10 @@
 //! Reference: Gosper, R. W. (1978). "Decision procedure for indefinite hypergeometric summation"
 
 use crate::hypergeometric::{is_hypergeometric, rationalize_hypergeometric};
+use arith::Q;
+use calculus::diff;
 use expr_core::{ExprId, Store};
+use polys::expr_to_unipoly;
 use simplify::simplify;
 
 /// Attempt to find a closed-form sum using Gosper's algorithm
@@ -26,6 +29,114 @@ pub fn gosper_sum(
     if !is_hypergeometric(store, term, var) {
         return None;
     }
+
+/// Compute prefix sum S(N) = sum_{k=0..N} P(k) r^k where P is polynomial with given coeffs
+/// coeffs[m] corresponds to k^m
+fn prefix_sums_poly_geom(
+    store: &mut Store,
+    r: ExprId,
+    n_expr: ExprId,
+    coeffs: &[ExprId],
+) -> Option<ExprId> {
+    if coeffs.is_empty() {
+        return Some(store.int(0));
+    }
+
+    let r_sym = store.sym("__R");
+    let one = store.int(1);
+    let minus_one = store.int(-1);
+
+    // S0(R,N)
+    let n_plus_1 = store.add(vec![n_expr, one]);
+    let r_pow_n1 = store.pow(r_sym, n_plus_1);
+    let neg_r_pow_n1 = store.mul(vec![minus_one, r_pow_n1]);
+    let num0 = store.add(vec![one, neg_r_pow_n1]);
+    let neg_r_sym = store.mul(vec![minus_one, r_sym]);
+    let den0 = store.add(vec![one, neg_r_sym]);
+    let den0_inv = store.pow(den0, minus_one);
+    let mut s_curr = store.mul(vec![num0, den0_inv]);
+
+    // combo = coeffs[0]*S0
+    let mut combo = store.mul(vec![coeffs[0], s_curr]);
+
+    // Repeatedly apply R d/dR to get higher S_m and accumulate
+    for coeff in coeffs.iter().skip(1) {
+        let ds = diff(store, s_curr, "__R");
+        s_curr = store.mul(vec![r_sym, ds]);
+        let term_m = store.mul(vec![*coeff, s_curr]);
+        combo = store.add(vec![combo, term_m]);
+    }
+
+    // Substitute R -> r
+    substitute(store, combo, "__R", r)
+}
+
+/// Extract quadratic coefficients (a,b,c) such that expr = a*k^2 + b*k + c (degree<=2)
+fn extract_quadratic_coeffs(
+    store: &mut Store,
+    expr: ExprId,
+    var: &str,
+) -> Option<(ExprId, ExprId, ExprId)> {
+    if let Some(poly) = expr_to_unipoly(store, expr, var) {
+        let a_q = if poly.coeffs.len() > 2 { poly.coeffs[2] } else { Q::zero() };
+        let b_q = if poly.coeffs.len() > 1 { poly.coeffs[1] } else { Q::zero() };
+        let c_q = if !poly.coeffs.is_empty() { poly.coeffs[0] } else { Q::zero() };
+        let a = q_to_expr(store, a_q);
+        let b = q_to_expr(store, b_q);
+        let c = q_to_expr(store, c_q);
+        return Some((a, b, c));
+    }
+    None
+}
+
+fn q_to_expr(store: &mut Store, q: Q) -> ExprId {
+    if q.1 == 1 {
+        store.int(q.0)
+    } else {
+        store.rat(q.0, q.1)
+    }
+}
+
+/// Compute prefix sum S(N) = sum_{k=0..N} (a k^2 + b k + c) r^k using derivative wrt placeholder R
+fn prefix_sums_deg2(
+    store: &mut Store,
+    r: ExprId,
+    n_expr: ExprId,
+    a: ExprId,
+    b: ExprId,
+    c: ExprId,
+) -> Option<ExprId> {
+    let r_sym = store.sym("__R");
+    let one = store.int(1);
+    let minus_one = store.int(-1);
+
+    // S0(R,N) = (1 - R^(N+1)) / (1 - R)
+    let n_plus_1 = store.add(vec![n_expr, one]);
+    let r_pow_n1 = store.pow(r_sym, n_plus_1);
+    let neg_r_pow_n1 = store.mul(vec![minus_one, r_pow_n1]);
+    let num0 = store.add(vec![one, neg_r_pow_n1]);
+    let neg_r_sym = store.mul(vec![minus_one, r_sym]);
+    let den0 = store.add(vec![one, neg_r_sym]);
+    let den0_inv = store.pow(den0, minus_one);
+    let s0 = store.mul(vec![num0, den0_inv]);
+
+    // S1(R,N) = R * d/dR S0
+    let ds0 = diff(store, s0, "__R");
+    let s1 = store.mul(vec![r_sym, ds0]);
+
+    // S2(R,N) = R * d/dR S1
+    let ds1 = diff(store, s1, "__R");
+    let s2 = store.mul(vec![r_sym, ds1]);
+
+    // Combine: a*S2 + b*S1 + c*S0
+    let a_s2 = store.mul(vec![a, s2]);
+    let b_s1 = store.mul(vec![b, s1]);
+    let c_s0 = store.mul(vec![c, s0]);
+    let combo = store.add(vec![a_s2, b_s1, c_s0]);
+
+    // Substitute R -> r
+    substitute(store, combo, "__R", r)
+}
 
     // Case 3: (a*k + b) * r^k with a,b independent of k
     if let expr_core::Op::Mul = store.get(term).op {
@@ -125,6 +236,67 @@ pub fn gosper_sum(
                             let sum_g = store.add(vec![g_u, neg_g_lm1]);
                             let b_term = store.mul(vec![b, sum_g]);
                             let sum_res = store.add(vec![a_term, b_term]);
+                            return Some(simplify(store, sum_res));
+                        }
+                        // Try quadratic case via derivative method: (a k^2 + b k + c) r^k
+                        if let Some((qa, qb, qc)) = extract_quadratic_coeffs(store, poly, var) {
+                            // If r == 1, let basic handle
+                            if let (expr_core::Op::Integer, expr_core::Payload::Int(v)) =
+                                (&store.get(r).op, &store.get(r).payload)
+                            {
+                                if *v == 1 {
+                                    return None;
+                                }
+                            }
+                            if let (expr_core::Op::Rational, expr_core::Payload::Rat(nv, dv)) =
+                                (&store.get(r).op, &store.get(r).payload)
+                            {
+                                if *nv == 1 && *dv == 1 {
+                                    return None;
+                                }
+                            }
+
+                            let minus_one = store.int(-1);
+                            let u = upper;
+                            let l_minus_1 = store.add(vec![lower, minus_one]);
+
+                            let sum_u = prefix_sums_deg2(store, r, u, qa, qb, qc)?;
+                            let sum_lm1 = prefix_sums_deg2(store, r, l_minus_1, qa, qb, qc)?;
+                            let neg_sum_lm1 = store.mul(vec![minus_one, sum_lm1]);
+                            let sum_res = store.add(vec![sum_u, neg_sum_lm1]);
+                            return Some(simplify(store, sum_res));
+                        }
+                        // Try general polynomial P(k) r^k using repeated R d/dR
+                        if let Some(poly) = expr_to_unipoly(store, poly, var) {
+                            // Translate Q coeffs to ExprId
+                            let mut coeff_ids: Vec<ExprId> = Vec::with_capacity(poly.coeffs.len());
+                            for q in poly.coeffs.iter() {
+                                coeff_ids.push(q_to_expr(store, *q));
+                            }
+                            // If r == 1, let basic handle
+                            if let (expr_core::Op::Integer, expr_core::Payload::Int(v)) =
+                                (&store.get(r).op, &store.get(r).payload)
+                            {
+                                if *v == 1 {
+                                    return None;
+                                }
+                            }
+                            if let (expr_core::Op::Rational, expr_core::Payload::Rat(nv, dv)) =
+                                (&store.get(r).op, &store.get(r).payload)
+                            {
+                                if *nv == 1 && *dv == 1 {
+                                    return None;
+                                }
+                            }
+
+                            let minus_one = store.int(-1);
+                            let u = upper;
+                            let l_minus_1 = store.add(vec![lower, minus_one]);
+
+                            let sum_u = prefix_sums_poly_geom(store, r, u, &coeff_ids)?;
+                            let sum_lm1 = prefix_sums_poly_geom(store, r, l_minus_1, &coeff_ids)?;
+                            let neg_sum_lm1 = store.mul(vec![minus_one, sum_lm1]);
+                            let sum_res = store.add(vec![sum_u, neg_sum_lm1]);
                             return Some(simplify(store, sum_res));
                         }
                     }
@@ -272,6 +444,7 @@ fn substitute(store: &mut Store, expr: ExprId, var: &str, replacement: ExprId) -
             Some(simplify(store, new_expr))
         }
     }
+
 }
 
 /// Check if expression depends on variable
@@ -370,6 +543,52 @@ mod tests {
         let term = st.mul(vec![k, pow]);
 
         let result = sum_closed_form(&mut st, term, "k", zero, n).expect("sum k*2^k");
+        let s = st.to_string(result);
+        assert!(s.contains("2") && s.contains("n"));
+    }
+
+    #[test]
+    fn test_gosper_quadratic_times_geometric_sum() {
+        // ∑(k=0..n) (k^2 + 3k + 1) 2^k
+        let mut st = Store::new();
+        let k = st.sym("k");
+        let zero = st.int(0);
+        let n = st.sym("n");
+        let two = st.int(2);
+        let two_exp = st.int(2);
+        let k2 = st.pow(k, two_exp);
+        let three = st.int(3);
+        let three_k = st.mul(vec![three, k]);
+        let one = st.int(1);
+        let poly = st.add(vec![k2, three_k, one]);
+        let pow = st.pow(two, k);
+        let term = st.mul(vec![poly, pow]);
+
+        let result = sum_closed_form(&mut st, term, "k", zero, n).expect("sum quadratic*2^k");
+        let s = st.to_string(result);
+        assert!(s.contains("2") && s.contains("n"));
+    }
+
+    #[test]
+    fn test_gosper_cubic_times_geometric_sum() {
+        // ∑(k=0..n) (k^3 + 2k^2 + k + 1) 2^k
+        let mut st = Store::new();
+        let k = st.sym("k");
+        let zero = st.int(0);
+        let n = st.sym("n");
+        let two = st.int(2);
+        let two_exp = st.int(2);
+        let three_exp = st.int(3);
+        let k2 = st.pow(k, two_exp);
+        let k3 = st.pow(k, three_exp);
+        let two_c = st.int(2);
+        let mul_two_k2 = st.mul(vec![two_c, k2]);
+        let one = st.int(1);
+        let poly = st.add(vec![k3, mul_two_k2, k, one]);
+        let pow = st.pow(two, k);
+        let term = st.mul(vec![poly, pow]);
+
+        let result = sum_closed_form(&mut st, term, "k", zero, n).expect("sum cubic*2^k");
         let s = st.to_string(result);
         assert!(s.contains("2") && s.contains("n"));
     }

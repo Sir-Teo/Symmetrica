@@ -69,6 +69,39 @@ pub fn zeilberger_recurrence(
         }
     }
 
+    // Binomial family: F(n,k) = binom(n,k)
+    // Recognize a function call named "binom" or "C" with arguments (n, k)
+    if let Op::Function = store.get(term).op {
+        let fname = match &store.get(term).payload {
+            Payload::Func(s) => s.clone(),
+            _ => String::new(),
+        };
+        if fname == "binom" || fname == "C" {
+            let ch = store.get(term).children.clone();
+            if ch.len() == 2 {
+                let n_arg = ch[0];
+                let k_arg = ch[1];
+                // Ensure k_arg is sum_var and n_arg is the parameter variable
+                let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload),
+                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload),
+                    (Op::Symbol, Payload::Sym(s)) if s == param_var);
+                if k_ok && n_ok {
+                    // For S(n) = sum_k binom(n,k), S(n+1) - 2 S(n) = 0
+                    let one = store.int(1);
+                    let neg_two = store.int(-2);
+                    let a0 = neg_two; // coefficient for S(n)
+                    let a1 = one;     // coefficient for S(n+1)
+                    return Some(Certificate {
+                        rational_cert: store.int(0),
+                        coefficients: vec![a0, a1],
+                        inhom_term: None,
+                    });
+                }
+            }
+        }
+    }
+
     // Placeholder for general case: not implemented
     None
 }
@@ -115,5 +148,21 @@ mod tests {
         // inhom term should reference 2^(n+1)
         let rhs_str = st.to_string(cert.inhom_term.expect("inhom"));
         assert!(rhs_str.contains("2"));
+    }
+
+    #[test]
+    fn test_zeilberger_binomial_sum() {
+        let mut st = Store::new();
+        let n = st.sym("n");
+        let k = st.sym("k");
+        let term = st.func("binom", vec![n, k]);
+
+        let cert = zeilberger_recurrence(&mut st, term, "k", "n").expect("binom rec");
+        assert_eq!(cert.coefficients.len(), 2);
+        let c0 = st.to_string(cert.coefficients[0]);
+        let c1 = st.to_string(cert.coefficients[1]);
+        assert!(c0.contains("-2"));
+        assert!(c1.contains("1"));
+        assert!(cert.inhom_term.is_none());
     }
 }
