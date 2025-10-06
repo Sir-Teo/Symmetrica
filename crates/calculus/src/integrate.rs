@@ -119,6 +119,10 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             if let Some(res) = try_trig_power_general(store, id, var) {
                 return Some(res);
             }
+            // Try even-even trig products sin^(2k)(x) * cos^(2l)(x)
+            if let Some(res) = try_trig_even_even_product(store, id, var) {
+                return Some(res);
+            }
             // Try basic trig product pattern (sin(x) * cos(x))
             if let Some(res) = try_trig_power_pattern(store, id, var) {
                 return Some(res);
@@ -936,6 +940,117 @@ fn try_trig_even_power_single(st: &mut Store, id: ExprId, var: &str) -> Option<E
     }
 
     None
+}
+
+/// Integrate even-even mixed products: sin^(2k)(x) * cos^(2l)(x)
+/// Uses reduction formula:
+/// ∫ sin^m cos^n dx = -sin^(m-1) cos^(n+1) / (m+n) + (m-1)/(m+n) ∫ sin^(m-2) cos^n dx
+fn try_trig_even_even_product(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    if st.get(id).op != Op::Mul {
+        return None;
+    }
+
+    let children = st.get(id).children.clone();
+
+    // Extract sin^m and cos^n from product (with optional coefficients)
+    let mut coeff = (1i64, 1i64);
+    let mut sin_pow: Option<(ExprId, i64)> = None;
+    let mut cos_pow: Option<(ExprId, i64)> = None;
+
+    for &child in &children {
+        match (&st.get(child).op, &st.get(child).payload) {
+            (Op::Integer, Payload::Int(n)) => {
+                coeff = q_mul(coeff, (*n, 1));
+            }
+            (Op::Rational, Payload::Rat(p, q)) => {
+                coeff = q_mul(coeff, (*p, *q));
+            }
+            (Op::Pow, _) => {
+                let base = st.get(child).children[0];
+                let exp = st.get(child).children[1];
+                if let (Op::Integer, Payload::Int(n)) = (&st.get(exp).op, &st.get(exp).payload) {
+                    if *n >= 2 && (*n % 2 == 0) {
+                        if let (Op::Function, Payload::Func(fname)) =
+                            (&st.get(base).op, &st.get(base).payload)
+                        {
+                            if st.get(base).children.len() == 1 {
+                                let arg = st.get(base).children[0];
+                                if matches!((&st.get(arg).op, &st.get(arg).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+                                {
+                                    if fname == "sin" && sin_pow.is_none() {
+                                        sin_pow = Some((arg, *n));
+                                    } else if fname == "cos" && cos_pow.is_none() {
+                                        cos_pow = Some((arg, *n));
+                                    } else {
+                                        return None;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            (Op::Function, Payload::Func(fname)) if fname == "sin" || fname == "cos" => {
+                // sin(x) or cos(x) treated as power 1, but we want even powers only
+                return None;
+            }
+            _ => return None,
+        }
+    }
+
+    // Check we have both sin^(2k) and cos^(2l)
+    let (x, m) = sin_pow?;
+    let (_, n) = cos_pow?;
+
+    if m < 2 || n < 2 || m % 2 != 0 || n % 2 != 0 {
+        return None;
+    }
+
+    // Recursive reduction
+    fn reduce_sin_m_cos_n(st: &mut Store, x: ExprId, m: i64, n: i64, var: &str) -> Option<ExprId> {
+        if m == 0 {
+            // ∫ cos^n dx
+            let cosx = st.func("cos", vec![x]);
+            let n_e = st.int(n);
+            let cos_n = st.pow(cosx, n_e);
+            return integrate(st, cos_n, var);
+        }
+        if n == 0 {
+            // ∫ sin^m dx
+            let sinx = st.func("sin", vec![x]);
+            let m_e = st.int(m);
+            let sin_m = st.pow(sinx, m_e);
+            return integrate(st, sin_m, var);
+        }
+
+        // term1 = -sin^(m-1) cos^(n+1) / (m+n)
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let sin_m1_e = st.int(m - 1);
+        let cos_n1_e = st.int(n + 1);
+        let sin_m1 = st.pow(sinx, sin_m1_e);
+        let cos_n1 = st.pow(cosx, cos_n1_e);
+        let c1 = st.rat(-1, m + n);
+        let term1 = st.mul(vec![c1, sin_m1, cos_n1]);
+
+        // term2 = (m-1)/(m+n) ∫ sin^(m-2) cos^n dx
+        let inner = reduce_sin_m_cos_n(st, x, m - 2, n, var)?;
+        let c2 = st.rat(m - 1, m + n);
+        let term2 = st.mul(vec![c2, inner]);
+
+        let sum = st.add(vec![term1, term2]);
+        Some(simplify(st, sum))
+    }
+
+    let res = reduce_sin_m_cos_n(st, x, m, n, var)?;
+
+    if coeff == (1, 1) {
+        Some(res)
+    } else {
+        let c_expr = if coeff.1 == 1 { st.int(coeff.0) } else { st.rat(coeff.0, coeff.1) };
+        let mul_res = st.mul(vec![c_expr, res]);
+        Some(simplify(st, mul_res))
+    }
 }
 
 /// Try to integrate sin^m(x) * cos^n(x) patterns using reduction formulas
