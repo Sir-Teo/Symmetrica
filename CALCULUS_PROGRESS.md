@@ -2,8 +2,8 @@
 
 **Last Updated:** 2025-10-06  
 **Status:** Phase 2 & 3 Complete ✅ | Phase 4 In Progress 🚀  
-**Coverage:** 84.55% (2615/3093 lines) +0.43%  
-**Tests:** 195 passing (100% pass rate) +22 tests
+**Coverage:** 84.62% (2641/3121 lines) +0.50%  
+**Tests:** 201 passing (100% pass rate) +28 tests
 
 ---
 
@@ -134,20 +134,29 @@ d/dx atan(x) = 1/(1+x²)
 - **Different args preserved:** sin²x + cos²y → (not simplified)
 - **Tests:** 6 comprehensive tests
 
-##### 5. Double-Angle Formula ⭐ NEW!
+##### 5. Double-Angle Formula (sin) ⭐
 - **Basic form:** 2sin(x)cos(x) → sin(2x)
 - **Order independent:** cos(x)·sin(x)·2 → sin(2x)
 - **Any argument:** 2sin(x/2)cos(x/2) → sin(x)
 - **With coefficients:** Preserves other factors
 - **Different args preserved:** 2sin(x)cos(y) → (not simplified)
 - **Tests:** 6 comprehensive tests
-- **Coverage:** `symbolic_simplify.rs` at 86.8% (112/129 lines)
+
+##### 6. Double-Angle Formula (cos) ⭐ NEW!
+- **Basic form:** cos²(x) - sin²(x) → cos(2x)
+- **Order independent:** -sin²(x) + cos²(x) → cos(2x)
+- **Any argument:** cos²(2x) - sin²(2x) → cos(4x)
+- **With extra terms:** 1 + cos²(x) - sin²(x) → 1 + cos(2x)
+- **Different args preserved:** cos²(x) - sin²(y) → (not simplified)
+- **Pythagorean preserved:** cos²(x) + sin²(x) → 1 (not cos(2x))
+- **Tests:** 6 comprehensive tests
+- **Coverage:** `symbolic_simplify.rs` at 87.9% (138/157 lines)
 
 #### Test Coverage
-- **Total tests:** 22 (was 16, +6 for double-angle)
+- **Total tests:** 28 (was 22, +6 for double-angle cos)
 - **Pass rate:** 100%
-- **Module coverage:** 86.8% (+1.5%)
-- **Example file:** `examples/symbolic_simplification.rs` (15 demonstrations)
+- **Module coverage:** 87.9% (+1.1%)
+- **Example file:** `examples/symbolic_simplification.rs` (17 demonstrations)
 
 #### Architecture
 
@@ -291,15 +300,16 @@ Expression → Op detection → Pattern matching → Result
 
 ## 🔮 Phase 4: Future Enhancements
 
-### High Priority ✅ (In Progress - 50% Complete)
+### High Priority ✅ (In Progress - 60% Complete)
 1. **Symbolic simplification engine** ✅ PARTIALLY COMPLETE
    - ✅ √4 → 2, √9 → 3 (perfect squares)
    - ✅ ln(e^x) → x, e^(ln x) → x (exp/log identities)
    - ✅ atan(tan x) → x (inverse trig)
    - ✅ sin²x + cos²x → 1 (Pythagorean identity)
-   - ✅ 2sin(x)cos(x) → sin(2x) (double-angle formula)
-   - 🔄 TODO: cos²x - sin²x → cos(2x) (double-angle cosine)
+   - ✅ 2sin(x)cos(x) → sin(2x) (double-angle sine)
+   - ✅ cos²x - sin²x → cos(2x) (double-angle cosine)
    - 🔄 TODO: More Pythagorean variants (1 + tan²x = sec²x)
+   - 🔄 TODO: Identity rearrangements (1 - sin²x → cos²x)
 
 2. **More inverse trig functions** 🔄 TODO
    - asin(x), acos(x) differentiation
@@ -369,7 +379,8 @@ Expression → Op detection → Pattern matching → Result
 7. **7a31d5b**: Phase 4 START - symbolic simplification module + comprehensive progress doc
 8. **9d105c5**: Pythagorean identity simplification (sin²x + cos²x → 1) + examples; 84.47% coverage
 9. **1153c2c**: Examples + documentation update for Pythagorean identity; 189 tests
-10. **[PENDING]**: Double-angle formula (2sin(x)cos(x) → sin(2x)); 195 tests, 84.55% coverage
+10. **6d7c2ef**: Double-angle formula for sine (2sin(x)cos(x) → sin(2x)); 195 tests, 84.55% coverage
+11. **[PENDING]**: Double-angle formula for cosine (cos²x - sin²x → cos(2x)); 201 tests, 84.62% coverage
 
 ---
 

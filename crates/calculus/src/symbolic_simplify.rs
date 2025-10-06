@@ -154,7 +154,7 @@ fn simplify_atan(store: &mut Store, arg: ExprId) -> ExprId {
     store.func("atan", vec![arg])
 }
 
-/// Simplifies addition: sin²x + cos²x → 1, etc.
+/// Simplifies addition: sin²x + cos²x → 1, cos²x - sin²x → cos(2x), etc.
 fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
     // First recursively simplify children
     let children = store.get(expr).children.clone();
@@ -163,6 +163,11 @@ fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
 
     // Try to detect sin²x + cos²x → 1
     if let Some(result) = try_pythagorean_identity(store, &simplified_children) {
+        return result;
+    }
+
+    // Try to detect cos²x - sin²x → cos(2x)
+    if let Some(result) = try_double_angle_cos(store, &simplified_children) {
         return result;
     }
 
@@ -213,6 +218,99 @@ fn try_pythagorean_identity(store: &mut Store, children: &[ExprId]) -> Option<Ex
     }
 
     None
+}
+
+/// Detects and simplifies cos²x - sin²x → cos(2x)
+fn try_double_angle_cos(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for pattern: cos²(arg) + (-1)*sin²(arg) → cos(2*arg)
+    // or equivalently: cos²(arg) - sin²(arg)
+
+    for i in 0..children.len() {
+        for j in 0..children.len() {
+            if i == j {
+                continue;
+            }
+
+            let child_i = children[i];
+            let child_j = children[j];
+
+            // Check if child_i is cos²(arg)
+            if let Some((fname_i, arg_i)) = is_trig_squared(store, child_i) {
+                if fname_i != "cos" {
+                    continue;
+                }
+
+                // Check if child_j is -sin²(arg) or (-1)*sin²(arg)
+                let (is_negative, sin_squared) = is_negative_term(store, child_j);
+
+                if is_negative {
+                    if let Some((fname_j, arg_j)) = is_trig_squared(store, sin_squared) {
+                        if fname_j == "sin" && arg_i == arg_j {
+                            // Found cos²(arg) - sin²(arg)!
+                            // Create cos(2*arg)
+                            let two = store.int(2);
+                            let two_arg = store.mul(vec![two, arg_i]);
+                            let cos_2arg = store.func("cos", vec![two_arg]);
+
+                            // Collect remaining terms
+                            let mut remaining: Vec<ExprId> = children
+                                .iter()
+                                .enumerate()
+                                .filter(|(idx, _)| *idx != i && *idx != j)
+                                .map(|(_, &c)| c)
+                                .collect();
+
+                            if remaining.is_empty() {
+                                return Some(cos_2arg);
+                            }
+
+                            remaining.push(cos_2arg);
+                            return Some(store.add(remaining));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Helper to detect if a term is negative (e.g., -x or (-1)*x)
+/// Returns (is_negative, underlying_expr)
+fn is_negative_term(store: &mut Store, expr: ExprId) -> (bool, ExprId) {
+    // Check if expr is a multiplication with -1
+    if store.get(expr).op == Op::Mul {
+        let mul_children = &store.get(expr).children;
+
+        // Look for -1 in the multiplication
+        let has_neg_one = mul_children.iter().any(|&c| {
+            matches!((&store.get(c).op, &store.get(c).payload), (Op::Integer, Payload::Int(-1)))
+        });
+
+        if has_neg_one {
+            // Extract the non-negative-one terms
+            let other_terms: Vec<ExprId> = mul_children
+                .iter()
+                .filter(|&&c| {
+                    !matches!(
+                        (&store.get(c).op, &store.get(c).payload),
+                        (Op::Integer, Payload::Int(-1))
+                    )
+                })
+                .copied()
+                .collect();
+
+            if other_terms.len() == 1 {
+                return (true, other_terms[0]);
+            } else if !other_terms.is_empty() {
+                // Reconstruct multiplication without -1
+                return (true, store.mul(other_terms));
+            }
+        }
+    }
+
+    (false, expr)
 }
 
 /// Checks if an expression is trig²(arg), returns (trig_name, arg)
@@ -746,5 +844,149 @@ mod tests {
 
         // Should NOT simplify (no factor of 2)
         assert_eq!(st.get(result).op, Op::Mul);
+    }
+
+    #[test]
+    fn test_double_angle_cos_basic() {
+        // cos²(x) - sin²(x) → cos(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+
+        // Create cos²(x) - sin²(x) as cos²(x) + (-1)*sin²(x)
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![cos2, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert!(result_str.contains("2"));
+
+        // Verify it's a function
+        assert_eq!(st.get(result).op, Op::Function);
+        if let Payload::Func(fname) = &st.get(result).payload {
+            assert_eq!(fname, "cos");
+        }
+    }
+
+    #[test]
+    fn test_double_angle_cos_reversed() {
+        // -sin²(x) + cos²(x) → cos(2x) (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![neg_sin2, cos2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert!(result_str.contains("2"));
+    }
+
+    #[test]
+    fn test_double_angle_cos_complex_arg() {
+        // cos²(2x) - sin²(2x) → cos(4x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two_const = st.int(2);
+        let two_x = st.mul(vec![two_const, x]);
+        let sin_2x = st.func("sin", vec![two_x]);
+        let cos_2x = st.func("cos", vec![two_x]);
+        let two_exp = st.int(2);
+        let sin2 = st.pow(sin_2x, two_exp);
+        let cos2 = st.pow(cos_2x, two_exp);
+
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![cos2, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos(4x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert!(result_str.contains("4"));
+    }
+
+    #[test]
+    fn test_double_angle_cos_with_extra_terms() {
+        // 1 + cos²(x) - sin²(x) → 1 + cos(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let sum = st.add(vec![one, cos2, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to something with cos(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+    }
+
+    #[test]
+    fn test_double_angle_cos_different_args() {
+        // cos²(x) - sin²(y) should NOT simplify (different arguments)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sinx = st.func("sin", vec![y]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![cos2, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should NOT simplify (different args)
+        assert_eq!(st.get(result).op, Op::Add);
+    }
+
+    #[test]
+    fn test_no_double_angle_cos_without_subtraction() {
+        // cos²(x) + sin²(x) should become 1, not cos(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+        let sum = st.add(vec![cos2, sin2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 1 (Pythagorean), not cos(2x)
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
     }
 }

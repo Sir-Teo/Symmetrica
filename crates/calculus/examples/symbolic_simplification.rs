@@ -228,7 +228,7 @@ fn main() {
         let cosx = st.func("cos", vec![x]);
         let product = st.mul(vec![two, sinx, cosx]);
         println!("Before: {}", st.to_string(product));
-        
+
         let result = simplify_calculus(&mut st, product);
         println!("After:  {}", st.to_string(result));
         println!("✓ 2sin(x)cos(x) → sin(2x)");
@@ -243,7 +243,7 @@ fn main() {
         // Reverse order
         let product = st.mul(vec![cosx, sinx, two]);
         println!("\nBefore: {}", st.to_string(product));
-        
+
         let result = simplify_calculus(&mut st, product);
         println!("After:  {}", st.to_string(result));
         println!("✓ cos(x) · sin(x) · 2 → sin(2x) (order independent)");
@@ -258,10 +258,54 @@ fn main() {
         let cosx = st.func("cos", vec![x]);
         let product = st.mul(vec![three, two, sinx, cosx]);
         println!("\nBefore: {}", st.to_string(product));
-        
+
         let result = simplify_calculus(&mut st, product);
         println!("After:  {}", st.to_string(result));
         println!("✓ 3 · 2sin(x)cos(x) → 3sin(2x)");
+    }
+
+    // Example 7: Double-angle formula for cosine (NEW!)
+    println!("\n\n🎯 Example 7: Double-Angle Formula for Cosine (NEW!)");
+    println!("{}", "-".repeat(60));
+    {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+        
+        // Create cos²(x) - sin²(x)
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![cos2, neg_sin2]);
+        println!("Before: {}", st.to_string(diff));
+        
+        let result = simplify_calculus(&mut st, diff);
+        println!("After:  {}", st.to_string(result));
+        println!("✓ cos²(x) - sin²(x) → cos(2x)");
+    }
+
+    {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two_const = st.int(2);
+        let two_x = st.mul(vec![two_const, x]);
+        let sin_2x = st.func("sin", vec![two_x]);
+        let cos_2x = st.func("cos", vec![two_x]);
+        let two_exp = st.int(2);
+        let sin2 = st.pow(sin_2x, two_exp);
+        let cos2 = st.pow(cos_2x, two_exp);
+        
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![cos2, neg_sin2]);
+        println!("\nBefore: {}", st.to_string(diff));
+        
+        let result = simplify_calculus(&mut st, diff);
+        println!("After:  {}", st.to_string(result));
+        println!("✓ cos²(2x) - sin²(2x) → cos(4x)");
     }
 
     println!("\n{}", "=".repeat(60));
@@ -271,7 +315,8 @@ fn main() {
     println!("  • Exponential/logarithmic inverse cancellation");
     println!("  • Inverse trigonometric simplification");
     println!("  • Pythagorean identity: sin²x + cos²x → 1");
-    println!("  • Double-angle formula: 2sin(x)cos(x) → sin(2x)");
+    println!("  • Double-angle formula (sin): 2sin(x)cos(x) → sin(2x)");
+    println!("  • Double-angle formula (cos): cos²x - sin²x → cos(2x)");
     println!("  • Recursive simplification of nested expressions");
     println!("  • Argument-independent pattern matching");
 }
