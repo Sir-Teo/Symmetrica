@@ -190,8 +190,11 @@ function loadExample(exampleKey) {
     
     // Update code
     const codeEditor = document.getElementById('code-editor');
+    // Reset classes and set fresh content before highlighting
+    codeEditor.className = 'language-rust';
     codeEditor.textContent = example.code;
-    hljs.highlightElement(codeEditor);
+    // Defer highlight to next frame to ensure DOM updates applied
+    requestAnimationFrame(() => hljs.highlightElement(codeEditor));
     
     // Update output
     const output = document.getElementById('output');
@@ -250,8 +253,30 @@ function runExample() {
         
         // Get active example and code from editor
         const activeBtn = document.querySelector('.example-btn.active');
-        const exampleKey = activeBtn ? activeBtn.getAttribute('data-example') : 'basic';
+        let exampleKey = activeBtn ? activeBtn.getAttribute('data-example') : 'basic';
         const code = document.getElementById('code-editor').textContent;
+
+        // Try to infer the example from the pasted code (helps when user copies another snippet)
+        const c = code;
+        if (c.includes('maclaurin(')) {
+            exampleKey = 'series';
+        } else if (c.includes('solve_univariate') || c.includes('.solve(')) {
+            exampleKey = 'solve';
+        } else if (c.includes('integrate(')) {
+            exampleKey = 'integrate';
+        } else if (c.includes('diff(')) {
+            exampleKey = 'diff';
+        } else if (c.includes('simplify_with(')) {
+            exampleKey = 'simplify';
+        }
+
+        // Sync the active button with the inferred example for UX consistency
+        const currentActive = activeBtn ? activeBtn.getAttribute('data-example') : null;
+        if (exampleKey && exampleKey !== currentActive) {
+            document.querySelectorAll('.example-btn').forEach(btn => btn.classList.remove('active'));
+            const target = document.querySelector(`[data-example="${exampleKey}"]`);
+            if (target) target.classList.add('active');
+        }
         
         // Extract numbers from the edited code
         const numbers = extractNumbers(code);
@@ -345,6 +370,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Initial highlight
-    hljs.highlightAll();
+    // Avoid double-highlighting here; main site script already highlights static blocks.
+    // Ensure the editor starts highlighted once.
+    const editor = document.getElementById('code-editor');
+    if (editor && !editor.classList.contains('hljs')) {
+        // Ensure language class is present so highlight.js knows what to do
+        if (!Array.from(editor.classList).some(c => c.startsWith('language-'))) {
+            editor.classList.add('language-rust');
+        }
+        hljs.highlightElement(editor);
+    }
 });
