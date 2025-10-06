@@ -668,14 +668,12 @@ x^5: 1/120`,
     }
 };
 
-// Updated to use the simplified code editor
+// Always return runnable JavaScript for the code editor
 function getJsCodeForExample(exampleKey) {
-    const example = examples[exampleKey];
-    if (!example || !example.code) return `print('Example code not found');`;
-    return example.code;
+    return getJsCodeForExampleLegacy(exampleKey);
 }
 
-// Legacy function for backward compatibility
+// Central JS mapping for all examples
 function getJsCodeForExampleLegacy(exampleKey) {
     switch (exampleKey) {
         case 'basic':
@@ -695,17 +693,19 @@ const sin_x2 = Symmetrica.sin(x2);
 const derivative = sin_x2.diff('x');
 print(derivative.toString());`;
         case 'integrate':
-            return `// Integrate x^2 dx
+            return `// Integrate x^2 and 1/x dx
 const x = Symmetrica.Expr.symbol('x');
 const x2 = x.pow(new Symmetrica.Expr(2));
-const integral = x2.integrate('x');
-print(integral.toString());`;
+const int1 = x2.integrate('x');
+print(int1.toString());
+const inv_x = x.pow(new Symmetrica.Expr(-1));
+const int2 = inv_x.integrate('x');
+print(int2.toString());`;
         case 'simplify':
             return `// Simplify ln(x*y)
 const x = Symmetrica.Expr.symbol('x');
 const y = Symmetrica.Expr.symbol('y');
-const prod = x.mul(y);
-const ln_prod = Symmetrica.ln(prod);
+const ln_prod = Symmetrica.ln(x.mul(y));
 const simplified = ln_prod.simplify();
 print(simplified.toString());`;
         case 'solve':
@@ -720,7 +720,83 @@ print('Roots: ' + JSON.stringify(roots));`;
         case 'series':
             return `// Series expansion (Maclaurin) is not yet exposed in the WASM API.
 print('Series example is not runnable in the browser yet.');`;
+
+        // Phase 6: Trigonometric identities
+        case 'trig_product':
+            return `// Product-to-sum: sin(x)cos(y)
+const x = Symmetrica.Expr.symbol('x');
+const y = Symmetrica.Expr.symbol('y');
+const expr = Symmetrica.sin(x).mul(Symmetrica.cos(y));
+const simplified = expr.simplify();
+print(simplified.toString());`;
+        case 'trig_sum':
+            return `// Sum-to-product: sin(x) + sin(y)
+const x = Symmetrica.Expr.symbol('x');
+const y = Symmetrica.Expr.symbol('y');
+const expr = Symmetrica.sin(x).add(Symmetrica.sin(y));
+const simplified = expr.simplify();
+print(simplified.toString());`;
+        case 'trig_halfangle':
+            return `// Half-angle: sin^2(x/2)
+const x = Symmetrica.Expr.symbol('x');
+const half = Symmetrica.Expr.rational(1, 2);
+const x_half = half.mul(x);
+const sin_half = Symmetrica.sin(x_half);
+const sin_sq = sin_half.pow(new Symmetrica.Expr(2));
+const simplified = sin_sq.simplify();
+print(simplified.toString());`;
+
+        // Phase 6: Radical simplification
+        case 'radical_perfect':
+            return `// sqrt(16) -> 4
+const sixteen = new Symmetrica.Expr(16);
+const sqrt_16 = Symmetrica.sqrt(sixteen);
+const simplified = sqrt_16.simplify();
+print(simplified.toString());`;
+        case 'radical_factor':
+            return `// sqrt(4x) -> 2*sqrt(x)
+const x = Symmetrica.Expr.symbol('x');
+const four = new Symmetrica.Expr(4);
+const four_x = four.mul(x);
+const sqrt_4x = Symmetrica.sqrt(four_x);
+const simplified = sqrt_4x.simplify();
+print(simplified.toString());`;
+
+        // Phase 6: Logarithm rules
+        case 'log_product':
+            return `// ln(x*y) -> ln(x)+ln(y) if safe
+const x = Symmetrica.Expr.symbol('x');
+const y = Symmetrica.Expr.symbol('y');
+const ln_prod = Symmetrica.ln(x.mul(y));
+const simplified = ln_prod.simplify();
+print(simplified.toString());`;
+        case 'log_power':
+            return `// ln(x^3) -> 3*ln(x)
+const x = Symmetrica.Expr.symbol('x');
+const three = new Symmetrica.Expr(3);
+const x3 = x.pow(three);
+const ln_x3 = Symmetrica.ln(x3);
+const simplified = ln_x3.simplify();
+print(simplified.toString());`;
+
+        // Phase 5: Summation (closed-form formulas)
+        case 'sum_arithmetic':
+            return `// Sum k=1..n of k = n(n+1)/2
+const n = Symmetrica.Expr.symbol('n');
+const result = Symmetrica.Expr.rational(1, 2).mul(n).mul(n.add(new Symmetrica.Expr(1))).simplify();
+print(result.toString());`;
+        case 'sum_geometric':
+            return `// Sum k=0..n of 2^k = (2^(n+1)-1)/(2-1)
+const n = Symmetrica.Expr.symbol('n');
+const two = new Symmetrica.Expr(2);
+const geom = two.pow(n.add(new Symmetrica.Expr(1))).sub(new Symmetrica.Expr(1)).div(two.sub(new Symmetrica.Expr(1))).simplify();
+print(geom.toString());`;
         default:
+            // If the example already contains JS code, fall back to it; otherwise show a message.
+            if (examples[exampleKey] && typeof examples[exampleKey].code === 'string') {
+                const c = examples[exampleKey].code;
+                if (!/use\s+expr_core|fn\s+main\s*\(/i.test(c)) return c;
+            }
             return `print('Example not implemented');`;
     }
 }

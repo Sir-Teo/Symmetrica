@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="css/playground.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <!-- Preload WASM module and binary for faster startup -->
-    <link rel="modulepreload" href="./pkg/symmetrica_wasm.js?v=play-2">
-    <link rel="preload" as="fetch" href="./pkg/symmetrica_wasm_bg.wasm?v=play-2" type="application/wasm" crossorigin>
+    <link rel="modulepreload" href="./pkg/symmetrica_wasm.js?v=play-3">
+    <link rel="preload" as="fetch" href="./pkg/symmetrica_wasm_bg.wasm?v=play-3" type="application/wasm" crossorigin>
 </head>
 <body>
     <nav class="navbar">
@@ -240,16 +240,16 @@ cargo run --example basic_polynomial</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
-    <script src="js/main.js?v=play-2"></script>
+    <script src="js/main.js?v=play-3"></script>
     
     <!-- Initialize WASM before playground -->
     <script type="module">
-        import init, * as Symmetrica from './pkg/symmetrica_wasm.js?v=play-2';
+        import init, * as Symmetrica from './pkg/symmetrica_wasm.js?v=play-3';
         
         (async () => {
             try {
                 // Pass a versioned URL so the .wasm also bypasses caches
-                const wasmUrl = new URL('./pkg/symmetrica_wasm_bg.wasm?v=play-2', import.meta.url);
+                const wasmUrl = new URL('./pkg/symmetrica_wasm_bg.wasm?v=play-3', import.meta.url);
                 await init(wasmUrl);
                 window.Symmetrica = Symmetrica;
                 window.SYM_WASM_READY = true;
@@ -264,6 +264,6 @@ cargo run --example basic_polynomial</code></pre>
         })();
     </script>
     
-    <script src="js/playground.js?v=play-2"></script>
+    <script src="js/playground.js?v=play-3"></script>
 </body>
 </html>
