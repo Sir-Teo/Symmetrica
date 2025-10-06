@@ -275,13 +275,13 @@ fn main() {
         let two = st.int(2);
         let sin2 = st.pow(sinx, two);
         let cos2 = st.pow(cosx, two);
-        
+
         // Create cos²(x) - sin²(x)
         let neg_one = st.int(-1);
         let neg_sin2 = st.mul(vec![neg_one, sin2]);
         let diff = st.add(vec![cos2, neg_sin2]);
         println!("Before: {}", st.to_string(diff));
-        
+
         let result = simplify_calculus(&mut st, diff);
         println!("After:  {}", st.to_string(result));
         println!("✓ cos²(x) - sin²(x) → cos(2x)");
@@ -297,12 +297,12 @@ fn main() {
         let two_exp = st.int(2);
         let sin2 = st.pow(sin_2x, two_exp);
         let cos2 = st.pow(cos_2x, two_exp);
-        
+
         let neg_one = st.int(-1);
         let neg_sin2 = st.mul(vec![neg_one, sin2]);
         let diff = st.add(vec![cos2, neg_sin2]);
         println!("\nBefore: {}", st.to_string(diff));
-        
+
         let result = simplify_calculus(&mut st, diff);
         println!("After:  {}", st.to_string(result));
         println!("✓ cos²(2x) - sin²(2x) → cos(4x)");
