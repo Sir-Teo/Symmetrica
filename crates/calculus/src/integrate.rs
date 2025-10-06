@@ -204,6 +204,10 @@ fn integrate_impl(store: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
             if let Some(res) = try_weierstrass_substitution(store, id, var) {
                 return Some(res);
             }
+            // Try pattern 1/(a² + x²) → (1/a)atan(x/a)
+            if let Some(res) = try_atan_pattern(store, id, var) {
+                return Some(res);
+            }
             // Try trig square patterns (sin^2, cos^2)
             if let Some(res) = try_trig_square_pattern(store, id, var) {
                 return Some(res);
@@ -1294,6 +1298,128 @@ fn try_general_weierstrass(
     }
 }
 
+/// Try to integrate patterns like 1/(a² + x²) → (1/a)atan(x/a)
+/// Also handles 1/(1 + x²) → atan(x)
+fn try_atan_pattern(st: &mut Store, id: ExprId, var: &str) -> Option<ExprId> {
+    // Check if this is expr^(-1) pattern
+    if st.get(id).op != Op::Pow {
+        return None;
+    }
+    let children = &st.get(id).children;
+    if children.len() != 2 {
+        return None;
+    }
+    let base = children[0];
+    let exp = children[1];
+
+    // Check exponent is -1
+    if !matches!((&st.get(exp).op, &st.get(exp).payload), (Op::Integer, Payload::Int(-1))) {
+        return None;
+    }
+
+    // Check if base is a + b*x² pattern
+    if st.get(base).op != Op::Add {
+        return None;
+    }
+
+    let add_children = &st.get(base).children;
+    if add_children.len() != 2 {
+        return None;
+    }
+
+    // Extract a and b*x² (order independent)
+    let (a_term, x_sq_term) = if matches!(&st.get(add_children[0]).op, Op::Pow) {
+        (add_children[1], add_children[0])
+    } else if matches!(&st.get(add_children[1]).op, Op::Pow) {
+        (add_children[0], add_children[1])
+    } else {
+        return None;
+    };
+
+    // Extract constant a
+    let a = match (&st.get(a_term).op, &st.get(a_term).payload) {
+        (Op::Integer, Payload::Int(n)) => (*n, 1i64),
+        (Op::Rational, Payload::Rat(p, q)) => (*p, *q),
+        _ => return None,
+    };
+
+    // Check if other term is b*x² or just x²
+    // First try to extract coefficient from x_sq_term
+    let (coeff, x_sq) = if st.get(x_sq_term).op == Op::Mul {
+        // Could be b * x²
+        let mul_children = &st.get(x_sq_term).children;
+        let mut coef = (1i64, 1i64);
+        let mut pow_term = None;
+        for &child in mul_children {
+            match (&st.get(child).op, &st.get(child).payload) {
+                (Op::Integer, Payload::Int(n)) => coef = q_mul(coef, (*n, 1)),
+                (Op::Rational, Payload::Rat(p, q)) => coef = q_mul(coef, (*p, *q)),
+                (Op::Pow, _) => pow_term = Some(child),
+                _ => return None,
+            }
+        }
+        (coef, pow_term?)
+    } else if st.get(x_sq_term).op == Op::Pow {
+        // Just x²
+        ((1, 1), x_sq_term)
+    } else {
+        return None;
+    };
+
+    // Check x_sq is x^2
+    let pow_children = &st.get(x_sq).children;
+    if pow_children.len() != 2 {
+        return None;
+    }
+    let pow_base = pow_children[0];
+    let pow_exp = pow_children[1];
+
+    if !matches!((&st.get(pow_base).op, &st.get(pow_base).payload), (Op::Symbol, Payload::Sym(s)) if s == var)
+    {
+        return None;
+    }
+    if !matches!((&st.get(pow_exp).op, &st.get(pow_exp).payload), (Op::Integer, Payload::Int(2))) {
+        return None;
+    }
+
+    // Now we have 1/(a + b*x²)
+    // For 1/(a + x²) with a > 0, result is (1/√a) atan(x/√a)
+    // For 1/(a² + x²), result is (1/a) atan(x/a)
+
+    // Check if a is a perfect square times coeff
+    // For simplicity, handle the case where coeff = 1 and a = constant²
+    if coeff == (1, 1) && a.0 > 0 {
+        let x = st.sym(var);
+
+        // Special case: 1/(1 + x²) → atan(x)
+        if a == (1, 1) {
+            let atan_expr = st.func("atan", vec![x]);
+            return Some(atan_expr);
+        }
+
+        // General case: 1/(a + x²)
+        // Result: (1/√a) atan(x/√a)
+
+        // Create √a
+        let a_expr = if a.1 == 1 { st.int(a.0) } else { st.rat(a.0, a.1) };
+        let sqrt_a = st.func("sqrt", vec![a_expr]);
+
+        // Create x/√a
+        let neg_one = st.int(-1);
+        let inv_sqrt_a = st.pow(sqrt_a, neg_one);
+        let x_over_sqrt_a = st.mul(vec![x, inv_sqrt_a]);
+
+        // Create atan(x/√a)
+        let atan_expr = st.func("atan", vec![x_over_sqrt_a]);
+
+        // Create (1/√a) * atan(x/√a)
+        let result = st.mul(vec![inv_sqrt_a, atan_expr]);
+        return Some(simplify(st, result));
+    }
+
+    None
+}
+
 /// Extract coefficient and trig function from expressions like b*cos(x), b*sin(x), -b*cos(x), etc.
 /// Returns ((b_num, b_den), "cos"|"sin")
 fn extract_coeff_and_trig(st: &Store, id: ExprId, var: &str) -> Option<((i64, i64), String)> {
@@ -1526,10 +1652,10 @@ mod tests {
     }
 
     #[test]
-    fn integrate_rational_via_pf_fails_on_complex() {
+    fn integrate_one_over_x_squared_plus_one() {
         let mut st = Store::new();
         let x = st.sym("x");
-        // 1/(x^2 + 1) has no rational roots
+        // 1/(x^2 + 1) should be handled by atan pattern, not partial fractions
         let two = st.int(2);
         let x2 = st.pow(x, two);
         let one = st.int(1);
@@ -1537,7 +1663,13 @@ mod tests {
         let m1 = st.int(-1);
         let expr = st.pow(den, m1);
         let res = integrate(&mut st, expr, "x");
-        assert!(res.is_none());
+        // Should now succeed via atan pattern
+        assert!(res.is_some(), "1/(x²+1) should integrate to atan(x)");
+        if let Some(integral) = res {
+            // Should contain atan
+            let result_str = st.to_string(integral);
+            assert!(result_str.contains("atan") || result_str.contains("arctan"));
+        }
     }
 
     // ========== Integration by Parts Tests (Phase J) ==========
