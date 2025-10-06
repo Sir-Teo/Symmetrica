@@ -154,12 +154,17 @@ fn simplify_atan(store: &mut Store, arg: ExprId) -> ExprId {
     store.func("atan", vec![arg])
 }
 
-/// Simplifies addition: sin²x + cos²x → 1 (future)
+/// Simplifies addition: sin²x + cos²x → 1, etc.
 fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
-    // For now, recursively simplify children
+    // First recursively simplify children
     let children = store.get(expr).children.clone();
     let simplified_children: Vec<ExprId> =
         children.iter().map(|&c| apply_calculus_rules(store, c)).collect();
+
+    // Try to detect sin²x + cos²x → 1
+    if let Some(result) = try_pythagorean_identity(store, &simplified_children) {
+        return result;
+    }
 
     // Check if any children changed
     if simplified_children.iter().zip(children.iter()).any(|(a, b)| a != b) {
@@ -167,6 +172,85 @@ fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
     } else {
         expr
     }
+}
+
+/// Detects and simplifies sin²x + cos²x → 1
+fn try_pythagorean_identity(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for pairs of sin²x and cos²x with the same argument
+    for i in 0..children.len() {
+        for j in (i + 1)..children.len() {
+            let child_i = children[i];
+            let child_j = children[j];
+
+            // Check if one is sin²(arg) and the other is cos²(arg)
+            if let Some((fname_i, arg_i)) = is_trig_squared(store, child_i) {
+                if let Some((fname_j, arg_j)) = is_trig_squared(store, child_j) {
+                    // Check if we have sin² and cos² with same argument
+                    if ((fname_i == "sin" && fname_j == "cos")
+                        || (fname_i == "cos" && fname_j == "sin"))
+                        && arg_i == arg_j
+                    {
+                        // Found sin²x + cos²x!
+                        // Return 1 + sum of remaining terms
+                        let one = store.int(1);
+                        let mut remaining: Vec<ExprId> = children
+                            .iter()
+                            .enumerate()
+                            .filter(|(idx, _)| *idx != i && *idx != j)
+                            .map(|(_, &c)| c)
+                            .collect();
+
+                        if remaining.is_empty() {
+                            return Some(one);
+                        }
+
+                        remaining.push(one);
+                        return Some(store.add(remaining));
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Checks if an expression is trig²(arg), returns (trig_name, arg)
+fn is_trig_squared(store: &Store, expr: ExprId) -> Option<(String, ExprId)> {
+    // Check if this is a power expression
+    if store.get(expr).op != Op::Pow {
+        return None;
+    }
+
+    let children = &store.get(expr).children;
+    if children.len() != 2 {
+        return None;
+    }
+
+    let base = children[0];
+    let exp = children[1];
+
+    // Check exponent is 2
+    if !matches!((&store.get(exp).op, &store.get(exp).payload), (Op::Integer, Payload::Int(2))) {
+        return None;
+    }
+
+    // Check base is sin(arg) or cos(arg)
+    if store.get(base).op != Op::Function {
+        return None;
+    }
+
+    let fname = match &store.get(base).payload {
+        Payload::Func(s) => s.clone(),
+        _ => return None,
+    };
+
+    if (fname != "sin" && fname != "cos") || store.get(base).children.len() != 1 {
+        return None;
+    }
+
+    let arg = store.get(base).children[0];
+    Some((fname, arg))
 }
 
 /// Simplifies multiplication (future: trigonometric identities)
@@ -352,7 +436,129 @@ mod tests {
         let has_two = children.iter().any(|&c| {
             matches!((&st.get(c).op, &st.get(c).payload), (Op::Integer, Payload::Int(2)))
         });
-        
+
         assert!(has_x && has_two);
+    }
+
+    #[test]
+    fn test_pythagorean_identity_basic() {
+        // sin²x + cos²x → 1
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+        let sum = st.add(vec![sin2, cos2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_pythagorean_identity_reversed() {
+        // cos²x + sin²x → 1 (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosx, two);
+        let sum = st.add(vec![cos2, sin2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_pythagorean_identity_with_extra_terms() {
+        // 2 + sin²x + cos²x → 3
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let two_exp = st.int(2);
+        let sin2 = st.pow(sinx, two_exp);
+        let cos2 = st.pow(cosx, two_exp);
+        let sum = st.add(vec![two, sin2, cos2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 3 (or 2 + 1)
+        // After simplification should contain 3 or (1 + 2)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("3") || (result_str.contains("1") && result_str.contains("2")));
+    }
+
+    #[test]
+    fn test_pythagorean_identity_different_args_no_simplify() {
+        // sin²x + cos²y should NOT simplify (different arguments)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sinx = st.func("sin", vec![x]);
+        let cosy = st.func("cos", vec![y]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let cos2 = st.pow(cosy, two);
+        let sum = st.add(vec![sin2, cos2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should NOT simplify to 1
+        assert_ne!(st.get(result).op, Op::Integer);
+        // Should still be an addition
+        assert_eq!(st.get(result).op, Op::Add);
+    }
+
+    #[test]
+    fn test_pythagorean_identity_complex_arg() {
+        // sin²(2x) + cos²(2x) → 1
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let sin_2x = st.func("sin", vec![two_x]);
+        let cos_2x = st.func("cos", vec![two_x]);
+        let two_exp = st.int(2);
+        let sin2 = st.pow(sin_2x, two_exp);
+        let cos2 = st.pow(cos_2x, two_exp);
+        let sum = st.add(vec![sin2, cos2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_no_pythagorean_without_squares() {
+        // sin(x) + cos(x) should NOT simplify
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinx = st.func("sin", vec![x]);
+        let cosx = st.func("cos", vec![x]);
+        let sum = st.add(vec![sinx, cosx]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should NOT simplify
+        assert_eq!(st.get(result).op, Op::Add);
     }
 }
