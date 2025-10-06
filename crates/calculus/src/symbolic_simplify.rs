@@ -181,6 +181,11 @@ fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
         return result;
     }
 
+    // Try to detect cosh²x - sinh²x → 1 (hyperbolic identity)
+    if let Some(result) = try_hyperbolic_identity(store, &simplified_children) {
+        return result;
+    }
+
     // Check if any children changed
     if simplified_children.iter().zip(children.iter()).any(|(a, b)| a != b) {
         store.add(simplified_children)
@@ -497,6 +502,95 @@ fn try_identity_rearrangements(store: &mut Store, children: &[ExprId]) -> Option
     }
 
     None
+}
+
+/// Detects and simplifies cosh²x - sinh²x → 1 (hyperbolic identity)
+fn try_hyperbolic_identity(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for pairs of cosh²(arg) and -sinh²(arg) with the same argument
+    for i in 0..children.len() {
+        for j in 0..children.len() {
+            if i == j {
+                continue;
+            }
+
+            let child_i = children[i];
+            let child_j = children[j];
+
+            // Check if one is cosh²(arg)
+            if let Some((fname_i, arg_i)) = is_hyperbolic_squared(store, child_i) {
+                if fname_i != "cosh" {
+                    continue;
+                }
+
+                // Check if child_j is -sinh²(arg) or (-1)*sinh²(arg)
+                let (is_negative, sinh_squared) = is_negative_term(store, child_j);
+
+                if is_negative {
+                    if let Some((fname_j, arg_j)) = is_hyperbolic_squared(store, sinh_squared) {
+                        if fname_j == "sinh" && arg_i == arg_j {
+                            // Found cosh²(arg) - sinh²(arg)!
+                            // Return 1 + sum of remaining terms
+                            let one = store.int(1);
+                            let mut remaining: Vec<ExprId> = children
+                                .iter()
+                                .enumerate()
+                                .filter(|(idx, _)| *idx != i && *idx != j)
+                                .map(|(_, &c)| c)
+                                .collect();
+
+                            if remaining.is_empty() {
+                                return Some(one);
+                            }
+
+                            remaining.push(one);
+                            return Some(store.add(remaining));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Checks if an expression is hyperbolic²(arg), returns (hyperbolic_name, arg)
+/// Similar to is_trig_squared but for hyperbolic functions
+fn is_hyperbolic_squared(store: &Store, expr: ExprId) -> Option<(String, ExprId)> {
+    // Check if this is a power expression
+    if store.get(expr).op != Op::Pow {
+        return None;
+    }
+
+    let children = &store.get(expr).children;
+    if children.len() != 2 {
+        return None;
+    }
+
+    let base = children[0];
+    let exp = children[1];
+
+    // Check exponent is 2
+    if !matches!((&store.get(exp).op, &store.get(exp).payload), (Op::Integer, Payload::Int(2))) {
+        return None;
+    }
+
+    // Check base is sinh(arg) or cosh(arg)
+    if store.get(base).op != Op::Function {
+        return None;
+    }
+
+    let fname = match &store.get(base).payload {
+        Payload::Func(s) => s.clone(),
+        _ => return None,
+    };
+
+    if (fname != "sinh" && fname != "cosh") || store.get(base).children.len() != 1 {
+        return None;
+    }
+
+    let arg = store.get(base).children[0];
+    Some((fname, arg))
 }
 
 /// Simplifies multiplication: 2sin(x)cos(x) → sin(2x), etc.
@@ -1325,5 +1419,147 @@ mod tests {
         let result_str = st.to_string(result);
         assert!(result_str.contains("tan"));
         assert!(!result_str.contains("sec"));
+    }
+
+    #[test]
+    fn test_hyperbolic_identity_basic() {
+        // cosh²(x) - sinh²(x) → 1
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinhx = st.func("sinh", vec![x]);
+        let coshx = st.func("cosh", vec![x]);
+        let two = st.int(2);
+        let sinh2 = st.pow(sinhx, two);
+        let cosh2 = st.pow(coshx, two);
+
+        // Create cosh²(x) - sinh²(x) as cosh²(x) + (-1)*sinh²(x)
+        let neg_one = st.int(-1);
+        let neg_sinh2 = st.mul(vec![neg_one, sinh2]);
+        let diff = st.add(vec![cosh2, neg_sinh2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_hyperbolic_identity_reversed() {
+        // -sinh²(x) + cosh²(x) → 1 (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinhx = st.func("sinh", vec![x]);
+        let coshx = st.func("cosh", vec![x]);
+        let two = st.int(2);
+        let sinh2 = st.pow(sinhx, two);
+        let cosh2 = st.pow(coshx, two);
+
+        let neg_one = st.int(-1);
+        let neg_sinh2 = st.mul(vec![neg_one, sinh2]);
+        let diff = st.add(vec![neg_sinh2, cosh2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_hyperbolic_identity_with_extra_terms() {
+        // 2 + cosh²(x) - sinh²(x) → 3
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let sinhx = st.func("sinh", vec![x]);
+        let coshx = st.func("cosh", vec![x]);
+        let two_exp = st.int(2);
+        let sinh2 = st.pow(sinhx, two_exp);
+        let cosh2 = st.pow(coshx, two_exp);
+
+        let neg_one = st.int(-1);
+        let neg_sinh2 = st.mul(vec![neg_one, sinh2]);
+        let sum = st.add(vec![two, cosh2, neg_sinh2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to 3 (or 2 + 1)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("3") || (result_str.contains("1") && result_str.contains("2")));
+    }
+
+    #[test]
+    fn test_hyperbolic_identity_different_args_no_simplify() {
+        // cosh²(x) - sinh²(y) should NOT simplify (different arguments)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let sinhx = st.func("sinh", vec![y]);
+        let coshx = st.func("cosh", vec![x]);
+        let two = st.int(2);
+        let sinh2 = st.pow(sinhx, two);
+        let cosh2 = st.pow(coshx, two);
+
+        let neg_one = st.int(-1);
+        let neg_sinh2 = st.mul(vec![neg_one, sinh2]);
+        let diff = st.add(vec![cosh2, neg_sinh2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should NOT simplify to 1
+        assert_ne!(st.get(result).op, Op::Integer);
+        // Should still be an addition
+        assert_eq!(st.get(result).op, Op::Add);
+    }
+
+    #[test]
+    fn test_hyperbolic_identity_complex_arg() {
+        // cosh²(2x) - sinh²(2x) → 1
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let two_x = st.mul(vec![two, x]);
+        let sinh_2x = st.func("sinh", vec![two_x]);
+        let cosh_2x = st.func("cosh", vec![two_x]);
+        let two_exp = st.int(2);
+        let sinh2 = st.pow(sinh_2x, two_exp);
+        let cosh2 = st.pow(cosh_2x, two_exp);
+
+        let neg_one = st.int(-1);
+        let neg_sinh2 = st.mul(vec![neg_one, sinh2]);
+        let diff = st.add(vec![cosh2, neg_sinh2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to 1
+        assert!(matches!(
+            (&st.get(result).op, &st.get(result).payload),
+            (Op::Integer, Payload::Int(1))
+        ));
+    }
+
+    #[test]
+    fn test_no_hyperbolic_identity_without_difference() {
+        // cosh²(x) + sinh²(x) should NOT simplify to 1 (need subtraction)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let sinhx = st.func("sinh", vec![x]);
+        let coshx = st.func("cosh", vec![x]);
+        let two = st.int(2);
+        let sinh2 = st.pow(sinhx, two);
+        let cosh2 = st.pow(coshx, two);
+        let sum = st.add(vec![cosh2, sinh2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should NOT simplify to 1
+        assert_ne!(st.get(result).op, Op::Integer);
+        // Should still be an addition
+        assert_eq!(st.get(result).op, Op::Add);
     }
 }
