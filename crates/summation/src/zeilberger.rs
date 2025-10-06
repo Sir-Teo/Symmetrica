@@ -40,122 +40,99 @@ pub fn zeilberger_recurrence(
         if ch.len() == 2 {
             let base = ch[0];
             let exp = ch[1];
-            // exponent equals k and base independent of k and n
             if let (Op::Symbol, Payload::Sym(s)) = (&store.get(exp).op, &store.get(exp).payload) {
-                if s == sum_var
-                    && !depends_on_var(store, base, sum_var)
-                    && !depends_on_var(store, base, param_var)
-                {
-                    // Recurrence: S(n+1) - S(n) = r^(n+1)
+                if s == sum_var && !depends_on_var(store, base, sum_var) && !depends_on_var(store, base, param_var) {
                     let neg_one = store.int(-1);
                     let one = store.int(1);
-                    let a0 = neg_one; // coefficient for S(n)
-                    let a1 = one; // coefficient for S(n+1)
+                    let a0 = neg_one;
+                    let a1 = one;
                     let coeffs = vec![a0, a1];
 
-                    // inhom_term = r^(n+1)
                     let n_sym = store.sym(param_var);
                     let n_plus_1 = store.add(vec![n_sym, one]);
                     let rhs = store.pow(base, n_plus_1);
 
                     let zero = store.int(0);
-                    return Some(Certificate {
-                        rational_cert: zero,
-                        coefficients: coeffs,
-                        inhom_term: Some(rhs),
-                    });
-                }
-
-                // Binomial times geometric: F(n,k) = binom(n,k) * r^k with r independent of n,k
-                if let Op::Mul = store.get(term).op {
-                    let ch = store.get(term).children.clone();
-                    // locate binom(n,k)
-                    let mut bin_idx: Option<usize> = None;
-                    let mut pow_idx: Option<usize> = None;
-                    for (i, &c) in ch.iter().enumerate() {
-                        match store.get(c).op {
-                            Op::Function => {
-                                if let Payload::Func(ref fname) = store.get(c).payload {
-                                    if fname == "binom" || fname == "C" {
-                                        bin_idx = Some(i);
-                                    }
-                                }
-                            }
-                            Op::Pow => {
-                                pow_idx = Some(i);
-                            }
-                            _ => {}
-                        }
-                    }
-                    if let (Some(bi), Some(pi)) = (bin_idx, pow_idx) {
-                        let bin = ch[bi];
-                        let pow = ch[pi];
-                        let bch = store.get(bin).children.clone();
-                        let pch = store.get(pow).children.clone();
-                        if bch.len() == 2 && pch.len() == 2 {
-                            let n_arg = bch[0];
-                            let k_arg = bch[1];
-                            let r = pch[0];
-                            let e = pch[1];
-                            let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload),
-                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
-                            let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload),
-                    (Op::Symbol, Payload::Sym(s)) if s == param_var);
-                            let e_ok = matches!((&store.get(e).op, &store.get(e).payload),
-                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
-                            if k_ok
-                                && n_ok
-                                && e_ok
-                                && !depends_on_var(store, r, sum_var)
-                                && !depends_on_var(store, r, param_var)
-                            {
-                                // S(n+1) - (1 + r) S(n) = 0
-                                let one = store.int(1);
-                                let a1 = one; // S(n+1)
-                                let one_plus_r = store.add(vec![one, r]);
-                                let neg_one = store.int(-1);
-                                let a0 = store.mul(vec![neg_one, one_plus_r]);
-                                return Some(Certificate {
-                                    rational_cert: store.int(0),
-                                    coefficients: vec![a0, a1],
-                                    inhom_term: None,
-                                });
-                            }
-                        }
-                    }
+                    return Some(Certificate { rational_cert: zero, coefficients: coeffs, inhom_term: Some(rhs) });
                 }
             }
         }
     }
 
-    // Binomial family: F(n,k) = binom(n,k)
-    // Recognize a function call named "binom" or "C" with arguments (n, k)
+    // Binomial times geometric: F(n,k) = binom(n,k) * r^k
+    if let Op::Mul = store.get(term).op {
+        let ch = store.get(term).children.clone();
+        let mut bin_idx: Option<usize> = None;
+        let mut pow_idx: Option<usize> = None;
+        for (i, &c) in ch.iter().enumerate() {
+            match store.get(c).op {
+                Op::Function => {
+                    if let Payload::Func(ref fname) = store.get(c).payload {
+                        if fname == "binom" || fname == "C" { bin_idx = Some(i); }
+                    }
+                }
+                Op::Pow => { pow_idx = Some(i); }
+                _ => {}
+            }
+        }
+        if let (Some(bi), Some(pi)) = (bin_idx, pow_idx) {
+            let bin = ch[bi];
+            let pow = ch[pi];
+            let bch = store.get(bin).children.clone();
+            let pch = store.get(pow).children.clone();
+            if bch.len() == 2 && pch.len() == 2 {
+                let n_arg = bch[0];
+                let k_arg = bch[1];
+                let r = pch[0];
+                let e = pch[1];
+                let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == param_var);
+                let e_ok = matches!((&store.get(e).op, &store.get(e).payload), (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                if k_ok && n_ok && e_ok && !depends_on_var(store, r, sum_var) && !depends_on_var(store, r, param_var) {
+                    let one = store.int(1);
+                    let a1 = one;
+                    let one_plus_r = store.add(vec![one, r]);
+                    let neg_one = store.int(-1);
+                    let a0 = store.mul(vec![neg_one, one_plus_r]);
+                    let ksym = store.sym(sum_var);
+                    let n_sym = store.sym(param_var);
+                    let n_plus_1 = store.add(vec![n_sym, one]);
+                    let neg_ksym = store.mul(vec![neg_one, ksym]);
+                    let denom = store.add(vec![n_plus_1, neg_ksym]);
+                    let inv = store.pow(denom, neg_one);
+                    let neg_k = store.mul(vec![neg_one, ksym]);
+                    let rat_cert = store.mul(vec![neg_k, inv]);
+                    return Some(Certificate { rational_cert: rat_cert, coefficients: vec![a0, a1], inhom_term: None });
+                }
+            }
+        }
+    }
+
+    // Binomial: F(n,k) = binom(n,k)
     if let Op::Function = store.get(term).op {
-        let fname = match &store.get(term).payload {
-            Payload::Func(s) => s.clone(),
-            _ => String::new(),
-        };
+        let fname = match &store.get(term).payload { Payload::Func(s) => s.clone(), _ => String::new() };
         if fname == "binom" || fname == "C" {
             let ch = store.get(term).children.clone();
             if ch.len() == 2 {
                 let n_arg = ch[0];
                 let k_arg = ch[1];
-                // Ensure k_arg is sum_var and n_arg is the parameter variable
-                let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload),
-                    (Op::Symbol, Payload::Sym(s)) if s == sum_var);
-                let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload),
-                    (Op::Symbol, Payload::Sym(s)) if s == param_var);
+                let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == sum_var);
+                let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == param_var);
                 if k_ok && n_ok {
-                    // For S(n) = sum_k binom(n,k), S(n+1) - 2 S(n) = 0
                     let one = store.int(1);
                     let neg_two = store.int(-2);
-                    let a0 = neg_two; // coefficient for S(n)
-                    let a1 = one; // coefficient for S(n+1)
-                    return Some(Certificate {
-                        rational_cert: store.int(0),
-                        coefficients: vec![a0, a1],
-                        inhom_term: None,
-                    });
+                    let a0 = neg_two;
+                    let a1 = one;
+                    let ksym = store.sym(sum_var);
+                    let n_sym = store.sym(param_var);
+                    let n_plus_1 = store.add(vec![n_sym, one]);
+                    let neg_one = store.int(-1);
+                    let neg_ksym = store.mul(vec![neg_one, ksym]);
+                    let denom = store.add(vec![n_plus_1, neg_ksym]);
+                    let inv = store.pow(denom, neg_one);
+                    let neg_k = store.mul(vec![neg_one, ksym]);
+                    let rat_cert = store.mul(vec![neg_k, inv]);
+                    return Some(Certificate { rational_cert: rat_cert, coefficients: vec![a0, a1], inhom_term: None });
                 }
             }
         }

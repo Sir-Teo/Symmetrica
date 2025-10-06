@@ -808,6 +808,7 @@ dependencies = [
  "calculus",
  "criterion",
  "expr_core",
+ "matrix",
  "polys",
  "proptest",
  "simplify",

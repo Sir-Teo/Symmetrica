@@ -1,6 +1,6 @@
 //! Definite integration framework (Phase 3)
 //!
-//! Provides infrastructure for computing definite integrals ∫[a,b] f(x) dx
+//! Provides infrastructure for computing definite integrals ∫\[a,b\] f(x) dx
 //! by evaluating the fundamental theorem of calculus: F(b) - F(a)
 //! where F is an antiderivative of f.
 //!
@@ -38,14 +38,14 @@ pub enum DefiniteResult {
     Unknown,
 }
 
-/// Computes a definite integral ∫[a,b] f(x) dx symbolically
+/// Computes a definite integral ∫\[a,b\] f(x) dx symbolically
 ///
 /// Uses the fundamental theorem of calculus when an antiderivative exists.
 /// Returns None if the integral cannot be computed symbolically.
 ///
 /// # Examples
-/// - ∫[0,1] x dx = [x²/2] from 0 to 1 = 1/2
-/// - ∫[0,∞) e^(-x) dx = 1
+/// - ∫\[0,1\] x dx = \[x²/2\] from 0 to 1 = 1/2
+/// - ∫\[0,∞) e^(-x) dx = 1
 pub fn definite_integrate(
     store: &mut Store,
     integrand: ExprId,

@@ -6,6 +6,7 @@
 //! - Zeilberger's algorithm for creative telescoping
 //! - Basic sum formulas (arithmetic, geometric, power sums)
 //! - Infinite products and Pochhammer symbols
+//! - Convergence tests (ratio test)
 //!
 //! # Examples
 //!
@@ -27,12 +28,14 @@ mod gosper;
 mod hypergeometric;
 mod pochhammer;
 mod zeilberger;
+mod convergence;
 
 pub use basic::{sum_arithmetic, sum_geometric, sum_power};
 pub use gosper::gosper_sum;
 pub use hypergeometric::{is_hypergeometric, rationalize_hypergeometric};
 pub use pochhammer::{falling_factorial, pochhammer, rising_factorial, rising_to_falling};
 pub use zeilberger::{zeilberger_recurrence, Certificate};
+pub use convergence::{ratio_test, ConvergenceResult};
 
 use expr_core::{ExprId, Store};
 

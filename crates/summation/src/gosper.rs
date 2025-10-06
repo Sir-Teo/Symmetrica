@@ -9,10 +9,11 @@
 //! Reference: Gosper, R. W. (1978). "Decision procedure for indefinite hypergeometric summation"
 
 use crate::hypergeometric::{is_hypergeometric, rationalize_hypergeometric};
-use arith::Q;
+use arith::{add_q, mul_q, sub_q, Q};
 use calculus::diff;
 use expr_core::{ExprId, Store};
-use polys::expr_to_unipoly;
+use matrix::MatrixQ;
+use polys::{expr_to_unipoly, unipoly_to_expr, UniPoly};
 use simplify::simplify;
 
 /// Attempt to find a closed-form sum using Gosper's algorithm
@@ -337,6 +338,16 @@ fn find_antidifference(store: &mut Store, term: ExprId, var: &str) -> Option<Exp
         return Some(result);
     }
 
+    // Try general Gosper via linear system on polynomial f(k): R f(k+1) - f(k) = 1
+    if let (Some(p_poly), Some(q_poly)) = (expr_to_unipoly(store, p, var), expr_to_unipoly(store, q, var)) {
+        if let Some(f_poly) = solve_gosper_via_linear_system(&p_poly, &q_poly, var) {
+            // g(k) = f(k) * t(k)
+            let f_expr = unipoly_to_expr(store, &f_poly);
+            let g = store.mul(vec![f_expr, term]);
+            return Some(simplify(store, g));
+        }
+    }
+
     None
 }
 
@@ -397,6 +408,94 @@ fn try_simple_gosper(
 
     // Case 2: Linear term (handled by basic module, but provide fallback)
     // For more complex cases, we would need full Gosper's algorithm
+
+    None
+}
+
+// ===== Helpers for general Gosper solver =====
+
+/// Compute binomial coefficient C(n,k) as rational Q
+fn binom_q(n: usize, k: usize) -> Q {
+    if k > n {
+        return Q::zero();
+    }
+    if k == 0 || k == n {
+        return Q::one();
+    }
+    let k = k.min(n - k);
+    let mut num: i128 = 1;
+    let mut den: i128 = 1;
+    for i in 1..=k {
+        num *= (n - (k - i)) as i128;
+        den *= i as i128;
+        let g = gcd_i128(num.abs(), den.abs());
+        if g > 1 {
+            num /= g;
+            den /= g;
+        }
+    }
+    Q(num as i64, den as i64)
+}
+
+fn gcd_i128(mut a: i128, mut b: i128) -> i128 {
+    while b != 0 {
+        let t = a % b;
+        a = b;
+        b = t;
+    }
+    a.abs()
+}
+
+/// Solve for polynomial f(k) of some degree D such that
+/// P(k)/Q(k) * f(k+1) - f(k) = 1  =>  P(k) f(k+1) - Q(k) f(k) = Q(k)
+/// Returns f as UniPoly if found.
+fn solve_gosper_via_linear_system(p: &UniPoly, q: &UniPoly, var: &str) -> Option<UniPoly> {
+    let dp = p.degree().unwrap_or(0);
+    let dq = q.degree().unwrap_or(0);
+    let dmax = dp + dq + 3; // heuristic upper bound
+
+    for deg_f in 0..=dmax {
+        let n = deg_f + 1; // unknowns f_0..f_deg_f
+        let rows = n;
+        let cols = n;
+        let mut a_entries: Vec<Q> = vec![Q::zero(); rows * cols];
+        let mut b_vec: Vec<Q> = vec![Q::zero(); rows];
+
+        for t in 0..rows {
+            // Right-hand side coefficient of k^t from Q(k)
+            b_vec[t] = if t < q.coeffs.len() { q.coeffs[t] } else { Q::zero() };
+
+            for i in 0..=deg_f {
+                let mut a_ti = Q::zero();
+
+                // Contribution from P(k) * f(k+1)
+                // coeff of k^t in sum_m p_m * (k+1)^i -> sum_m p_m * binom(i, t-m)
+                for m in 0..=dp {
+                    if t >= m {
+                        let j = t - m;
+                        if i >= j {
+                            let p_m = p.coeffs.get(m).copied().unwrap_or(Q::zero());
+                            let b = binom_q(i, j);
+                            a_ti = add_q(a_ti, mul_q(p_m, b));
+                        }
+                    }
+                }
+
+                // Contribution from - Q(k) * f(k)
+                if t >= i {
+                    let q_m = q.coeffs.get(t - i).copied().unwrap_or(Q::zero());
+                    a_ti = sub_q(a_ti, q_m);
+                }
+
+                a_entries[t * cols + i] = a_ti;
+            }
+        }
+
+        let a_mat = MatrixQ::new(rows, cols, a_entries);
+        if let Ok(Some(sol)) = a_mat.solve_bareiss(&b_vec) {
+            return Some(UniPoly::new(var.to_string(), sol));
+        }
+    }
 
     None
 }
