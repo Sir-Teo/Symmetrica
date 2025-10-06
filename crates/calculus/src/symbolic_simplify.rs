@@ -171,6 +171,16 @@ fn simplify_add(store: &mut Store, expr: ExprId) -> ExprId {
         return result;
     }
 
+    // Try to detect 1 + tan²x → sec²x (and similar Pythagorean variants)
+    if let Some(result) = try_pythagorean_variants(store, &simplified_children) {
+        return result;
+    }
+
+    // Try to detect 1 - sin²x → cos²x (identity rearrangements)
+    if let Some(result) = try_identity_rearrangements(store, &simplified_children) {
+        return result;
+    }
+
     // Check if any children changed
     if simplified_children.iter().zip(children.iter()).any(|(a, b)| a != b) {
         store.add(simplified_children)
@@ -349,6 +359,144 @@ fn is_trig_squared(store: &Store, expr: ExprId) -> Option<(String, ExprId)> {
 
     let arg = store.get(base).children[0];
     Some((fname, arg))
+}
+
+/// Detects and simplifies 1 + tan²x → sec²x, 1 + cot²x → csc²x
+fn try_pythagorean_variants(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for 1 + tan²(arg) or 1 + cot²(arg)
+    for i in 0..children.len() {
+        for j in 0..children.len() {
+            if i == j {
+                continue;
+            }
+
+            let child_i = children[i];
+            let child_j = children[j];
+
+            // Check if child_i is 1
+            if !matches!(
+                (&store.get(child_i).op, &store.get(child_i).payload),
+                (Op::Integer, Payload::Int(1))
+            ) {
+                continue;
+            }
+
+            // Check if child_j is tan²(arg) or cot²(arg)
+            if store.get(child_j).op != Op::Pow {
+                continue;
+            }
+
+            let pow_children = &store.get(child_j).children;
+            if pow_children.len() != 2 {
+                continue;
+            }
+
+            let base = pow_children[0];
+            let exp = pow_children[1];
+
+            // Check exponent is 2
+            if !matches!(
+                (&store.get(exp).op, &store.get(exp).payload),
+                (Op::Integer, Payload::Int(2))
+            ) {
+                continue;
+            }
+
+            // Check base is tan(arg) or cot(arg)
+            if store.get(base).op != Op::Function {
+                continue;
+            }
+
+            let fname = match &store.get(base).payload {
+                Payload::Func(s) => s.clone(),
+                _ => continue,
+            };
+
+            if (fname != "tan" && fname != "cot") || store.get(base).children.len() != 1 {
+                continue;
+            }
+
+            let arg = store.get(base).children[0];
+
+            // Found 1 + tan²(arg) → sec²(arg) or 1 + cot²(arg) → csc²(arg)
+            let result_fname = if fname == "tan" { "sec" } else { "csc" };
+            let result_func = store.func(result_fname, vec![arg]);
+            let two = store.int(2);
+            let squared = store.pow(result_func, two);
+
+            // Collect remaining terms
+            let mut remaining: Vec<ExprId> = children
+                .iter()
+                .enumerate()
+                .filter(|(idx, _)| *idx != i && *idx != j)
+                .map(|(_, &c)| c)
+                .collect();
+
+            if remaining.is_empty() {
+                return Some(squared);
+            }
+
+            remaining.push(squared);
+            return Some(store.add(remaining));
+        }
+    }
+
+    None
+}
+
+/// Detects and simplifies 1 - sin²x → cos²x, 1 - cos²x → sin²x
+fn try_identity_rearrangements(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
+    // Look for 1 + (-1)*sin²(arg) or 1 + (-1)*cos²(arg)
+    for i in 0..children.len() {
+        for j in 0..children.len() {
+            if i == j {
+                continue;
+            }
+
+            let child_i = children[i];
+            let child_j = children[j];
+
+            // Check if child_i is 1
+            if !matches!(
+                (&store.get(child_i).op, &store.get(child_i).payload),
+                (Op::Integer, Payload::Int(1))
+            ) {
+                continue;
+            }
+
+            // Check if child_j is -sin²(arg) or -cos²(arg)
+            let (is_negative, trig_squared) = is_negative_term(store, child_j);
+
+            if is_negative {
+                if let Some((fname, arg)) = is_trig_squared(store, trig_squared) {
+                    if fname == "sin" || fname == "cos" {
+                        // Found 1 - sin²(arg) → cos²(arg) or 1 - cos²(arg) → sin²(arg)
+                        let result_fname = if fname == "sin" { "cos" } else { "sin" };
+                        let result_func = store.func(result_fname, vec![arg]);
+                        let two = store.int(2);
+                        let squared = store.pow(result_func, two);
+
+                        // Collect remaining terms
+                        let mut remaining: Vec<ExprId> = children
+                            .iter()
+                            .enumerate()
+                            .filter(|(idx, _)| *idx != i && *idx != j)
+                            .map(|(_, &c)| c)
+                            .collect();
+
+                        if remaining.is_empty() {
+                            return Some(squared);
+                        }
+
+                        remaining.push(squared);
+                        return Some(store.add(remaining));
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 /// Simplifies multiplication: 2sin(x)cos(x) → sin(2x), etc.
@@ -988,5 +1136,194 @@ mod tests {
             (&st.get(result).op, &st.get(result).payload),
             (Op::Integer, Payload::Int(1))
         ));
+    }
+
+    #[test]
+    fn test_pythagorean_variant_tan_basic() {
+        // 1 + tan²(x) → sec²(x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let tanx = st.func("tan", vec![x]);
+        let two = st.int(2);
+        let tan2 = st.pow(tanx, two);
+        let sum = st.add(vec![one, tan2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to sec²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sec"));
+        assert_eq!(st.get(result).op, Op::Pow);
+    }
+
+    #[test]
+    fn test_pythagorean_variant_tan_reversed() {
+        // tan²(x) + 1 → sec²(x) (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let tanx = st.func("tan", vec![x]);
+        let two = st.int(2);
+        let tan2 = st.pow(tanx, two);
+        let sum = st.add(vec![tan2, one]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to sec²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sec"));
+    }
+
+    #[test]
+    fn test_pythagorean_variant_cot() {
+        // 1 + cot²(x) → csc²(x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let cotx = st.func("cot", vec![x]);
+        let two = st.int(2);
+        let cot2 = st.pow(cotx, two);
+        let sum = st.add(vec![one, cot2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to csc²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("csc"));
+        assert_eq!(st.get(result).op, Op::Pow);
+    }
+
+    #[test]
+    fn test_pythagorean_variant_complex_arg() {
+        // 1 + tan²(2x) → sec²(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let two_const = st.int(2);
+        let two_x = st.mul(vec![two_const, x]);
+        let tan_2x = st.func("tan", vec![two_x]);
+        let two_exp = st.int(2);
+        let tan2 = st.pow(tan_2x, two_exp);
+        let sum = st.add(vec![one, tan2]);
+
+        let result = simplify_calculus(&mut st, sum);
+
+        // Should simplify to sec²(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sec"));
+        assert_eq!(st.get(result).op, Op::Pow);
+    }
+
+    #[test]
+    fn test_identity_rearrangement_sin() {
+        // 1 - sin²(x) → cos²(x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let sinx = st.func("sin", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![one, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert_eq!(st.get(result).op, Op::Pow);
+
+        // Verify it's cos²(x) not something else
+        let pow_children = &st.get(result).children;
+        assert_eq!(pow_children.len(), 2);
+        let base = pow_children[0];
+        assert!(matches!(
+            &st.get(base).payload,
+            Payload::Func(fname) if fname == "cos"
+        ));
+    }
+
+    #[test]
+    fn test_identity_rearrangement_cos() {
+        // 1 - cos²(x) → sin²(x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let cosx = st.func("cos", vec![x]);
+        let two = st.int(2);
+        let cos2 = st.pow(cosx, two);
+        let neg_one = st.int(-1);
+        let neg_cos2 = st.mul(vec![neg_one, cos2]);
+        let diff = st.add(vec![one, neg_cos2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to sin²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("sin"));
+        assert_eq!(st.get(result).op, Op::Pow);
+    }
+
+    #[test]
+    fn test_identity_rearrangement_reversed() {
+        // -sin²(x) + 1 → cos²(x) (order independent)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let sinx = st.func("sin", vec![x]);
+        let two = st.int(2);
+        let sin2 = st.pow(sinx, two);
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![neg_sin2, one]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos²(x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+    }
+
+    #[test]
+    fn test_identity_rearrangement_complex_arg() {
+        // 1 - sin²(2x) → cos²(2x)
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let one = st.int(1);
+        let two_const = st.int(2);
+        let two_x = st.mul(vec![two_const, x]);
+        let sin_2x = st.func("sin", vec![two_x]);
+        let two_exp = st.int(2);
+        let sin2 = st.pow(sin_2x, two_exp);
+        let neg_one = st.int(-1);
+        let neg_sin2 = st.mul(vec![neg_one, sin2]);
+        let diff = st.add(vec![one, neg_sin2]);
+
+        let result = simplify_calculus(&mut st, diff);
+
+        // Should simplify to cos²(2x)
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("cos"));
+        assert_eq!(st.get(result).op, Op::Pow);
+    }
+
+    #[test]
+    fn test_no_pythagorean_variant_without_one() {
+        // tan²(x) alone should NOT simplify
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let tanx = st.func("tan", vec![x]);
+        let two = st.int(2);
+        let tan2 = st.pow(tanx, two);
+
+        let result = simplify_calculus(&mut st, tan2);
+
+        // Should remain as tan²(x)
+        assert_eq!(st.get(result).op, Op::Pow);
+        let result_str = st.to_string(result);
+        assert!(result_str.contains("tan"));
+        assert!(!result_str.contains("sec"));
     }
 }
