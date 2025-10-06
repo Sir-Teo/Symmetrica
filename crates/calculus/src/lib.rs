@@ -1,5 +1,6 @@
 //! Calculus v1 (minimal): structural differentiation for Add/Mul/Pow.
 //! Phase 3: definite integrals, limit evaluation, constant folding, and special functions
+//! Phase 4: symbolic simplification and advanced features
 mod definite;
 mod diff;
 mod evaluate;
@@ -7,6 +8,7 @@ mod integrate;
 mod limit;
 mod risch;
 mod series;
+mod symbolic_simplify;
 
 pub use definite::{definite_integrate, Bound, DefiniteResult};
 pub use diff::diff;
@@ -18,6 +20,7 @@ pub use risch::{
     try_integrate_logarithmic, ExtensionType, TowerElement,
 };
 pub use series::{limit_poly, maclaurin, LimitPoint, LimitResult, Series};
+pub use symbolic_simplify::simplify_calculus;
 
 #[cfg(test)]
 mod tests {
