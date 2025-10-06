@@ -339,7 +339,9 @@ fn find_antidifference(store: &mut Store, term: ExprId, var: &str) -> Option<Exp
     }
 
     // Try general Gosper via linear system on polynomial f(k): R f(k+1) - f(k) = 1
-    if let (Some(p_poly), Some(q_poly)) = (expr_to_unipoly(store, p, var), expr_to_unipoly(store, q, var)) {
+    if let (Some(p_poly), Some(q_poly)) =
+        (expr_to_unipoly(store, p, var), expr_to_unipoly(store, q, var))
+    {
         if let Some(f_poly) = solve_gosper_via_linear_system(&p_poly, &q_poly, var) {
             // g(k) = f(k) * t(k)
             let f_expr = unipoly_to_expr(store, &f_poly);

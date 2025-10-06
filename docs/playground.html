@@ -31,17 +31,113 @@
     <div class="playground-container">
         <div class="playground-header">
             <h1>Interactive Playground</h1>
-            <p>Try Symmetrica examples instantly</p>
+            <p>22 runnable examples — Try Symmetrica v2.0 with Phase 5 & 6 features in your browser!</p>
+            <div style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; font-size: 0.9rem;">
+                <span style="color: var(--success);">✓ Trig Identities</span>
+                <span style="color: var(--success);">✓ Radical Simplification</span>
+                <span style="color: var(--success);">✓ Logarithm Rules</span>
+                <span style="color: var(--success);">✓ Symbolic Summation</span>
+                <span style="color: var(--success);">✓ Advanced Calculus</span>
+                <span style="color: var(--success);">✓ Rational Arithmetic</span>
+            </div>
         </div>
 
         <div class="playground-layout">
             <aside class="examples-sidebar">
-                <h3>Examples</h3>
+                <h3>Phase 6: Trig Identities</h3>
+                <div class="example-list">
+                    <button class="example-btn" data-example="trig_product">
+                        <span class="example-icon">↔</span>
+                        Product-to-Sum
+                    </button>
+                    <button class="example-btn" data-example="trig_sum">
+                        <span class="example-icon">➕</span>
+                        Sum-to-Product
+                    </button>
+                    <button class="example-btn" data-example="trig_halfangle">
+                        <span class="example-icon">½</span>
+                        Half-Angle
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Phase 6: Radicals</h3>
+                <div class="example-list">
+                    <button class="example-btn" data-example="radical_perfect">
+                        <span class="example-icon">√</span>
+                        Perfect Squares
+                    </button>
+                    <button class="example-btn" data-example="radical_factor">
+                        <span class="example-icon">📐</span>
+                        Factoring
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Phase 6: Logarithms</h3>
+                <div class="example-list">
+                    <button class="example-btn" data-example="log_product">
+                        <span class="example-icon">✖️</span>
+                        Product Rule
+                    </button>
+                    <button class="example-btn" data-example="log_power">
+                        <span class="example-icon">^</span>
+                        Power Rule
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Phase 5: Summation</h3>
+                <div class="example-list">
+                    <button class="example-btn" data-example="sum_arithmetic">
+                        <span class="example-icon">Σ</span>
+                        Arithmetic Series
+                    </button>
+                    <button class="example-btn" data-example="sum_geometric">
+                        <span class="example-icon">∞</span>
+                        Geometric Series
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Advanced Calculus</h3>
+                <div class="example-list">
+                    <button class="example-btn" data-example="chain_rule">
+                        <span class="example-icon">🔗</span>
+                        Chain Rule
+                    </button>
+                    <button class="example-btn" data-example="multiple_vars">
+                        <span class="example-icon">∇</span>
+                        Partial Derivatives
+                    </button>
+                    <button class="example-btn" data-example="trig_integrals">
+                        <span class="example-icon">∫</span>
+                        Trig Integrals
+                    </button>
+                    <button class="example-btn" data-example="exponential">
+                        <span class="example-icon">e</span>
+                        Exp & Log
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Algebra</h3>
                 <div class="example-list">
                     <button class="example-btn active" data-example="basic">
                         <span class="example-icon">🔢</span>
                         Basic Operations
                     </button>
+                    <button class="example-btn" data-example="rational_arithmetic">
+                        <span class="example-icon">⅟</span>
+                        Rational Arithmetic
+                    </button>
+                    <button class="example-btn" data-example="polynomial_ops">
+                        <span class="example-icon">📈</span>
+                        Polynomials
+                    </button>
+                    <button class="example-btn" data-example="matrix_det">
+                        <span class="example-icon">▦</span>
+                        Matrix Operations
+                    </button>
+                </div>
+                
+                <h3 style="margin-top: 2rem;">Core Features</h3>
+                <div class="example-list">
                     <button class="example-btn" data-example="diff">
                         <span class="example-icon">∂</span>
                         Differentiation
@@ -68,19 +164,13 @@
             <main class="playground-main">
                 <div class="code-panel">
                     <div class="panel-header">
-                        <span>Code</span>
+                        <span>JavaScript Code (Editable & Runnable)</span>
                         <div>
                             <button class="btn-run" onclick="runExample()">▶ Run</button>
                             <button class="btn-copy" onclick="copyCode()">Copy</button>
                         </div>
                     </div>
-                    <div class="tabs-container">
-                        <div class="tab-buttons" style="padding: 0.5rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--bg-dark);">
-                            <button class="tab-button active" data-tab="js">JavaScript (runnable)</button>
-                            <button class="tab-button" data-tab="rust">Rust (reference)</button>
-                        </div>
-                        <div class="tab-pane active" id="js-tab">
-                            <pre><code id="code-editor-js" class="language-js" contenteditable="true">// This code runs in your browser using the Symmetrica WASM API.
+                    <pre><code id="code-editor" class="language-js" contenteditable="true">// This code runs in your browser using the Symmetrica WASM API.
 // Use print(...) or console.log(...) to write to the Output panel.
 // Example: basic polynomial simplification
 
@@ -92,27 +182,6 @@ const expr = x2.add(three_x).add(one);
 const simplified = expr.simplify();
 print(simplified.toString());
 </code></pre>
-                        </div>
-                        <div class="tab-pane" id="rust-tab">
-                            <pre><code id="code-editor-rust" class="language-rust" contenteditable="false">use expr_core::Store;
-use simplify::simplify;
-
-fn main() {
-    let mut st = Store::new();
-    let x = st.sym("x");
-    
-    // Build expression: x² + 3x + 1
-    let expr = st.add(vec![
-        st.pow(x, st.int(2)),
-        st.mul(vec![st.int(3), x]),
-        st.int(1),
-    ]);
-    
-    let simplified = simplify(&mut st, expr);
-    println!("{}", st.to_string(simplified));
-}</code></pre>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="output-panel">

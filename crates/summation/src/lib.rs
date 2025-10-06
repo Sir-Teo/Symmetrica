@@ -24,18 +24,20 @@
 //! ```
 
 mod basic;
+mod convergence;
 mod gosper;
 mod hypergeometric;
 mod pochhammer;
+mod products;
 mod zeilberger;
-mod convergence;
 
 pub use basic::{sum_arithmetic, sum_geometric, sum_power};
+pub use convergence::{ratio_test, ConvergenceResult};
 pub use gosper::gosper_sum;
 pub use hypergeometric::{is_hypergeometric, rationalize_hypergeometric};
 pub use pochhammer::{falling_factorial, pochhammer, rising_factorial, rising_to_falling};
+pub use products::{evaluate_finite_product, product_to_gamma_ratio};
 pub use zeilberger::{zeilberger_recurrence, Certificate};
-pub use convergence::{ratio_test, ConvergenceResult};
 
 use expr_core::{ExprId, Store};
 

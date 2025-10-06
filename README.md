@@ -1,12 +1,14 @@
 # Symmetrica
 [![CI](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml/badge.svg)](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml)
 
-A lightweight, embeddable symbolic computation engine (CAS) in Rust for symbolic mathematics, calculus, and equation solving.
+**Symmetrica v2.0** is a production-ready symbolic mathematics engine written in Rust, featuring advanced simplification, calculus, summation, and algebraic capabilities.
 
 ## Key Features
 
 - **Symbolic Computation**: Expression manipulation with automatic simplification
 - **Calculus**: Differentiation, integration, series expansion, and limits
+- **Summation**: Symbolic summation of arithmetic and geometric series
+- **Algebraic Capabilities**: Linear algebra, polynomial solving, and rational arithmetic
 - **Equation Solving**: Univariate polynomial solving with exact rational and symbolic roots
 - **Linear Algebra**: Exact matrix operations over rational numbers
 - **Plotting**: SVG visualization of mathematical functions

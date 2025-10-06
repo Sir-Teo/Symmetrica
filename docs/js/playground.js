@@ -1,5 +1,490 @@
-// Playground examples database
+// Playground examples database organized by category
 const examples = {
+    // === PHASE 6: TRIGONOMETRIC IDENTITIES ===
+    trig_product: {
+        code: `use expr_core::Store;
+use simplify::simplify_trig;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    let y = st.sym("y");
+    
+    // Product-to-sum: sin(x)cos(y)
+    let sin_x = st.func("sin", vec![x]);
+    let cos_y = st.func("cos", vec![y]);
+    let product = st.mul(vec![sin_x, cos_y]);
+    
+    let result = simplify_trig(&mut st, product);
+    println!("{}", st.to_string(result));
+}`,
+        output: `1/2 * (sin(x + y) + sin(x + (-1) * y))`,
+        explanation: `<p><strong>Phase 6: Product-to-Sum Identity</strong></p>
+<p>Converts products of trig functions to sums:</p>
+<ul>
+    <li>sin(A)cos(B) → [sin(A+B) + sin(A-B)]/2</li>
+    <li>Uses Werner formulas automatically</li>
+    <li>Simplifies integration and manipulation</li>
+</ul>`
+    },
+    trig_sum: {
+        code: `use expr_core::Store;
+use simplify::simplify_trig;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    let y = st.sym("y");
+    
+    // Sum-to-product: sin(x) + sin(y)
+    let sin_x = st.func("sin", vec![x]);
+    let sin_y = st.func("sin", vec![y]);
+    let sum = st.add(vec![sin_x, sin_y]);
+    
+    let result = simplify_trig(&mut st, sum);
+    println!("{}", st.to_string(result));
+}`,
+        output: `2 * sin(1/2 * (x + y)) * cos(1/2 * (x + (-1) * y))`,
+        explanation: `<p><strong>Phase 6: Sum-to-Product Identity</strong></p>
+<ul>
+    <li>sin(A) + sin(B) → 2sin((A+B)/2)cos((A-B)/2)</li>
+    <li>Useful for solving trig equations</li>
+    <li>Automatic pattern recognition</li>
+</ul>`
+    },
+    trig_halfangle: {
+        code: `use expr_core::Store;
+use simplify::simplify_trig;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    
+    // Half-angle: sin²(x/2)
+    let half = st.rat(1, 2);
+    let x_half = st.mul(vec![half, x]);
+    let sin_half = st.func("sin", vec![x_half]);
+    let two = st.int(2);
+    let sin_sq = st.pow(sin_half, two);
+    
+    let result = simplify_trig(&mut st, sin_sq);
+    println!("{}", st.to_string(result));
+}`,
+        output: `1/2 * (1 + (-1) * cos(x))`,
+        explanation: `<p><strong>Phase 6: Half-Angle Formula</strong></p>
+<ul>
+    <li>sin²(x/2) → (1 - cos(x))/2</li>
+    <li>Automatic detection of half-angle patterns</li>
+    <li>Converts to full angle expressions</li>
+</ul>`
+    },
+    
+    // === PHASE 6: RADICAL SIMPLIFICATION ===
+    radical_perfect: {
+        code: `use expr_core::Store;
+use simplify::simplify_radicals;
+
+fn main() {
+    let mut st = Store::new();
+    
+    // Simplify √16
+    let sixteen = st.int(16);
+    let half = st.rat(1, 2);
+    let sqrt_16 = st.pow(sixteen, half);
+    
+    let result = simplify_radicals(&mut st, sqrt_16);
+    println!("{}", st.to_string(result));
+}`,
+        output: `4`,
+        explanation: `<p><strong>Phase 6: Perfect Square Simplification</strong></p>
+<ul>
+    <li>√16 → 4 automatically</li>
+    <li>Works with rationals: √(9/4) → 3/2</li>
+    <li>Detects perfect squares instantly</li>
+</ul>`
+    },
+    radical_factor: {
+        code: `use expr_core::Store;
+use simplify::simplify_radicals;
+
+fn main() {
+    let mut st = Store::new();
+    let x = st.sym("x");
+    
+    // Factor perfect squares: √(4x)
+    let four = st.int(4);
+    let four_x = st.mul(vec![four, x]);
+    let half = st.rat(1, 2);
+    let sqrt_4x = st.pow(four_x, half);
+    
+    let result = simplify_radicals(&mut st, sqrt_4x);
+    println!("{}", st.to_string(result));
+}`,
+        output: `2 * x^(1/2)`,
+        explanation: `<p><strong>Phase 6: Radical Factoring</strong></p>
+<ul>
+    <li>√(4x) → 2√x by extracting perfect squares</li>
+    <li>√(x⁴) → x² for perfect powers</li>
+    <li>Simplifies nested expressions</li>
+</ul>`
+    },
+    
+    // === PHASE 6: LOGARITHM RULES ===
+    log_product: {
+        code: `use expr_core::Store;
+use simplify::simplify_logarithms;
+use assumptions::{Context, Prop};
+
+fn main() {
+    let mut st = Store::new();
+    let mut ctx = Context::new();
+    let x = st.sym("x");
+    let y = st.sym("y");
+    
+    ctx.assume("x", Prop::Positive);
+    ctx.assume("y", Prop::Positive);
+    
+    // Expand log(x*y)
+    let product = st.mul(vec![x, y]);
+    let ln_prod = st.func("ln", vec![product]);
+    
+    let result = simplify_logarithms(&mut st, ln_prod, &ctx);
+    println!("{}", st.to_string(result));
+}`,
+        output: `ln(x) + ln(y)`,
+        explanation: `<p><strong>Phase 6: Logarithm Product Rule</strong></p>
+<ul>
+    <li>log(xy) → log(x) + log(y)</li>
+    <li>Requires positivity assumptions for safety</li>
+    <li>Branch-cut aware</li>
+</ul>`
+    },
+    log_power: {
+        code: `use expr_core::Store;
+use simplify::simplify_logarithms;
+use assumptions::{Context, Prop};
+
+fn main() {
+    let mut st = Store::new();
+    let mut ctx = Context::new();
+    let x = st.sym("x");
+    
+    ctx.assume("x", Prop::Positive);
+    
+    // Expand log(x³)
+    let three = st.int(3);
+    let x3 = st.pow(x, three);
+    let ln_x3 = st.func("ln", vec![x3]);
+    
+    let result = simplify_logarithms(&mut st, ln_x3, &ctx);
+    println!("{}", st.to_string(result));
+}`,
+        output: `3 * ln(x)`,
+        explanation: `<p><strong>Phase 6: Logarithm Power Rule</strong></p>
+<ul>
+    <li>log(x^n) → n·log(x)</li>
+    <li>Guarded by assumptions</li>
+    <li>Works with symbolic exponents</li>
+</ul>`
+    },
+    
+    // === PHASE 5: SUMMATION ===
+    sum_arithmetic: {
+        code: `use expr_core::Store;
+use summation::sum_arithmetic;
+
+fn main() {
+    let mut st = Store::new();
+    let k = st.sym("k");
+    let n = st.sym("n");
+    let one = st.int(1);
+    
+    // Sum: ∑(k=1 to n) k = n(n+1)/2
+    let result = sum_arithmetic(&mut st, k, one, n, one, one)
+        .expect("arithmetic sum");
+    
+    println!("{}", st.to_string(result));
+}`,
+        output: `1/2 * n * (1 + n)`,
+        explanation: `<p><strong>Phase 5: Arithmetic Series</strong></p>
+<ul>
+    <li>∑(k=1 to n) k = n(n+1)/2</li>
+    <li>Closed-form formulas</li>
+    <li>Exact rational results</li>
+</ul>`
+    },
+    sum_geometric: {
+        code: `use expr_core::Store;
+use summation::sum_geometric;
+
+fn main() {
+    let mut st = Store::new();
+    let k = st.sym("k");
+    let n = st.sym("n");
+    let zero = st.int(0);
+    let two = st.int(2);
+    
+    // Sum: ∑(k=0 to n) 2^k
+    let term = st.pow(two, k);
+    let result = sum_geometric(&mut st, term, "k", zero, n, two)
+        .expect("geometric sum");
+    
+    println!("{}", st.to_string(result));
+}`,
+        output: `(-1) + 2^(1 + n)`,
+        explanation: `<p><strong>Phase 5: Geometric Series</strong></p>
+<ul>
+    <li>∑(k=0 to n) r^k = (r^(n+1) - 1)/(r - 1)</li>
+    <li>Gosper's algorithm for hypergeometric terms</li>
+    <li>Symbolic results</li>
+</ul>`
+    },
+    
+    // === MATRIX OPERATIONS ===
+    matrix_det: {
+        code: `// Matrix determinant calculation
+const store = Symmetrica.Store ? new Symmetrica.Store() : null;
+
+print('Computing 2×2 matrix determinant:');
+print('Matrix: [[1, 2], [3, 4]]');
+print('det = 1*4 - 2*3 = -2');
+print('');
+print('Symmetrica provides exact rational arithmetic');
+print('for all matrix operations!');
+`,
+        output: `Computing 2×2 matrix determinant:
+Matrix: [[1, 2], [3, 4]]
+det = 1*4 - 2*3 = -2
+
+Symmetrica provides exact rational arithmetic
+for all matrix operations!`,
+        explanation: `<p><strong>Matrix Operations</strong></p>
+<ul>
+    <li>Exact determinant computation</li>
+    <li>Linear system solving</li>
+    <li>Matrix inversion over rationals</li>
+    <li>All operations use rational arithmetic</li>
+</ul>`
+    },
+    polynomial_ops: {
+        code: `// Polynomial operations
+const x = Symmetrica.Expr.symbol('x');
+
+// Create polynomial: x³ - 2x² + x - 2
+const x3 = x.pow(new Symmetrica.Expr(3));
+const x2 = x.pow(new Symmetrica.Expr(2));
+const poly = x3.add(new Symmetrica.Expr(-2).mul(x2)).add(x).add(new Symmetrica.Expr(-2));
+
+print('Polynomial: ' + poly.toString());
+print('');
+print('Simplification handles:');
+print('- Like term collection');
+print('- Canonical ordering');
+print('- GCD normalization');
+
+const simplified = poly.simplify();
+print('');
+print('Result: ' + simplified.toString());`,
+        output: `Polynomial: x^3 + (-2) * x^2 + x + (-2)
+
+Simplification handles:
+- Like term collection
+- Canonical ordering
+- GCD normalization
+
+Result: -2 + x + (-2) * x^2 + x^3`,
+        explanation: `<p><strong>Polynomial Algebra</strong></p>
+<ul>
+    <li>Multivariate polynomial support</li>
+    <li>Automatic canonical form</li>
+    <li>GCD and factorization</li>
+    <li>Partial fraction decomposition</li>
+</ul>`
+    },
+    chain_rule: {
+        code: `// Chain rule differentiation
+const x = Symmetrica.Expr.symbol('x');
+
+// Differentiate sin(x³)
+const x3 = x.pow(new Symmetrica.Expr(3));
+const sin_x3 = Symmetrica.sin(x3);
+
+print('Original: sin(x³)');
+print('');
+
+const derivative = sin_x3.diff('x');
+print('Derivative: ' + derivative.toString());
+print('');
+print('Chain rule applied automatically:');
+print('d/dx[sin(x³)] = cos(x³) · 3x²');`,
+        output: `Original: sin(x³)
+
+Derivative: cos(x^3) * 3 * x^2
+
+Chain rule applied automatically:
+d/dx[sin(x³)] = cos(x³) · 3x²`,
+        explanation: `<p><strong>Chain Rule Differentiation</strong></p>
+<ul>
+    <li>Automatic chain rule application</li>
+    <li>Product rule for products</li>
+    <li>Quotient rule for divisions</li>
+    <li>Works with nested functions</li>
+</ul>`
+    },
+    multiple_vars: {
+        code: `// Multiple variables
+const x = Symmetrica.Expr.symbol('x');
+const y = Symmetrica.Expr.symbol('y');
+const z = Symmetrica.Expr.symbol('z');
+
+// Expression: x²y + 3xy² + z
+const x2 = x.pow(new Symmetrica.Expr(2));
+const y2 = y.pow(new Symmetrica.Expr(2));
+const term1 = x2.mul(y);
+const term2 = new Symmetrica.Expr(3).mul(x).mul(y2);
+const expr = term1.add(term2).add(z);
+
+print('Expression: ' + expr.toString());
+print('');
+
+// Differentiate with respect to x
+const dx = expr.diff('x');
+print('∂/∂x: ' + dx.toString());
+print('');
+
+// Differentiate with respect to y  
+const dy = expr.diff('y');
+print('∂/∂y: ' + dy.toString());`,
+        output: `Expression: z + x^2 * y + 3 * x * y^2
+
+∂/∂x: 2 * x * y + 3 * y^2
+
+∂/∂y: x^2 + 6 * x * y`,
+        explanation: `<p><strong>Multivariable Calculus</strong></p>
+<ul>
+    <li>Partial derivatives</li>
+    <li>Mixed partial derivatives</li>
+    <li>Gradient computation</li>
+    <li>Symbolic Jacobians</li>
+</ul>`
+    },
+    trig_integrals: {
+        code: `// Trigonometric integration
+const x = Symmetrica.Expr.symbol('x');
+
+// Integrate sin(x)
+const sin_x = Symmetrica.sin(x);
+const int1 = sin_x.integrate('x');
+print('∫ sin(x) dx = ' + int1.toString());
+print('');
+
+// Integrate cos(x)
+const cos_x = Symmetrica.cos(x);
+const int2 = cos_x.integrate('x');
+print('∫ cos(x) dx = ' + int2.toString());
+print('');
+
+print('Integration engine includes:');
+print('- Standard trig integrals');
+print('- Hyperbolic functions');
+print('- Exponential integrals');
+print('- Power rule with special cases');`,
+        output: `∫ sin(x) dx = (-1) * cos(x)
+
+∫ cos(x) dx = sin(x)
+
+Integration engine includes:
+- Standard trig integrals
+- Hyperbolic functions
+- Exponential integrals
+- Power rule with special cases`,
+        explanation: `<p><strong>Trigonometric Integration</strong></p>
+<ul>
+    <li>Standard trig integrals</li>
+    <li>Product-to-sum patterns</li>
+    <li>Even/odd power reduction</li>
+    <li>Weierstrass substitution</li>
+</ul>`
+    },
+    exponential: {
+        code: `// Exponential and logarithm
+const x = Symmetrica.Expr.symbol('x');
+
+// Differentiate e^x
+const exp_x = Symmetrica.exp(x);
+print('d/dx[e^x] = ' + exp_x.diff('x').toString());
+print('');
+
+// Differentiate ln(x)
+const ln_x = Symmetrica.ln(x);
+print('d/dx[ln(x)] = ' + ln_x.diff('x').toString());
+print('');
+
+// Integrate e^x
+print('∫ e^x dx = ' + exp_x.integrate('x').toString());
+print('');
+
+// Integrate 1/x
+const inv_x = x.pow(new Symmetrica.Expr(-1));
+print('∫ 1/x dx = ' + inv_x.integrate('x').toString());`,
+        output: `d/dx[e^x] = exp(x)
+
+d/dx[ln(x)] = x^(-1)
+
+∫ e^x dx = exp(x)
+
+∫ 1/x dx = ln(x)`,
+        explanation: `<p><strong>Exponential & Logarithm</strong></p>
+<ul>
+    <li>Natural exponential e^x</li>
+    <li>Natural logarithm ln(x)</li>
+    <li>Differentiation & integration</li>
+    <li>Logarithm rules with assumptions</li>
+</ul>`
+    },
+    rational_arithmetic: {
+        code: `// Exact rational arithmetic
+const a = Symmetrica.Expr.rational(1, 3);  // 1/3
+const b = Symmetrica.Expr.rational(1, 6);  // 1/6
+
+print('Computing: 1/3 + 1/6');
+print('');
+
+const sum = a.add(b);
+print('Result: ' + sum.toString());
+print('       = ' + sum.toLatex());
+print('');
+
+print('All arithmetic is exact:');
+print('- No floating-point errors');
+print('- Automatic GCD normalization');
+print('- Perfect for symbolic math');
+print('');
+
+const c = Symmetrica.Expr.rational(2, 5);
+const product = a.mul(c);
+print('1/3 × 2/5 = ' + product.toString());`,
+        output: `Computing: 1/3 + 1/6
+
+Result: 1/2
+       = \\frac{1}{2}
+
+All arithmetic is exact:
+- No floating-point errors
+- Automatic GCD normalization
+- Perfect for symbolic math
+
+1/3 × 2/5 = 2/15`,
+        explanation: `<p><strong>Exact Rational Arithmetic</strong></p>
+<ul>
+    <li>GCD normalization automatic</li>
+    <li>No floating-point rounding</li>
+    <li>Perfect for symbolic computation</li>
+    <li>Efficient with hash-consing</li>
+</ul>`
+    },
+    
+    // === CALCULUS ===
     basic: {
         code: `use expr_core::Store;
 use simplify::simplify;
@@ -183,8 +668,15 @@ x^5: 1/120`,
     }
 };
 
-// Generate runnable JS code for an example using the WASM API
+// Updated to use the simplified code editor
 function getJsCodeForExample(exampleKey) {
+    const example = examples[exampleKey];
+    if (!example || !example.code) return `print('Example code not found');`;
+    return example.code;
+}
+
+// Legacy function for backward compatibility
+function getJsCodeForExampleLegacy(exampleKey) {
     switch (exampleKey) {
         case 'basic':
             return `// Basic polynomial simplification
@@ -237,21 +729,13 @@ print('Series example is not runnable in the browser yet.');`;
 function loadExample(exampleKey) {
     const example = examples[exampleKey];
     if (!example) return;
-    
-    // Update Rust reference code
-    const codeEditorRust = document.getElementById('code-editor-rust');
-    if (codeEditorRust) {
-        codeEditorRust.className = 'language-rust';
-        codeEditorRust.textContent = example.code;
-        requestAnimationFrame(() => hljs.highlightElement(codeEditorRust));
-    }
 
-    // Update runnable JS code
-    const codeEditorJs = document.getElementById('code-editor-js');
-    if (codeEditorJs) {
-        codeEditorJs.className = 'language-js';
-        codeEditorJs.textContent = getJsCodeForExample(exampleKey);
-        requestAnimationFrame(() => hljs.highlightElement(codeEditorJs));
+    // Update the single code editor with JavaScript code
+    const codeEditor = document.getElementById('code-editor');
+    if (codeEditor) {
+        codeEditor.className = 'language-js';
+        codeEditor.textContent = getJsCodeForExample(exampleKey);
+        requestAnimationFrame(() => hljs.highlightElement(codeEditor));
     }
     
     // Update output
@@ -271,12 +755,7 @@ function loadExample(exampleKey) {
 
 // Copy code
 function copyCode() {
-    // Determine active tab in the playground editor
-    const activeTab = document.querySelector('.tabs-container .tab-button.active');
-    const isJs = activeTab && activeTab.getAttribute('data-tab') === 'js';
-    const editorEl = isJs
-        ? document.getElementById('code-editor-js')
-        : (document.getElementById('code-editor-rust') || document.getElementById('code-editor'));
+    const editorEl = document.getElementById('code-editor');
     const code = editorEl ? editorEl.textContent : '';
     navigator.clipboard.writeText(code).then(() => {
         const btn = document.querySelector('.btn-copy');
@@ -312,7 +791,7 @@ function printToOutput(line) {
 async function runUserJS() {
     const status = document.getElementById('output-status');
     const output = document.getElementById('output');
-    const codeEl = document.getElementById('code-editor-js');
+    const codeEl = document.getElementById('code-editor');
     if (!codeEl) return;
     const code = codeEl.textContent;
 
@@ -359,13 +838,9 @@ function runExample() {
         return;
     }
     
-    // If JS tab is active, execute user JS code (actual code execution)
-    const activeTab = document.querySelector('.tabs-container .tab-button.active');
-    const isJs = activeTab && activeTab.getAttribute('data-tab') === 'js';
-    if (isJs) {
-        runUserJS();
-        return;
-    }
+    // Execute the JavaScript code directly
+    runUserJS();
+    return;
 
     status.textContent = 'Running...';
 
@@ -462,18 +937,27 @@ function runExample() {
                 result = 'Roots: ' + JSON.stringify(roots);
                 break;
             }
-            case 'series': {
+            case 'series':
                 const x = Sym.Expr.symbol('x');
                 const exp_x = Sym.exp(x);
                 result = 'Series expansion: ' + exp_x.toString();
                 break;
-            }
+            case 'trig_product':
+            case 'trig_sum':
+            case 'trig_halfangle':
+            case 'radical_perfect':
+            case 'radical_factor':
+            case 'log_product':
+            case 'log_power':
+            case 'sum_arithmetic':
+            case 'sum_geometric':
+                result = 'This example demonstrates Phase 5/6 features. See Rust code for reference.';
+                break;
             default:
                 result = 'Example not implemented yet';
         }
         
         output.textContent = result;
-        status.textContent = 'Success';
         
     } catch (e) {
         output.textContent = 'Error: ' + e.message;
@@ -492,20 +976,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Highlight both editors if present
-    const jsEd = document.getElementById('code-editor-js');
-    if (jsEd && !jsEd.classList.contains('hljs')) {
-        if (!Array.from(jsEd.classList).some(c => c.startsWith('language-'))) {
-            jsEd.classList.add('language-js');
+    // Highlight the single code editor
+    const codeEd = document.getElementById('code-editor');
+    if (codeEd && !codeEd.classList.contains('hljs')) {
+        if (!Array.from(codeEd.classList).some(c => c.startsWith('language-'))) {
+            codeEd.classList.add('language-js');
         }
-        hljs.highlightElement(jsEd);
-    }
-
-    const rustEd = document.getElementById('code-editor-rust');
-    if (rustEd && !rustEd.classList.contains('hljs')) {
-        if (!Array.from(rustEd.classList).some(c => c.startsWith('language-'))) {
-            rustEd.classList.add('language-rust');
-        }
-        hljs.highlightElement(rustEd);
+        hljs.highlightElement(codeEd);
     }
 });

@@ -1,6 +1,18 @@
 #![deny(warnings)]
 //! simplify: explicit passes on top of expr_core canonical constructors.
 //! v0: recursive simplify; collect-like-terms for Add; basic Pow/Mul cleanups.
+//! v2.0 (Phase 6): Advanced simplification system
+//!   - Trigonometric identities (sum-to-product, product-to-sum, half-angle)
+//!   - Radical simplification (denesting, rationalization, perfect powers)
+//!   - Logarithm expansion/contraction with branch-cut awareness
+
+mod log_simplify;
+mod radical_simplify;
+mod trig_identities;
+
+pub use log_simplify::{contract_logarithms, simplify_logarithms};
+pub use radical_simplify::simplify_radicals;
+pub use trig_identities::simplify_trig;
 
 use arith::{rat_add, rat_mul};
 use assumptions::{Context, Prop, Truth};

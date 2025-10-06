@@ -4,7 +4,7 @@
 
 use crate::hypergeometric::rationalize_hypergeometric;
 use expr_core::{ExprId, Store};
-use polys::{expr_to_unipoly, UniPoly};
+use polys::expr_to_unipoly;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConvergenceResult {
@@ -12,7 +12,6 @@ pub enum ConvergenceResult {
     Divergent,
     Inconclusive,
 }
-
 /// Ratio test using lim_{k->∞} |a_{k+1}/a_k| for hypergeometric terms a_k
 ///
 /// If limit L < 1 -> Convergent
@@ -21,31 +20,32 @@ pub enum ConvergenceResult {
 pub fn ratio_test(store: &mut Store, term: ExprId, var: &str) -> Option<ConvergenceResult> {
     // First try general hypergeometric rationalization
     if let Some((p, q)) = rationalize_hypergeometric(store, term, var) {
-        if let (Some(p_poly), Some(q_poly)) = (expr_to_unipoly(store, p, var), expr_to_unipoly(store, q, var)) {
+        if let (Some(p_poly), Some(q_poly)) =
+            (expr_to_unipoly(store, p, var), expr_to_unipoly(store, q, var))
+        {
+            let dp = p_poly.degree().unwrap_or(0);
+            let dq = q_poly.degree().unwrap_or(0);
 
-        let dp = p_poly.degree().unwrap_or(0);
-        let dq = q_poly.degree().unwrap_or(0);
-
-        if dp < dq {
-            return Some(ConvergenceResult::Convergent);
-        }
-        if dp > dq {
-            return Some(ConvergenceResult::Divergent);
-        }
-        let lp = p_poly.leading_coeff();
-        let lq = q_poly.leading_coeff();
-        if lq.is_zero() {
-            return None;
-        }
-        let ap = (lp.0 as i128).abs() * (lq.1 as i128);
-        let aq = (lq.0 as i128).abs() * (lp.1 as i128);
-        return if ap < aq {
-            Some(ConvergenceResult::Convergent)
-        } else if ap > aq {
-            Some(ConvergenceResult::Divergent)
-        } else {
-            Some(ConvergenceResult::Inconclusive)
-        };
+            if dp < dq {
+                return Some(ConvergenceResult::Convergent);
+            }
+            if dp > dq {
+                return Some(ConvergenceResult::Divergent);
+            }
+            let lp = p_poly.leading_coeff();
+            let lq = q_poly.leading_coeff();
+            if lq.is_zero() {
+                return None;
+            }
+            let ap = (lp.0 as i128).abs() * (lq.1 as i128);
+            let aq = (lq.0 as i128).abs() * (lp.1 as i128);
+            return if ap < aq {
+                Some(ConvergenceResult::Convergent)
+            } else if ap > aq {
+                Some(ConvergenceResult::Divergent)
+            } else {
+                Some(ConvergenceResult::Inconclusive)
+            };
         }
         // Fallback to pow-case on the original term if p/q not convertible to polynomials
         // (e.g., geometric series ratio)
@@ -55,20 +55,29 @@ pub fn ratio_test(store: &mut Store, term: ExprId, var: &str) -> Option<Converge
             if ch.len() == 2 {
                 let base = ch[0];
                 let exp = ch[1];
-                if let (Op::Symbol, Payload::Sym(s)) = (&store.get(exp).op, &store.get(exp).payload) {
+                if let (Op::Symbol, Payload::Sym(s)) = (&store.get(exp).op, &store.get(exp).payload)
+                {
                     if s == var {
                         match (&store.get(base).op, &store.get(base).payload) {
                             (Op::Integer, Payload::Int(n)) => {
                                 let an = (*n as i128).abs();
-                                if an < 1 { return Some(ConvergenceResult::Convergent); }
-                                if an > 1 { return Some(ConvergenceResult::Divergent); }
+                                if an < 1 {
+                                    return Some(ConvergenceResult::Convergent);
+                                }
+                                if an > 1 {
+                                    return Some(ConvergenceResult::Divergent);
+                                }
                                 return Some(ConvergenceResult::Inconclusive);
                             }
                             (Op::Rational, Payload::Rat(n, d)) => {
                                 let an = (*n as i128).abs();
                                 let ad = (*d as i128).abs().max(1);
-                                if an < ad { return Some(ConvergenceResult::Convergent); }
-                                if an > ad { return Some(ConvergenceResult::Divergent); }
+                                if an < ad {
+                                    return Some(ConvergenceResult::Convergent);
+                                }
+                                if an > ad {
+                                    return Some(ConvergenceResult::Divergent);
+                                }
                                 return Some(ConvergenceResult::Inconclusive);
                             }
                             _ => {}
@@ -93,15 +102,23 @@ pub fn ratio_test(store: &mut Store, term: ExprId, var: &str) -> Option<Converge
                     match (&store.get(base).op, &store.get(base).payload) {
                         (Op::Integer, Payload::Int(n)) => {
                             let an = (*n as i128).abs();
-                            if an < 1 { return Some(ConvergenceResult::Convergent); }
-                            if an > 1 { return Some(ConvergenceResult::Divergent); }
+                            if an < 1 {
+                                return Some(ConvergenceResult::Convergent);
+                            }
+                            if an > 1 {
+                                return Some(ConvergenceResult::Divergent);
+                            }
                             return Some(ConvergenceResult::Inconclusive);
                         }
                         (Op::Rational, Payload::Rat(n, d)) => {
                             let an = (*n as i128).abs();
                             let ad = (*d as i128).abs().max(1);
-                            if an < ad { return Some(ConvergenceResult::Convergent); }
-                            if an > ad { return Some(ConvergenceResult::Divergent); }
+                            if an < ad {
+                                return Some(ConvergenceResult::Convergent);
+                            }
+                            if an > ad {
+                                return Some(ConvergenceResult::Divergent);
+                            }
                             return Some(ConvergenceResult::Inconclusive);
                         }
                         _ => {}

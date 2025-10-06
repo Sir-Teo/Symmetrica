@@ -33,8 +33,9 @@
                     <span class="gradient-text">Reimagined in Rust</span>
                 </h1>
                 <p class="hero-subtitle">
-                    A lightweight, embeddable CAS with exact arithmetic, powerful simplification, 
-                    and comprehensive calculus support. Built for safety, performance, and determinism.
+                    A production-ready CAS with advanced simplification, symbolic summation, 
+                    and comprehensive calculus. <strong>v2.0 now features Phase 5 & 6</strong>: 
+                    trig identities, radical simplification, logarithm rules, and Gosper/Zeilberger algorithms.
                 </p>
                 <div class="hero-buttons">
                     <a href="getting-started.html" class="btn btn-primary">Get Started</a>
@@ -42,12 +43,12 @@
                 </div>
                 <div class="hero-stats">
                     <div class="stat">
-                        <div class="stat-value">714+</div>
+                        <div class="stat-value">780+</div>
                         <div class="stat-label">Tests Passing</div>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">89.8%</div>
-                        <div class="stat-label">Code Coverage</div>
+                        <div class="stat-value">v2.0</div>
+                        <div class="stat-label">Phase 5 & 6 Complete</div>
                     </div>
                     <div class="stat">
                         <div class="stat-value">Zero</div>
@@ -172,6 +173,56 @@ println!("{}", st.to_string(simplified));
                         <li>Model interpretability</li>
                     </ul>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));">
+        <div class="container">
+            <h2 class="section-title">🎉 New in v2.0: Phase 5 & 6</h2>
+            <p class="section-subtitle" style="max-width: 800px; margin: 0 auto 3rem;">Advanced simplification and symbolic summation capabilities</p>
+            <div class="features-grid" style="margin-bottom: 4rem;">
+                <div class="feature-card" style="border: 2px solid var(--primary);">
+                    <div class="feature-icon">↔</div>
+                    <h3>Trig Identities</h3>
+                    <p>Product-to-sum, sum-to-product, and half-angle formulas. Automatic pattern recognition.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">sin(x)cos(y) → [sin(x+y) + sin(x-y)]/2</code>
+                </div>
+                <div class="feature-card" style="border: 2px solid var(--primary);">
+                    <div class="feature-icon">√</div>
+                    <h3>Radical Simplification</h3>
+                    <p>Perfect squares, denesting (Ramanujan), rationalization. Automatic factoring.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">√(4x) → 2√x, √16 → 4</code>
+                </div>
+                <div class="feature-card" style="border: 2px solid var(--primary);">
+                    <div class="feature-icon">log</div>
+                    <h3>Logarithm Rules</h3>
+                    <p>Branch-cut aware expansion with assumptions. Safe transformations only.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">log(xy) → log(x) + log(y) [when x,y > 0]</code>
+                </div>
+                <div class="feature-card" style="border: 2px solid var(--success);">
+                    <div class="feature-icon">Σ</div>
+                    <h3>Symbolic Summation</h3>
+                    <p>Gosper & Zeilberger algorithms. Closed-form solutions for series.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">∑(k=1..n) k = n(n+1)/2</code>
+                </div>
+                <div class="feature-card" style="border: 2px solid var(--success);">
+                    <div class="feature-icon">∏</div>
+                    <h3>Infinite Products</h3>
+                    <p>Factorial evaluation, Gamma function connections. Pochhammer symbols.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">∏(k=1..n) k = n!</code>
+                </div>
+                <div class="feature-card" style="border: 2px solid var(--success);">
+                    <div class="feature-icon">∞</div>
+                    <h3>Convergence Tests</h3>
+                    <p>Ratio test for hypergeometric series. Automatic convergence determination.</p>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 0.85rem;">∑ (1/2)^k → Convergent</code>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-bottom: 3rem;">
+                <a href="phase6-examples.html" class="btn btn-primary" style="margin-right: 1rem;">Phase 6 Examples →</a>
+                <a href="phase5-examples.html" class="btn btn-primary">Phase 5 Examples →</a>
             </div>
         </div>
     </section>

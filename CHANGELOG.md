@@ -2,11 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on Keep a Changelog (https://keepachangelog.com/en/1.0.0/) and this project adheres to Semantic Versioning.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.1.0] - In Progress
+## [2.0.0] - 2025-10-06
+### Added - Phase 6: Enhanced Simplification
+- **Trigonometric Identities Module** (`simplify/src/trig_identities.rs`):
+  - Product-to-sum: `sin(A)cos(B) → [sin(A+B) + sin(A-B)]/2`
+  - Sum-to-product: `sin(A) + sin(B) → 2sin((A+B)/2)cos((A-B)/2)`
+  - Half-angle formulas: `sin²(x/2) → (1 - cos(x))/2`
+  - 30 comprehensive tests (14 unit + 16 integration)
+- **Radical Simplification Module** (`simplify/src/radical_simplify.rs`):
+  - Perfect square detection: `√4 → 2`, `√(4/9) → 2/3`
+  - Perfect power simplification: `√(x⁴) → x²`
+  - Factoring: `√(4x) → 2√x`
+  - Ramanujan's denesting algorithm for nested radicals
+  - Denominator rationalization: `1/√x → √x/x`
+  - 17 comprehensive tests (5 unit + 12 integration)
+- **Logarithm Expansion Module** (`simplify/src/log_simplify.rs`):
+  - Product rule: `log(xy) → log(x) + log(y)` [assumption-guarded]
+  - Power rule: `log(x^n) → n·log(x)` [assumption-guarded]
+  - Quotient rule: `log(x/y) → log(x) - log(y)` [assumption-guarded]
+  - Logarithm contraction: `log(x) + log(y) → log(xy)`
+  - Branch-cut aware transformations with assumptions context
+  - 18 comprehensive tests (5 unit + 13 integration)
+- **Phase 6 Summary**:
+  - 3 new modules (~1200 lines production code)
+  - 104 total tests in simplify crate (100% passing)
+  - Public API: `simplify_trig`, `simplify_radicals`, `simplify_logarithms`, `contract_logarithms`
+
+### Added - Phase 5: Symbolic Summation (Completed)
+- **Infinite Products Module** (`summation/src/products.rs`):
+  - Finite product evaluation: `∏(k=1..n) k = n!`
+  - Geometric products: `∏(k=0..n) r^k = r^(n(n+1)/2)`
+  - Gamma function connection: `∏(k=0..n-1) (x+k) = Γ(x+n)/Γ(x)`
+  - 3 comprehensive tests
+
+## [1.4.0] - 2025-10-06 - Phase 5 Complete
+### Added
+- **Symbolic Summation Complete** (`crates/summation`):
+  - Gosper's algorithm for hypergeometric summation
+  - Zeilberger's algorithm for creative telescoping
+  - Basic sums: arithmetic, geometric, power sums
+  - Convergence tests: ratio test
+  - Pochhammer symbols and factorial operations
+  - Infinite products with Gamma function connections
+  - 59 comprehensive tests across all modules
+
+## [1.1.0] - 2025-10-05
 ### Added
 - **Hyperbolic Functions (v1.1):**
   - Differentiation: `d/dx sinh(u) = cosh(u) * u'`, `d/dx cosh(u) = sinh(u) * u'`, `d/dx tanh(u) = (1 - tanh²(u)) * u'`

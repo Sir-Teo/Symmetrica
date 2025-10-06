@@ -41,7 +41,10 @@ pub fn zeilberger_recurrence(
             let base = ch[0];
             let exp = ch[1];
             if let (Op::Symbol, Payload::Sym(s)) = (&store.get(exp).op, &store.get(exp).payload) {
-                if s == sum_var && !depends_on_var(store, base, sum_var) && !depends_on_var(store, base, param_var) {
+                if s == sum_var
+                    && !depends_on_var(store, base, sum_var)
+                    && !depends_on_var(store, base, param_var)
+                {
                     let neg_one = store.int(-1);
                     let one = store.int(1);
                     let a0 = neg_one;
@@ -53,7 +56,11 @@ pub fn zeilberger_recurrence(
                     let rhs = store.pow(base, n_plus_1);
 
                     let zero = store.int(0);
-                    return Some(Certificate { rational_cert: zero, coefficients: coeffs, inhom_term: Some(rhs) });
+                    return Some(Certificate {
+                        rational_cert: zero,
+                        coefficients: coeffs,
+                        inhom_term: Some(rhs),
+                    });
                 }
             }
         }
@@ -68,10 +75,14 @@ pub fn zeilberger_recurrence(
             match store.get(c).op {
                 Op::Function => {
                     if let Payload::Func(ref fname) = store.get(c).payload {
-                        if fname == "binom" || fname == "C" { bin_idx = Some(i); }
+                        if fname == "binom" || fname == "C" {
+                            bin_idx = Some(i);
+                        }
                     }
                 }
-                Op::Pow => { pow_idx = Some(i); }
+                Op::Pow => {
+                    pow_idx = Some(i);
+                }
                 _ => {}
             }
         }
@@ -88,7 +99,12 @@ pub fn zeilberger_recurrence(
                 let k_ok = matches!((&store.get(k_arg).op, &store.get(k_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == sum_var);
                 let n_ok = matches!((&store.get(n_arg).op, &store.get(n_arg).payload), (Op::Symbol, Payload::Sym(s)) if s == param_var);
                 let e_ok = matches!((&store.get(e).op, &store.get(e).payload), (Op::Symbol, Payload::Sym(s)) if s == sum_var);
-                if k_ok && n_ok && e_ok && !depends_on_var(store, r, sum_var) && !depends_on_var(store, r, param_var) {
+                if k_ok
+                    && n_ok
+                    && e_ok
+                    && !depends_on_var(store, r, sum_var)
+                    && !depends_on_var(store, r, param_var)
+                {
                     let one = store.int(1);
                     let a1 = one;
                     let one_plus_r = store.add(vec![one, r]);
@@ -102,7 +118,11 @@ pub fn zeilberger_recurrence(
                     let inv = store.pow(denom, neg_one);
                     let neg_k = store.mul(vec![neg_one, ksym]);
                     let rat_cert = store.mul(vec![neg_k, inv]);
-                    return Some(Certificate { rational_cert: rat_cert, coefficients: vec![a0, a1], inhom_term: None });
+                    return Some(Certificate {
+                        rational_cert: rat_cert,
+                        coefficients: vec![a0, a1],
+                        inhom_term: None,
+                    });
                 }
             }
         }
@@ -110,7 +130,10 @@ pub fn zeilberger_recurrence(
 
     // Binomial: F(n,k) = binom(n,k)
     if let Op::Function = store.get(term).op {
-        let fname = match &store.get(term).payload { Payload::Func(s) => s.clone(), _ => String::new() };
+        let fname = match &store.get(term).payload {
+            Payload::Func(s) => s.clone(),
+            _ => String::new(),
+        };
         if fname == "binom" || fname == "C" {
             let ch = store.get(term).children.clone();
             if ch.len() == 2 {
@@ -132,7 +155,11 @@ pub fn zeilberger_recurrence(
                     let inv = store.pow(denom, neg_one);
                     let neg_k = store.mul(vec![neg_one, ksym]);
                     let rat_cert = store.mul(vec![neg_k, inv]);
-                    return Some(Certificate { rational_cert: rat_cert, coefficients: vec![a0, a1], inhom_term: None });
+                    return Some(Certificate {
+                        rational_cert: rat_cert,
+                        coefficients: vec![a0, a1],
+                        inhom_term: None,
+                    });
                 }
             }
         }
