@@ -177,6 +177,32 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                     let inv_denom = store.pow(one_plus_u_sq, minus_one);
                     store.mul(vec![du, inv_denom])
                 }
+                // Special functions (Phase 3)
+                "Gamma" => {
+                    // d/dx Gamma(u) = Gamma(u) * Digamma(u) * u'
+                    let gamma_u = store.func("Gamma", vec![u]);
+                    let digamma_u = store.func("Digamma", vec![u]);
+                    store.mul(vec![gamma_u, digamma_u, du])
+                }
+                "erf" => {
+                    // d/dx erf(u) = (2/√π) * exp(-u²) * u'
+                    let sqrt_pi = std::f64::consts::PI.sqrt();
+                    let coeff =
+                        store.rat((2.0 * 1_000_000.0) as i64, (sqrt_pi * 1_000_000.0) as i64);
+                    let two = store.int(2);
+                    let u_sq = store.pow(u, two);
+                    let neg_one = store.int(-1);
+                    let neg_u_sq = store.mul(vec![neg_one, u_sq]);
+                    let exp_term = store.func("exp", vec![neg_u_sq]);
+                    store.mul(vec![coeff, exp_term, du])
+                }
+                "Ei" => {
+                    // d/dx Ei(u) = exp(u) / u * u'
+                    let exp_u = store.func("exp", vec![u]);
+                    let minus_one = store.int(-1);
+                    let u_inv = store.pow(u, minus_one);
+                    store.mul(vec![exp_u, u_inv, du])
+                }
                 _ => store.int(0),
             };
             simplify(store, out)
@@ -439,6 +465,42 @@ mod tests {
         // d/dx(tanh(x)) = 1 - tanh^2(x)
         let result = st.to_string(d);
         assert!(result.contains("tanh"));
+    }
+
+    // Special function differentiation tests (Phase 3)
+    #[test]
+    fn diff_gamma() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let gamma_x = st.func("Gamma", vec![x]);
+        let d = diff(&mut st, gamma_x, "x");
+        // d/dx Gamma(x) = Gamma(x) * Digamma(x)
+        let result = st.to_string(d);
+        assert!(result.contains("Gamma"));
+        assert!(result.contains("Digamma"));
+    }
+
+    #[test]
+    fn diff_erf() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let erf_x = st.func("erf", vec![x]);
+        let d = diff(&mut st, erf_x, "x");
+        // d/dx erf(x) = (2/√π) * exp(-x²)
+        let result = st.to_string(d);
+        assert!(result.contains("exp"));
+    }
+
+    #[test]
+    fn diff_ei() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let ei_x = st.func("Ei", vec![x]);
+        let d = diff(&mut st, ei_x, "x");
+        // d/dx Ei(x) = exp(x) / x
+        let result = st.to_string(d);
+        assert!(result.contains("exp"));
+        assert!(result.contains("x"));
     }
 
     #[test]

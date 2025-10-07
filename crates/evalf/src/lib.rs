@@ -313,6 +313,31 @@ fn eval_function(
             Ok(max_val)
         }
 
+        // Special functions (Phase 3)
+        "Gamma" => {
+            check_arity(name, args, 1)?;
+            let x = eval_recursive(store, args[0], ctx)?;
+            let gamma_func = special::gamma::GammaFunction;
+            special::SpecialFunction::eval(&gamma_func, &[x])
+                .ok_or_else(|| EvalError::DomainError(format!("Gamma({}) not computable", x)))
+        }
+
+        "erf" => {
+            check_arity(name, args, 1)?;
+            let x = eval_recursive(store, args[0], ctx)?;
+            let erf_func = special::erf::ErfFunction;
+            special::SpecialFunction::eval(&erf_func, &[x])
+                .ok_or_else(|| EvalError::DomainError(format!("erf({}) not computable", x)))
+        }
+
+        "Ei" => {
+            check_arity(name, args, 1)?;
+            let x = eval_recursive(store, args[0], ctx)?;
+            let ei_func = special::expint::EiFunction;
+            special::SpecialFunction::eval(&ei_func, &[x])
+                .ok_or_else(|| EvalError::DomainError(format!("Ei({}) not computable", x)))
+        }
+
         _ => Err(EvalError::UnknownFunction(name.to_string())),
     }
 }
@@ -810,5 +835,48 @@ mod tests {
         let expr = st.func("atan2", vec![one]);
         let ctx = EvalContext::new();
         assert!(matches!(eval(&st, expr, &ctx), Err(EvalError::DomainError(_))));
+    }
+
+    // Special function tests (Phase 3)
+    #[test]
+    fn eval_gamma_at_one() {
+        let mut st = Store::new();
+        let one = st.int(1);
+        let gamma_1 = st.func("Gamma", vec![one]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, gamma_1, &ctx).unwrap();
+        assert_eq!(result, 1.0);
+    }
+
+    #[test]
+    fn eval_gamma_at_half() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let gamma_half = st.func("Gamma", vec![half]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, gamma_half, &ctx).unwrap();
+        // Γ(1/2) = √π
+        assert!((result - std::f64::consts::PI.sqrt()).abs() < 1e-10);
+    }
+
+    #[test]
+    fn eval_erf_at_zero() {
+        let mut st = Store::new();
+        let zero = st.int(0);
+        let erf_0 = st.func("erf", vec![zero]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, erf_0, &ctx).unwrap();
+        assert_eq!(result, 0.0);
+    }
+
+    #[test]
+    fn eval_erf_small_value() {
+        let mut st = Store::new();
+        let half = st.rat(1, 2);
+        let erf_half = st.func("erf", vec![half]);
+        let ctx = EvalContext::new();
+        let result = eval(&st, erf_half, &ctx).unwrap();
+        // erf(0.5) ≈ 0.5205
+        assert!((result - 0.5205).abs() < 0.001);
     }
 }

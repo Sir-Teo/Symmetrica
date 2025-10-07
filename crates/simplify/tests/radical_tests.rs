@@ -94,7 +94,8 @@ fn test_factor_perfect_square_9y() {
 
 #[test]
 fn test_perfect_power_x_to_4() {
-    // √(x^4) → x^2
+    // √(x^4) requires domain assumptions, so simplify_radicals leaves it unchanged
+    // Use full simplify() with assumptions for this transformation
     let mut st = Store::new();
     let x = st.sym("x");
     let four = st.int(4);
@@ -102,21 +103,17 @@ fn test_perfect_power_x_to_4() {
     let half = st.rat(1, 2);
     let sqrt_x4 = st.pow(x4, half);
 
+    // Without assumptions, simplify_radicals should not simplify symbolic powers
     let result = simplify_radicals(&mut st, sqrt_x4);
 
-    // Should be x^2
-    assert_eq!(st.get(result).op, Op::Pow);
-    let pow_children = &st.get(result).children;
-    assert_eq!(pow_children[0], x);
-    assert!(matches!(
-        (&st.get(pow_children[1]).op, &st.get(pow_children[1]).payload),
-        (Op::Integer, Payload::Int(2))
-    ));
+    // Should remain unchanged (domain-aware simplification requires assumptions)
+    assert_eq!(st.to_string(result), st.to_string(sqrt_x4));
 }
 
 #[test]
 fn test_perfect_power_x_to_6() {
-    // √(x^6) → x^3
+    // √(x^6) requires domain assumptions, so simplify_radicals leaves it unchanged
+    // Use full simplify() with assumptions for this transformation
     let mut st = Store::new();
     let x = st.sym("x");
     let six = st.int(6);
@@ -124,15 +121,11 @@ fn test_perfect_power_x_to_6() {
     let half = st.rat(1, 2);
     let sqrt_x6 = st.pow(x6, half);
 
+    // Without assumptions, simplify_radicals should not simplify symbolic powers
     let result = simplify_radicals(&mut st, sqrt_x6);
 
-    // Should be x^3
-    assert_eq!(st.get(result).op, Op::Pow);
-    let pow_children = &st.get(result).children;
-    assert!(matches!(
-        (&st.get(pow_children[1]).op, &st.get(pow_children[1]).payload),
-        (Op::Integer, Payload::Int(3))
-    ));
+    // Should remain unchanged (domain-aware simplification requires assumptions)
+    assert_eq!(st.to_string(result), st.to_string(sqrt_x6));
 }
 
 #[test]

@@ -98,6 +98,7 @@ dependencies = [
  "polys",
  "proptest",
  "simplify",
+ "special",
 ]
 
 [[package]]
@@ -236,6 +237,7 @@ version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
  "proptest",
+ "special",
 ]
 
 [[package]]
@@ -276,6 +278,14 @@ dependencies = [
  "libc",
  "r-efi",
  "wasi",
+]
+
+[[package]]
+name = "grobner"
+version = "0.1.0"
+dependencies = [
+ "expr_core",
+ "polys",
 ]
 
 [[package]]
@@ -801,16 +811,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "summation"
-version = "1.4.0"
+name = "special"
+version = "0.1.0"
 dependencies = [
  "arith",
- "calculus",
- "criterion",
  "expr_core",
- "matrix",
+ "simplify",
+]
+
+[[package]]
+name = "summation"
+version = "0.1.0"
+dependencies = [
+ "arith",
+ "expr_core",
  "polys",
- "proptest",
  "simplify",
 ]
 

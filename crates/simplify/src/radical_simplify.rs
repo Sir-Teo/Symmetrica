@@ -16,11 +16,63 @@ use expr_core::{ExprId, Op, Payload, Store};
 /// - Rationalization: 1/√x → √x/x
 /// - Combined radicals: √2 + √2 → 2√2
 pub fn simplify_radicals(store: &mut Store, expr: ExprId) -> ExprId {
-    match &store.get(expr).op {
-        Op::Pow => try_simplify_radical_power(store, expr),
-        Op::Mul => try_rationalize_denominator(store, expr).unwrap_or(expr),
-        Op::Add => try_combine_like_radicals(store, expr),
+    // First recurse into children
+    let expr_after_children = match store.get(expr).op {
+        Op::Add | Op::Mul => {
+            let children = store.get(expr).children.clone();
+            let simplified_children: Vec<ExprId> =
+                children.iter().map(|&c| simplify_radicals(store, c)).collect::<Vec<_>>();
+
+            // Early exit if children unchanged
+            if simplified_children.iter().zip(children.iter()).all(|(a, b)| a == b) {
+                expr
+            } else {
+                match store.get(expr).op {
+                    Op::Add => store.add(simplified_children),
+                    Op::Mul => store.mul(simplified_children),
+                    _ => unreachable!(),
+                }
+            }
+        }
+        Op::Pow => {
+            let children = store.get(expr).children.clone();
+            let base = simplify_radicals(store, children[0]);
+            let exp = simplify_radicals(store, children[1]);
+
+            // Early exit if unchanged
+            if base == children[0] && exp == children[1] {
+                expr
+            } else {
+                store.pow(base, exp)
+            }
+        }
+        Op::Function => {
+            let name = match &store.get(expr).payload {
+                Payload::Func(s) => s.clone(),
+                _ => return expr,
+            };
+            let children = store.get(expr).children.clone();
+            let simplified_children: Vec<ExprId> =
+                children.iter().map(|&c| simplify_radicals(store, c)).collect::<Vec<_>>();
+
+            // Early exit if children unchanged
+            if simplified_children.iter().zip(children.iter()).all(|(a, b)| a == b) {
+                expr
+            } else {
+                store.func(name, simplified_children)
+            }
+        }
         _ => expr,
+    };
+
+    // Then apply radical simplification at this level
+    match &store.get(expr_after_children).op {
+        Op::Pow => try_simplify_radical_power(store, expr_after_children),
+        Op::Mul => {
+            try_rationalize_denominator(store, expr_after_children).unwrap_or(expr_after_children)
+        }
+        Op::Add => try_combine_like_radicals(store, expr_after_children),
+        _ => expr_after_children,
     }
 }
 
@@ -78,21 +130,12 @@ fn try_perfect_square(store: &mut Store, base: ExprId) -> Option<ExprId> {
             None
         }
         // Check for perfect power: (x^2)^(1/2) → x
+        // NOTE: This simplification requires domain assumptions (x ≥ 0)
+        // and is handled in the main simplifier with assumption-aware logic.
+        // We don't simplify symbolic powers here to avoid incorrect transformations.
         (Op::Pow, _) => {
-            let pow_children = store.get(base).children.clone();
-            if pow_children.len() == 2 {
-                let pow_base = pow_children[0];
-                let pow_exp = pow_children[1];
-                // If exponent is even, √(x^(2k)) → x^k
-                if let (Op::Integer, Payload::Int(exp_val)) =
-                    (&store.get(pow_exp).op, &store.get(pow_exp).payload)
-                {
-                    if exp_val % 2 == 0 {
-                        let new_exp = store.int(exp_val / 2);
-                        return Some(store.pow(pow_base, new_exp));
-                    }
-                }
-            }
+            // Disabled: requires domain assumptions
+            // Only numerical perfect powers are safe to simplify without assumptions
             None
         }
         _ => None,

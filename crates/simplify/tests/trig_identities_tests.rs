@@ -287,3 +287,49 @@ fn test_idempotency() {
     // Should be idempotent (or at least not crash)
     assert_eq!(st.get(result2).op, Op::Mul);
 }
+
+#[test]
+fn test_nested_expression_traversal() {
+    // Test that simplify_trig recursively traverses nested expressions
+    // (sin(x) + sin(y)) * 2 should simplify the inner sum
+    let mut st = Store::new();
+    let x = st.sym("x");
+    let y = st.sym("y");
+    let sinx = st.func("sin", vec![x]);
+    let siny = st.func("sin", vec![y]);
+    let sum = st.add(vec![sinx, siny]);
+    let two = st.int(2);
+    let nested = st.mul(vec![sum, two]);
+
+    let result = simplify_trig(&mut st, nested);
+
+    // The inner sum should be simplified to a product (sum-to-product)
+    // Result structure: (2 * sin((x+y)/2) * cos((x-y)/2)) * 2
+    assert_eq!(st.get(result).op, Op::Mul);
+    let result_str = st.to_string(result);
+    // Should contain simplified trig functions
+    assert!(result_str.contains("sin") || result_str.contains("cos"));
+}
+
+#[test]
+fn test_deeply_nested_expression() {
+    // Test multiple levels of nesting
+    // ((sin(x) * cos(y)) + 3)
+    let mut st = Store::new();
+    let x = st.sym("x");
+    let y = st.sym("y");
+    let sinx = st.func("sin", vec![x]);
+    let cosy = st.func("cos", vec![y]);
+    let product = st.mul(vec![sinx, cosy]);
+    let three = st.int(3);
+    let sum = st.add(vec![product, three]);
+
+    let result = simplify_trig(&mut st, sum);
+
+    // The inner product should be simplified (product-to-sum)
+    assert_eq!(st.get(result).op, Op::Add);
+    let result_str = st.to_string(result);
+    // Should still contain 3 and have simplified trig
+    assert!(result_str.contains("3"));
+    assert!(result_str.contains("sin"));
+}

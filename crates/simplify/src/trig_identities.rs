@@ -13,18 +13,72 @@ use expr_core::{ExprId, Op, Payload, Store};
 
 /// Apply advanced trigonometric simplification rules to an expression
 ///
-/// This function tries to apply advanced trig identities:
+/// This function recursively traverses the expression tree and tries to apply
+/// advanced trig identities:
 /// - Product-to-sum: sin A cos B → (sin(A+B) + sin(A-B))/2
 /// - Sum-to-product: sin A + sin B → 2 sin((A+B)/2) cos((A-B)/2)
 /// - Half-angle detection and simplification
 ///
 /// Returns the simplified expression, or the original if no rules apply.
 pub fn simplify_trig(store: &mut Store, expr: ExprId) -> ExprId {
-    match &store.get(expr).op {
-        Op::Add => try_sum_to_product(store, expr),
-        Op::Mul => try_product_to_sum(store, expr),
-        Op::Pow => try_half_angle_expansion(store, expr),
+    // First recurse into children
+    let expr_after_children = match store.get(expr).op {
+        Op::Add | Op::Mul => {
+            let children = store.get(expr).children.clone();
+            let simplified_children: Vec<ExprId> =
+                children.iter().map(|&c| simplify_trig(store, c)).collect();
+
+            // Early exit if children unchanged
+            if simplified_children.iter().zip(children.iter()).all(|(a, b)| a == b) {
+                expr
+            } else {
+                match store.get(expr).op {
+                    Op::Add => store.add(simplified_children),
+                    Op::Mul => store.mul(simplified_children),
+                    _ => unreachable!(),
+                }
+            }
+        }
+        Op::Pow => {
+            let children = store.get(expr).children.clone();
+            if children.len() != 2 {
+                return expr;
+            }
+            let base = simplify_trig(store, children[0]);
+            let exp = simplify_trig(store, children[1]);
+
+            // Early exit if unchanged
+            if base == children[0] && exp == children[1] {
+                expr
+            } else {
+                store.pow(base, exp)
+            }
+        }
+        Op::Function => {
+            let name = match &store.get(expr).payload {
+                Payload::Func(s) => s.clone(),
+                _ => return expr,
+            };
+            let children = store.get(expr).children.clone();
+            let simplified_children: Vec<ExprId> =
+                children.iter().map(|&c| simplify_trig(store, c)).collect();
+
+            // Early exit if children unchanged
+            if simplified_children.iter().zip(children.iter()).all(|(a, b)| a == b) {
+                expr
+            } else {
+                store.func(name, simplified_children)
+            }
+        }
         _ => expr,
+    };
+
+    // Then apply trig identities at this level
+    match &store.get(expr_after_children).op {
+        Op::Add => try_sum_to_product(store, expr_after_children),
+        Op::Mul => try_product_to_sum(store, expr_after_children),
+        Op::Pow => try_half_angle_expansion(store, expr_after_children),
+        _ => expr_after_children,
     }
 }
 

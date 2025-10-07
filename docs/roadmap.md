@@ -1,7 +1,7 @@
 # Symmetrica Development Roadmap
 
-**Current Version:** 1.0.0-rc.1  
-**Status:** Release Candidate - Preparing for 1.0.0 stable release
+**Current Version:** 1.1.0  
+**Status:** Phase 2 & 2.5 complete; preparing Phase 3 and Phase 6 wiring
 
 ---
 
@@ -11,14 +11,14 @@ Transform Symmetrica into a comprehensive Computer Algebra System (CAS) comparab
 
 ---
 
-## Current Status: Phase 2 Complete! Moving to Phase 3 🚀
+## Current Status: Phase 2 and 2.5 Complete! Preparing Phase 3 and Phase 6 wiring 🚀
 
-Symmetrica has completed **Phase 2 (Advanced Integration)** ahead of schedule! The system is production-ready with **210 calculus tests** (100% pass rate) and **84.64% code coverage**.
+Symmetrica has completed **Phase 2 (Advanced Integration)** and **Phase 2.5 (Symbolic Simplification)**. The system is production-ready with **210 calculus tests** (100% pass rate) and **84.64% code coverage**.
 
 ### 📍 Active Development Summary
 
-**Current Version:** 1.1 (Phase 2 Complete)  
-**Active Phases:** Phase 2.5 (Simplification - 60% complete)  
+**Current Version:** 1.1 (Phase 2 & 2.5 Complete)  
+**Active Phases:** Phase 6 (Enhanced Simplification wiring - partially implemented; integration pending)  
 **Recent Commits:** 12+ commits in Phase 2/2.5 (c41f81f → current)
 
 #### Phase 2 Completed Features ✅
@@ -30,17 +30,17 @@ Symmetrica has completed **Phase 2 (Advanced Integration)** ahead of schedule! T
 - **U-Substitution:** Pattern detection for composite functions
 - **Hyperbolic Functions:** sinh, cosh, tanh integration and differentiation
 
-#### Phase 2.5 In Progress (60% Complete) 🔄
+#### Phase 2.5 Complete ✅
 - **Symbolic Simplification:**
   - ✅ Perfect square roots: √4 → 2, √(4/9) → 2/3
   - ✅ Exponential/log identities: ln(e^x) → x, e^(ln x) → x
   - ✅ Pythagorean identity: sin²x + cos²x → 1
   - ✅ Double-angle formulas: 2sin(x)cos(x) → sin(2x), cos²x - sin²x → cos(2x)
   - ✅ Pythagorean variants: 1 + tan²x → sec²x
-  - 🔄 Hyperbolic identities (next)
+  - ✅ Hyperbolic identities
 
 #### What's Next 🎯
-- **Immediate:** Complete Phase 2.5 (hyperbolic identities)
+- **Immediate:** Wire Phase 6 modules (trig/log/radicals) into the default `simplify()` pipeline with assumption-aware gating and integration tests
 - **Short-term:** Phase 3 (Special Functions) or Phase 4 (Advanced Solving)
 - **Medium-term:** Continue roadmap phases
 
@@ -511,11 +511,16 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 6: Enhanced Simplification (v2.0)
 
-**Status:** 🔄 Not Started  
+**Status:** 🔄 In Progress (modules implemented; default wiring pending)  
 **Goal:** Advanced simplification and rewriting
 **Current Coverage Snapshot:**
 - `simplify`: like-term collection, power merging, guarded log/exp rules via `assumptions`
-- Missing: trigonometric identities, radical denesting, logarithm branch-cut aware rules, e-graph equality saturation
+- Implemented modules:
+  - `crates/simplify/src/trig_identities.rs` (half-angle, sum-to-product, product-to-sum)
+  - `crates/simplify/src/radical_simplify.rs` (perfect powers, denesting, rationalization)
+  - `crates/simplify/src/log_simplify.rs` (product/power expansions with assumptions, contraction)
+- Pending integration: wire these modules into the default `simplify()` pipeline with assumption-aware gating and add integration tests
+- Optional (future): e-graph equality saturation
 
 #### Checklist
 
