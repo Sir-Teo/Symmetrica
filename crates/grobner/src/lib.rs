@@ -41,6 +41,29 @@ impl Monomial {
         Some(Monomial { exponents })
     }
 
+    #[test]
+    fn test_s_polynomial_structure() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        // f = x^2 + y
+        let x2 = st.pow(x, two);
+        let f = st.add(vec![x2, y]);
+        // g = x*y + 1
+        let xy = st.mul(vec![x, y]);
+        let one = st.int(1);
+        let g = st.add(vec![xy, one]);
+
+        let vars = vec!["x".to_string(), "y".to_string()];
+        let s = s_polynomial(&mut st, f, g, &vars, MonomialOrder::Lex).expect("s poly");
+        // Should be an Add of two terms mf*f + (-1)*mg*g
+        assert_eq!(st.get(s).op, Op::Add);
+        let ch = st.get(s).children.clone();
+        assert_eq!(ch.len(), 2);
+        assert_eq!(st.get(ch[1]).op, Op::Mul);
+    }
+
     /// Total degree of the monomial
     pub fn degree(&self) -> i64 {
         self.exponents.values().sum()
@@ -141,28 +164,191 @@ fn extract_monomial(
 /// Compute the S-polynomial of two polynomials
 /// S(f, g) = (lcm(LT(f), LT(g)) / LT(f)) * f - (lcm(LT(f), LT(g)) / LT(g)) * g
 pub fn s_polynomial(
-    _store: &mut Store,
-    _f: ExprId,
-    _g: ExprId,
-    _vars: &[String],
-    _order: MonomialOrder,
+    store: &mut Store,
+    f: ExprId,
+    g: ExprId,
+    vars: &[String],
+    order: MonomialOrder,
 ) -> Option<ExprId> {
-    // Simplified stub: full implementation requires leading term extraction
-    // and LCM computation of monomials
-    None
+    // Extract terms (children of Add) or treat whole expr as single term
+    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+        match store.get(p).op {
+            Op::Add => store.get(p).children.clone(),
+            _ => vec![p],
+        }
+    }
+
+    fn leading_term(store: &Store, p: ExprId, vars: &[String], order: MonomialOrder) -> Option<ExprId> {
+        let mut best: Option<(Monomial, ExprId)> = None;
+        for t in terms_of(store, p) {
+            if let Some(m) = Monomial::from_expr(store, t) {
+                match &best {
+                    None => best = Some((m, t)),
+                    Some((bm, _)) => {
+                        if m.compare(bm, order, vars) == std::cmp::Ordering::Greater {
+                            best = Some((m, t));
+                        }
+                    }
+                }
+            }
+        }
+        best.map(|(_, t)| t)
+    }
+
+    // Build monomial expression from exponent map
+    fn monomial_expr(store: &mut Store, exps: &HashMap<String, i64>) -> ExprId {
+        let mut factors: Vec<ExprId> = Vec::new();
+        for (v, e) in exps.iter() {
+            if *e == 0 {
+                continue;
+            }
+            let sym = store.sym(v);
+            if *e == 1 { factors.push(sym); } else {
+                let ei = store.int(*e);
+                let p = store.pow(sym, ei);
+                factors.push(p);
+            }
+        }
+        if factors.is_empty() { return store.int(1); }
+        if factors.len() == 1 { return factors[0]; }
+        store.mul(factors)
+    }
+
+    fn lcm_exponents(a: &Monomial, b: &Monomial) -> HashMap<String, i64> {
+        let mut out = a.exponents.clone();
+        for (k, vb) in &b.exponents {
+            let va = *out.get(k).unwrap_or(&0);
+            if vb > &va { out.insert(k.clone(), *vb); }
+        }
+        out
+    }
+
+    fn exponent_diff(a: &HashMap<String, i64>, b: &Monomial) -> HashMap<String, i64> {
+        let mut out = HashMap::new();
+        for (k, va) in a {
+            let vb = *b.exponents.get(k).unwrap_or(&0);
+            let d = *va - vb;
+            if d != 0 { out.insert(k.clone(), d); }
+        }
+        out
+    }
+
+    let lt_f = leading_term(store, f, vars, order)?;
+    let lt_g = leading_term(store, g, vars, order)?;
+    let mf = Monomial::from_expr(store, lt_f)?;
+    let mg = Monomial::from_expr(store, lt_g)?;
+
+    let lcm_exp = lcm_exponents(&mf, &mg);
+    let mult_f_exp = exponent_diff(&lcm_exp, &mf);
+    let mult_g_exp = exponent_diff(&lcm_exp, &mg);
+
+    let mult_f = monomial_expr(store, &mult_f_exp);
+    let mult_g = monomial_expr(store, &mult_g_exp);
+
+    let mf_f = store.mul(vec![mult_f, f]);
+    let mg_g = store.mul(vec![mult_g, g]);
+    let neg_one = store.int(-1);
+    let minus_mg_g = store.mul(vec![neg_one, mg_g]);
+    Some(store.add(vec![mf_f, minus_mg_g]))
 }
 
 /// Reduce polynomial f with respect to set of polynomials G
 /// Returns the remainder after division
 pub fn reduce(
-    _store: &mut Store,
-    _f: ExprId,
-    _basis: &[ExprId],
-    _vars: &[String],
-    _order: MonomialOrder,
+    store: &mut Store,
+    f: ExprId,
+    basis: &[ExprId],
+    vars: &[String],
+    order: MonomialOrder,
 ) -> ExprId {
-    // Simplified stub: full implementation requires multivariate division algorithm
-    _f
+    // Helpers (duplicated from s_polynomial for now)
+    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+        match store.get(p).op {
+            Op::Add => store.get(p).children.clone(),
+            _ => vec![p],
+        }
+    }
+
+    fn leading_term(store: &Store, p: ExprId, vars: &[String], order: MonomialOrder) -> Option<ExprId> {
+        let mut best: Option<(Monomial, ExprId)> = None;
+        for t in terms_of(store, p) {
+            if let Some(m) = Monomial::from_expr(store, t) {
+                match &best {
+                    None => best = Some((m, t)),
+                    Some((bm, _)) => {
+                        if m.compare(bm, order, vars) == std::cmp::Ordering::Greater {
+                            best = Some((m, t));
+                        }
+                    }
+                }
+            }
+        }
+        best.map(|(_, t)| t)
+    }
+
+    fn monomial_expr(store: &mut Store, exps: &HashMap<String, i64>) -> ExprId {
+        let mut factors: Vec<ExprId> = Vec::new();
+        for (v, e) in exps.iter() {
+            if *e == 0 { continue; }
+            let sym = store.sym(v);
+            if *e == 1 { factors.push(sym); } else {
+                let ei = store.int(*e);
+                factors.push(store.pow(sym, ei));
+            }
+        }
+        if factors.is_empty() { return store.int(1); }
+        if factors.len() == 1 { return factors[0]; }
+        store.mul(factors)
+    }
+
+    fn exp_ge(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> bool {
+        for (k, vb) in b {
+            let va = *a.get(k).unwrap_or(&0);
+            if va < *vb { return false; }
+        }
+        true
+    }
+
+    fn exp_sub(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> HashMap<String, i64> {
+        let mut out = HashMap::new();
+        for (k, va) in a {
+            let vb = *b.get(k).unwrap_or(&0);
+            let d = *va - vb;
+            if d != 0 { out.insert(k.clone(), d); }
+        }
+        out
+    }
+
+    let mut p = f;
+    let mut changed = true;
+    let max_steps = 256;
+    let mut steps = 0;
+    while changed && steps < max_steps {
+        steps += 1;
+        changed = false;
+        // Pick a term from p
+        let lt_p = if let Some(t) = leading_term(store, p, vars, order) { t } else { break; };
+        let mp = if let Some(m) = Monomial::from_expr(store, lt_p) { m } else { break; };
+
+        // Try to reduce with basis
+        'outer: for &g in basis {
+            if let Some(lt_g) = leading_term(store, g, vars, order) {
+                if let (Some(mg),) = (Monomial::from_expr(store, lt_g),) {
+                    if exp_ge(&mp.exponents, &mg.exponents) {
+                        let q_exp = exp_sub(&mp.exponents, &mg.exponents);
+                        let q = monomial_expr(store, &q_exp);
+                        let qg = store.mul(vec![q, g]);
+                        let neg_one = store.int(-1);
+                        let sub = store.mul(vec![neg_one, qg]);
+                        p = store.add(vec![p, sub]);
+                        changed = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+    p
 }
 
 /// Buchberger's algorithm for computing Gröbner basis
@@ -333,5 +519,21 @@ mod tests {
         let x = st.sym("x");
         let reduced = reduce(&mut st, x, &[], &["x".to_string()], MonomialOrder::Lex);
         assert_eq!(reduced, x);
+    }
+
+    #[test]
+    fn test_reduce_simple() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let xy = st.mul(vec![x, y]);
+        let one = st.int(1);
+        let f = st.add(vec![x2, xy, one]);
+        let basis = vec![x, y];
+        let r = reduce(&mut st, f, &basis, &["x".to_string(), "y".to_string()], MonomialOrder::Lex);
+        // Expect remainder 1
+        assert!(matches!((&st.get(r).op, &st.get(r).payload), (Op::Integer, Payload::Int(1))));
     }
 }

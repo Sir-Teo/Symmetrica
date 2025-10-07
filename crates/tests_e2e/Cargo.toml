@@ -21,3 +21,7 @@ matrix    = { path = "../matrix" }
 evalf     = { path = "../evalf" }
 plot      = { path = "../plot" }
 assumptions = { path = "../assumptions" }
+grobner   = { path = "../grobner" }
+summation = { path = "../summation" }
+special   = { path = "../special" }
+number_theory = { path = "../number_theory", features = ["number_theory_experimental"] }

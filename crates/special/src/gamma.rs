@@ -26,7 +26,7 @@ impl SpecialFunction for GammaFunction {
         1
     }
 
-    /// Numerical evaluation using Lanczos approximation
+    /// Numerical evaluation using Lanczos approximation with reflection
     fn eval(&self, args: &[f64]) -> Option<f64> {
         if args.len() != 1 {
             return None;
@@ -34,23 +34,57 @@ impl SpecialFunction for GammaFunction {
 
         let z = args[0];
 
-        // Handle special cases
         if z <= 0.0 && z.fract() == 0.0 {
-            // Gamma is undefined at non-positive integers
+            // Poles at non-positive integers
             return None;
         }
-
         if z == 1.0 {
             return Some(1.0);
         }
-
         if z == 0.5 {
             return Some(std::f64::consts::PI.sqrt());
         }
 
-        // For now, return None - full Lanczos approximation would go here
-        // TODO: Implement Lanczos approximation for general case
-        None
+        // Lanczos approximation constants (g=7, n=9), from Numerical Recipes/Wikipedia
+        // Coefficients for double precision
+        const G: f64 = 7.0;
+        const COEFFS: [f64; 9] = [
+            0.999_999_999_999_809_9,
+            676.520_368_121_885_1,
+            -1_259.139_216_722_402_8,
+            771.323_428_777_653_1,
+            -176.615_029_162_140_6,
+            12.507_343_278_686_905,
+            -0.138_571_095_265_720_12,
+            9.984_369_578_019_572e-6,
+            1.505_632_735_149_311_6e-7,
+        ];
+
+        fn lanczos_gamma(x: f64) -> f64 {
+            let x0 = x - 1.0;
+            let mut a = COEFFS[0];
+            for (k, c) in COEFFS.iter().enumerate().skip(1) {
+                a += c / (x0 + k as f64);
+            }
+            let t = x0 + G + 0.5;
+            (2.0 * std::f64::consts::PI).sqrt() * t.powf(x0 + 0.5) * (-t).exp() * a
+        }
+
+        if z < 0.5 {
+            // Reflection formula: Γ(z) = π / (sin(πz) * Γ(1 - z))
+            let sin_term = (std::f64::consts::PI * z).sin();
+            if sin_term.abs() < 1e-15 {
+                return None;
+            }
+            let one_minus_z = 1.0 - z;
+            let gamma_1_minus_z = lanczos_gamma(one_minus_z);
+            if !gamma_1_minus_z.is_finite() {
+                return None;
+            }
+            Some(std::f64::consts::PI / (sin_term * gamma_1_minus_z))
+        } else {
+            Some(lanczos_gamma(z))
+        }
     }
 
     /// Derivative: d/dz Γ(z) = Γ(z) · Ψ(z) where Ψ is the digamma function
@@ -120,5 +154,21 @@ mod tests {
 
         assert!(st.to_string(gx).contains("Gamma"));
         assert!(st.to_string(gx).contains("x"));
+    }
+
+    #[test]
+    fn gamma_five_is_factorial_four() {
+        let g = GammaFunction;
+        // Γ(5) = 24
+        let val = g.eval(&[5.0]).unwrap();
+        assert!((val - 24.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn gamma_two_point_five() {
+        let g = GammaFunction;
+        // Γ(2.5) ≈ 1.329340388
+        let val = g.eval(&[2.5]).unwrap();
+        assert!((val - 1.329_340_388_f64).abs() < 1e-9);
     }
 }

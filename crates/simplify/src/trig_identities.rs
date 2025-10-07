@@ -76,10 +76,74 @@ pub fn simplify_trig(store: &mut Store, expr: ExprId) -> ExprId {
     // Then apply trig identities at this level
     match &store.get(expr_after_children).op {
         Op::Add => try_sum_to_product(store, expr_after_children),
-        Op::Mul => try_product_to_sum(store, expr_after_children),
+        Op::Mul => {
+            if let Some(dbl) = try_double_angle_in_mul(store, expr_after_children) {
+                dbl
+            } else {
+                try_product_to_sum(store, expr_after_children)
+            }
+        }
         Op::Pow => try_half_angle_expansion(store, expr_after_children),
         _ => expr_after_children,
     }
+}
+
+/// Detects 2*sin(x)*cos(x) in a Mul and rewrites to sin(2x), preserving other factors
+fn try_double_angle_in_mul(store: &mut Store, expr: ExprId) -> Option<ExprId> {
+    if store.get(expr).op != Op::Mul {
+        return None;
+    }
+
+    let children = store.get(expr).children.clone();
+    let mut has_two = false;
+    let mut sin_arg: Option<ExprId> = None;
+    let mut cos_arg: Option<ExprId> = None;
+    let mut other_factors: Vec<ExprId> = Vec::new();
+
+    for &child in &children {
+        match (&store.get(child).op, &store.get(child).payload) {
+            (Op::Integer, Payload::Int(2)) => {
+                // Capture presence of a numeric 2 factor
+                has_two = true;
+            }
+            (Op::Function, Payload::Func(fname)) => {
+                // Capture one sin(arg) and one cos(arg)
+                if store.get(child).children.len() == 1 {
+                    let arg = store.get(child).children[0];
+                    if fname == "sin" && sin_arg.is_none() {
+                        sin_arg = Some(arg);
+                    } else if fname == "cos" && cos_arg.is_none() {
+                        cos_arg = Some(arg);
+                    } else {
+                        other_factors.push(child);
+                    }
+                } else {
+                    other_factors.push(child);
+                }
+            }
+            _ => other_factors.push(child),
+        }
+    }
+
+    if has_two {
+        if let (Some(s_arg), Some(c_arg)) = (sin_arg, cos_arg) {
+            if s_arg == c_arg {
+                // sin(2x)
+                let two = store.int(2);
+                let two_arg = store.mul(vec![two, s_arg]);
+                let sin_2arg = store.func("sin", vec![two_arg]);
+
+                if other_factors.is_empty() {
+                    return Some(sin_2arg);
+                }
+                let mut factors = other_factors;
+                factors.push(sin_2arg);
+                return Some(store.mul(factors));
+            }
+        }
+    }
+
+    None
 }
 
 /// Detects and expands half-angle patterns

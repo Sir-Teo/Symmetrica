@@ -20,6 +20,8 @@ impl SpecialFunction for EiFunction {
         "Ei"
     }
 
+    
+
     fn arity(&self) -> usize {
         1
     }
@@ -33,13 +35,36 @@ impl SpecialFunction for EiFunction {
         let z = args[0];
 
         if z == 0.0 {
-            // Ei(0) is undefined (has a logarithmic singularity)
+            // Ei(0) is undefined (logarithmic singularity)
             return None;
         }
 
-        // TODO: Implement numerical evaluation via series or continued fraction
-        // For now, return None
-        None
+        // Series: Ei(z) = gamma + ln|z| + Σ_{k=1..∞} z^k / (k·k!)
+        const EULER_GAMMA: f64 = 0.577_215_664_901_532_9_f64;
+        let ln_term = z.abs().ln();
+
+        // Accumulate using term recurrence for z^k/k!: term_{k+1} = term_k * z/(k+1)
+        let mut k: u64 = 1;
+        let mut term = z; // z^1/1!
+        let mut sum = term / (k as f64);
+        let mut prev_sum = sum;
+        let max_iter = 200usize;
+        for i in 1..max_iter {
+            let kk = (k + 1) as f64;
+            term *= z / kk; // update to z^{k+1}/(k+1)!
+            k += 1;
+            sum += term / (k as f64);
+            if (sum - prev_sum).abs() <= 1e-16 * sum.abs().max(1.0) {
+                break;
+            }
+            prev_sum = sum;
+            if i + 1 == max_iter {
+                // If not converged, still return best effort
+                break;
+            }
+        }
+
+        Some(EULER_GAMMA + ln_term + sum)
     }
 
     /// Derivative: d/dz Ei(z) = e^z/z
@@ -88,6 +113,22 @@ mod tests {
         let ex = ei(&mut st, x);
 
         assert!(st.to_string(ex).contains("Ei"));
+    }
+
+    #[test]
+    fn ei_one_numeric() {
+        let e = EiFunction;
+        // Ei(1) ≈ 1.8951178163559368
+        let v = e.eval(&[1.0]).unwrap();
+        assert!((v - 1.895_117_816_355_936_8_f64).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ei_minus_one_numeric() {
+        let e = EiFunction;
+        // Ei(-1) ≈ -0.2193839343955203
+        let v = e.eval(&[-1.0]).unwrap();
+        assert!((v + 0.219_383_934_395_520_3_f64).abs() < 1e-12);
     }
 
     #[test]

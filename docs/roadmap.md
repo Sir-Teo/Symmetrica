@@ -1,7 +1,7 @@
 # Symmetrica Development Roadmap
 
 **Current Version:** 1.1.0  
-**Status:** Phase 2 & 2.5 complete; preparing Phase 3 and Phase 6 wiring
+**Status:** Phase 2 & 2.5 complete; Phase 6 wired; Phases 3–5 foundations present; Phase 7 scaffold created
 
 ---
 
@@ -11,15 +11,15 @@ Transform Symmetrica into a comprehensive Computer Algebra System (CAS) comparab
 
 ---
 
-## Current Status: Phase 2 and 2.5 Complete! Preparing Phase 3 and Phase 6 wiring 🚀
+## Current Status: Phase 2 and 2.5 Complete! Phase 6 wired; Phases 3–5 foundations present; Phase 7 scaffold 🚀
 
 Symmetrica has completed **Phase 2 (Advanced Integration)** and **Phase 2.5 (Symbolic Simplification)**. The system is production-ready with **210 calculus tests** (100% pass rate) and **84.64% code coverage**.
 
 ### 📍 Active Development Summary
 
 **Current Version:** 1.1 (Phase 2 & 2.5 Complete)  
-**Active Phases:** Phase 6 (Enhanced Simplification wiring - partially implemented; integration pending)  
-**Recent Commits:** 12+ commits in Phase 2/2.5 (c41f81f → current)
+**Active Phases:** Phase 6 (Enhanced Simplification wired), Phases 3–5 (foundations in repo), Phase 7 (number theory scaffold)  
+**Recent Commits:** Phase 2/2.5 (c41f81f →), Phase 6 wiring, Phase 3–5 scaffolds, Phase 7 scaffold
 
 #### Phase 2 Completed Features ✅
 - **Advanced Trigonometric Integration:** `∫ sin^m(x) cos^n(x) dx` for all cases (odd/even powers)
@@ -304,11 +304,13 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 3: Special Functions Library (v1.2)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Comprehensive special function support
 **Current Coverage Snapshot:**
-- No `crates/special` present; no special functions (Gamma/Bessel/Hypergeometric) in current APIs
-- `evalf` provides numeric evaluation for elementary functions only; no special-function eval or series
+- `crates/special` present with `gamma.rs`, `erf.rs`, `expint.rs`; `SpecialFunction` trait defined
+- `evalf` dispatch implemented for `Gamma`, `erf`, and `Ei`
+- `calculus/diff.rs` chain rules for `Gamma`, `erf`, and `Ei`
+- Series/advanced numerics (Lanczos/continued fractions) are placeholders
 
 #### Checklist
 
@@ -379,12 +381,13 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 4: Advanced Equation Solving (v1.3)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Multivariate systems, transcendental equations, and ODEs
 **Current Coverage Snapshot:**
-- `solver`: linear → quartic univariate solving implemented (Cardano, Ferrari). No Lambert W or transcendental solvers
-- `polys`: univariate GCD, resultants, discriminants; multivariate sparse polynomials exist, but no Gröbner bases
-- No ODE solving framework in current codebase
+- `grobner` crate present: monomial ordering (Lex/GrLex/GRevLex), monomial extraction, Buchberger skeleton
+- `s_polynomial` and multivariate division/reduction are stubs; solving and elimination pending
+- `solver`: linear → quartic univariate solving exists (Cardano/Ferrari)
+- No ODE solving framework yet
 
 #### Checklist
 
@@ -462,10 +465,11 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 5: Symbolic Summation (v1.4)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Closed-form summation and product evaluation
 **Current Coverage Snapshot:**
-- No dedicated summation module; no Gosper/Zeilberger; series support limited to Maclaurin in `calculus`
+- `summation` crate present: arithmetic/geometric sums implemented; hypergeometric-term recognizer
+- Gosper/Zeilberger are stubs; dispatcher pending
 
 #### Checklist
 
@@ -511,7 +515,7 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 6: Enhanced Simplification (v2.0)
 
-**Status:** 🔄 In Progress (modules implemented; default wiring pending)  
+**Status:** ✅ Wired in default pipeline  
 **Goal:** Advanced simplification and rewriting
 **Current Coverage Snapshot:**
 - `simplify`: like-term collection, power merging, guarded log/exp rules via `assumptions`
@@ -519,7 +523,7 @@ All foundational features implemented and tested. System is production-ready.
   - `crates/simplify/src/trig_identities.rs` (half-angle, sum-to-product, product-to-sum)
   - `crates/simplify/src/radical_simplify.rs` (perfect powers, denesting, rationalization)
   - `crates/simplify/src/log_simplify.rs` (product/power expansions with assumptions, contraction)
-- Pending integration: wire these modules into the default `simplify()` pipeline with assumption-aware gating and add integration tests
+- Integrated: modules wired into `simplify()` pipeline with assumption-aware gating; e2e tests added
 - Optional (future): e-graph equality saturation
 
 #### Checklist

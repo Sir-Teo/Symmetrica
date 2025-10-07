@@ -316,7 +316,10 @@ mod tests {
         let xp2 = st.add(vec![x, two_c]);
         let lnxp2 = st.func("ln", vec![xp2]);
         let expected = st.add(vec![lnxp1, lnxp2]);
-        assert_eq!(st.to_string(int), st.to_string(expected));
+        // Compare after simplification to accommodate log contraction/expansion
+        let int_s = simplify::simplify(&mut st, int);
+        let expected_s = simplify::simplify(&mut st, expected);
+        assert_eq!(st.get(int_s).digest, st.get(expected_s).digest);
     }
 
     #[test]

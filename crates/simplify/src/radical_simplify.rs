@@ -104,6 +104,16 @@ fn try_simplify_radical_power(store: &mut Store, expr: ExprId) -> ExprId {
         }
     }
 
+    // Rationalize reciprocal square root: exponent = -1/2
+    if matches!((&store.get(exp).op, &store.get(exp).payload), (Op::Rational, Payload::Rat(-1, 2))) {
+        // 1/sqrt(base) -> sqrt(base)/base
+        let half = store.rat(1, 2);
+        let sqrt_base = store.pow(base, half);
+        let minus_one = store.int(-1);
+        let inv_base = store.pow(base, minus_one);
+        return store.mul(vec![sqrt_base, inv_base]);
+    }
+
     expr
 }
 

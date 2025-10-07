@@ -61,6 +61,8 @@ fn simplify_full(store: &mut Store, id: ExprId, ctx: &Context) -> ExprId {
         current = simplify_trig(store, current);
         current = simplify_radicals(store, current);
         current = simplify_logarithms(store, current, ctx);
+        // After expansion opportunities, try contracting log sums back where beneficial
+        current = contract_logarithms(store, current, ctx);
 
         // Recursively simplify to catch nested patterns
         current = simplify_rec(store, current, ctx);

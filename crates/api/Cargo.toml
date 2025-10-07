@@ -7,7 +7,7 @@ description = "Symmetrica Python bindings via PyO3"
 
 [lib]
 name = "symmetrica"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
