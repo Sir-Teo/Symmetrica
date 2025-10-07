@@ -591,4 +591,121 @@ mod tests {
         // Expect remainder 1
         assert!(matches!((&st.get(r).op, &st.get(r).payload), (Op::Integer, Payload::Int(1))));
     }
+
+    #[test]
+    fn test_monomial_compare_grevlex() {
+        let mut mono1 = Monomial { exponents: HashMap::new() };
+        mono1.exponents.insert("x".to_string(), 3);
+        mono1.exponents.insert("y".to_string(), 1);
+
+        let mut mono2 = Monomial { exponents: HashMap::new() };
+        mono2.exponents.insert("x".to_string(), 2);
+        mono2.exponents.insert("y".to_string(), 2);
+
+        let vars = vec!["x".to_string(), "y".to_string()];
+        // Both have same degree 4, so use reverse lex
+        let ord = mono1.compare(&mono2, MonomialOrder::GRevLex, &vars);
+        assert!(ord != std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_s_polynomial_basic() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+
+        // f = x^2, g = xy
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+        let xy = st.mul(vec![x, y]);
+
+        let vars = vec!["x".to_string(), "y".to_string()];
+        let s = s_polynomial(&mut st, x2, xy, &vars, MonomialOrder::Lex);
+        assert!(s.is_some());
+    }
+
+    #[test]
+    fn test_buchberger_two_polys() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let one = st.int(1);
+        let neg_one = st.int(-1);
+
+        // f = x - 1, g = y - 1
+        let f = st.add(vec![x, neg_one]);
+        let neg_one_2 = st.int(-1);
+        let minus_one = st.mul(vec![neg_one_2, one]);
+        let g = st.add(vec![y, minus_one]);
+
+        let vars = vec!["x".to_string(), "y".to_string()];
+        let basis = buchberger(&mut st, vec![f, g], vars, MonomialOrder::Lex);
+        assert!(basis.len() >= 2);
+    }
+
+    #[test]
+    fn test_monomial_from_mul_with_powers() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        let two = st.int(2);
+        let three = st.int(3);
+        let x2 = st.pow(x, two);
+        let y3 = st.pow(y, three);
+        let prod = st.mul(vec![x2, y3]);
+
+        let mono = Monomial::from_expr(&st, prod).unwrap();
+        assert_eq!(mono.degree(), 5);
+        assert_eq!(mono.exponents.get("x"), Some(&2));
+        assert_eq!(mono.exponents.get("y"), Some(&3));
+    }
+
+    #[test]
+    fn test_reduce_with_monomial_basis() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let two = st.int(2);
+        let x2 = st.pow(x, two);
+
+        // Reduce x^2 with basis [x^2]
+        let basis = vec![x2];
+        let r = reduce(&mut st, x2, &basis, &["x".to_string()], MonomialOrder::Lex);
+
+        // Should reduce to 0
+        assert!(matches!((&st.get(r).op, &st.get(r).payload), (Op::Integer, Payload::Int(0))));
+    }
+
+    #[test]
+    fn test_monomial_equal_comparison() {
+        let mut mono1 = Monomial { exponents: HashMap::new() };
+        mono1.exponents.insert("x".to_string(), 2);
+
+        let mono2 = mono1.clone();
+
+        let vars = vec!["x".to_string()];
+        assert_eq!(mono1.compare(&mono2, MonomialOrder::Lex, &vars), std::cmp::Ordering::Equal);
+        assert_eq!(mono1.compare(&mono2, MonomialOrder::GrLex, &vars), std::cmp::Ordering::Equal);
+        assert_eq!(mono1.compare(&mono2, MonomialOrder::GRevLex, &vars), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn test_extract_monomial_with_constant_mul() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let five = st.int(5);
+        let five_x = st.mul(vec![five, x]);
+
+        let mono = Monomial::from_expr(&st, five_x).unwrap();
+        assert_eq!(mono.degree(), 1);
+        assert_eq!(mono.exponents.get("x"), Some(&1));
+    }
+
+    #[test]
+    fn test_solve_system_placeholder() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let result = solve_system(&mut st, vec![x], vec!["x".to_string()]);
+        // Currently returns None as it's a placeholder
+        assert!(result.is_none());
+    }
 }

@@ -394,4 +394,130 @@ mod tests {
         assert_eq!(t.shape(), &[1]);
         assert_eq!(*t.get(&[0]), 1 + 4);
     }
+
+    #[test]
+    fn test_is_empty_and_len() {
+        let t = Tensor::new(vec![3, 2], 0i64);
+        assert!(!t.is_empty());
+        assert_eq!(t.len(), 6);
+        assert_eq!(t.rank(), 2);
+    }
+
+    #[test]
+    fn test_permute_axes_3d() {
+        // Test permutation on a 3D tensor
+        let t = Tensor::from_vec(vec![2, 3, 2], (0..12).collect::<Vec<i64>>());
+        let p = t.permute_axes(&[2, 0, 1]);
+        assert_eq!(p.shape(), &[2, 2, 3]);
+        // Check a few values to ensure permutation is correct
+        assert_eq!(*t.get(&[0, 0, 0]), *p.get(&[0, 0, 0]));
+        assert_eq!(*t.get(&[1, 2, 1]), *p.get(&[1, 1, 2]));
+    }
+
+    #[test]
+    fn test_sum_axis_edge_cases() {
+        // Test summing when output shape becomes scalar
+        let v = Tensor::from_vec(vec![4], vec![1i64, 2, 3, 4]);
+        let s = v.sum_axis(0);
+        assert_eq!(s.shape(), &[1]);
+        assert_eq!(*s.get(&[0]), 10);
+    }
+
+    #[test]
+    fn test_contract_to_scalar() {
+        // Contract two vectors to get a scalar (dot product via contract)
+        let a = Tensor::from_vec(vec![3], vec![1i64, 2, 3]);
+        let b = Tensor::from_vec(vec![3], vec![4i64, 5, 6]);
+        let c = a.contract(&b, 0, 0);
+        assert_eq!(c.shape(), &[1]);
+        assert_eq!(*c.get(&[0]), 32);
+    }
+
+    #[test]
+    fn test_trace_higher_rank() {
+        // Test trace on a 3D tensor
+        let t = Tensor::from_vec(vec![2, 2, 3], (0..12).collect::<Vec<i64>>());
+        let tr = t.trace_pair(0, 1);
+        assert_eq!(tr.shape(), &[3]);
+        // trace sums elements where first two indices are equal
+        // [0,0,k] + [1,1,k] for k=0,1,2
+        assert_eq!(*tr.get(&[0]), t.get(&[0, 0, 0]) + t.get(&[1, 1, 0]));
+        assert_eq!(*tr.get(&[1]), t.get(&[0, 0, 1]) + t.get(&[1, 1, 1]));
+        assert_eq!(*tr.get(&[2]), t.get(&[0, 0, 2]) + t.get(&[1, 1, 2]));
+    }
+
+    #[test]
+    fn test_outer_vectors() {
+        let a = Tensor::from_vec(vec![2], vec![1i64, 2]);
+        let b = Tensor::from_vec(vec![2], vec![3i64, 4]);
+        let o = a.outer(&b);
+        assert_eq!(o.shape(), &[2, 2]);
+        assert_eq!(*o.get(&[0, 0]), 3);
+        assert_eq!(*o.get(&[0, 1]), 4);
+        assert_eq!(*o.get(&[1, 0]), 6);
+        assert_eq!(*o.get(&[1, 1]), 8);
+    }
+
+    #[test]
+    fn test_rank_and_shape() {
+        let t = Tensor::new(vec![2, 3, 4], 0i64);
+        assert_eq!(t.rank(), 3);
+        assert_eq!(t.shape(), &[2, 3, 4]);
+        assert_eq!(t.len(), 24);
+    }
+
+    #[test]
+    fn test_from_vec() {
+        let data = vec![1i64, 2, 3, 4, 5, 6];
+        let t = Tensor::from_vec(vec![2, 3], data.clone());
+        assert_eq!(t.shape(), &[2, 3]);
+        assert_eq!(t.len(), 6);
+    }
+
+    #[test]
+    #[should_panic(expected = "tensor must have rank >= 1")]
+    fn test_empty_shape_panics() {
+        let _t = Tensor::<i64>::new(vec![], 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "data length does not match shape")]
+    fn test_from_vec_size_mismatch() {
+        let _t = Tensor::from_vec(vec![2, 3], vec![1i64, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic(expected = "new shape must have rank >= 1")]
+    fn test_reshape_empty_panics() {
+        let t = Tensor::new(vec![2, 3], 0i64);
+        let _tr = t.reshape(vec![]);
+    }
+
+    #[test]
+    #[should_panic(expected = "reshape must keep total size")]
+    fn test_reshape_size_mismatch() {
+        let t = Tensor::new(vec![2, 3], 0i64);
+        let _tr = t.reshape(vec![2, 2]);
+    }
+
+    #[test]
+    #[should_panic(expected = "perm length must equal rank")]
+    fn test_permute_wrong_length() {
+        let t = Tensor::new(vec![2, 3], 0i64);
+        let _p = t.permute_axes(&[0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "perm has duplicates")]
+    fn test_permute_duplicates() {
+        let t = Tensor::new(vec![2, 3], 0i64);
+        let _p = t.permute_axes(&[0, 0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "perm index out of range")]
+    fn test_permute_out_of_range() {
+        let t = Tensor::new(vec![2, 3], 0i64);
+        let _p = t.permute_axes(&[0, 5]);
+    }
 }

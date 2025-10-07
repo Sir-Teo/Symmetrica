@@ -124,4 +124,15 @@ mod tests {
         assert_eq!(y.a, Q::new(-7, 1));
         assert_eq!(y.b, Q::zero());
     }
+
+    #[test]
+    fn test_sub() {
+        let d = 5;
+        let x = Quad::new(q(3, 2), q(1, 3), d);
+        let y = Quad::new(q(1, 2), q(1, 6), d);
+        let diff = x - y;
+        assert_eq!(diff.d, d);
+        assert_eq!(diff.a, sub_q(q(3, 2), q(1, 2)));
+        assert_eq!(diff.b, sub_q(q(1, 3), q(1, 6)));
+    }
 }

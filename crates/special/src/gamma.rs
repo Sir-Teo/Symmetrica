@@ -171,4 +171,55 @@ mod tests {
         let val = g.eval(&[2.5]).unwrap();
         assert!((val - 1.329_340_388_f64).abs() < 1e-9);
     }
+
+    #[test]
+    fn gamma_reflection_formula() {
+        let g = GammaFunction;
+        // Test reflection formula for z < 0.5
+        let val = g.eval(&[0.3]).unwrap();
+        assert!(val.is_finite() && val > 0.0);
+    }
+
+    #[test]
+    fn gamma_derivative_symbolic() {
+        let g = GammaFunction;
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let deriv = g.derivative(&mut st, &[x], 0);
+        assert!(deriv.is_some());
+    }
+
+    #[test]
+    fn gamma_series_unimplemented() {
+        let g = GammaFunction;
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let series = g.series(&mut st, &[x], 5);
+        assert!(series.is_none());
+    }
+
+    #[test]
+    fn gamma_name_and_arity() {
+        let g = GammaFunction;
+        assert_eq!(g.name(), "Gamma");
+        assert_eq!(g.arity(), 1);
+    }
+
+    #[test]
+    fn gamma_wrong_arity() {
+        let g = GammaFunction;
+        assert!(g.eval(&[1.0, 2.0]).is_none());
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+        assert!(g.derivative(&mut st, &[x, y], 0).is_none());
+    }
+
+    #[test]
+    fn test_factorial() {
+        let mut st = Store::new();
+        let five = st.int(5);
+        let fact = factorial(&mut st, five);
+        assert!(st.to_string(fact).contains("Gamma"));
+    }
 }
