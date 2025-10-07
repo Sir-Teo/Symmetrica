@@ -844,7 +844,9 @@ dependencies = [
 name = "symmetrica"
 version = "1.0.0-rc.2"
 dependencies = [
+ "arith",
  "calculus",
+ "evalf",
  "expr_core",
  "io",
  "matrix",

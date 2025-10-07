@@ -44,44 +44,38 @@
 
 - **`io`**: LaTeX, JSON, and S-expression serialization/parsing
 - **`evalf`**: Numeric evaluation with f64 (arbitrary precision planned)
-- **`plot`**: SVG plotting with numerical evaluation
 - **`cli`**: Command-line interface (matika_cli)
 - **`api`**: Python bindings via PyO3 with feature flag
 - **`wasm`**: WebAssembly bindings via wasm-bindgen for browser/Node.js
 - **`tests_e2e`**: End-to-end integration tests
 
-## Quickstart
+## Quick Start
 
- Build everything:
+```bash
+# Clone and test
+git clone https://github.com/Sir-Teo/Symmetrica.git
+cd Symmetrica
+cargo test
 
- ```bash
- cargo build --workspace
- ```
+# Run examples (13 available)
+cargo run --example basic_polynomial
+cargo run --example trigonometric
+cargo run --example calculus_visualization
 
- Run tests:
+# Try the CLI
+cargo run -p matika_cli
+```
 
- ```bash
- cargo test --workspace
- ```
+### Feature Overview
 
- Run the demo CLI:
-
- ```bash
- cargo run -p matika_cli
- ```
-
-## Features
-
- - Immutable DAG with hash-consing in `crates/expr_core` for structural sharing.
- - Canonical constructors for `Add`/`Mul`/`Pow`; deterministic ordering and stable digests.
- - Small rational arithmetic (i64) and precedence-aware pretty printer via `Store::to_string()`.
- - Simplifier (`crates/simplify`): constant folding, like-term/factor collection, rational normalization, and power-merge in products.
- - Calculus (`crates/calculus`):
-   - `diff()` for `Add`/`Mul`/`Pow` with integer exponents, common funcs (`sin`/`cos`/`exp`/`ln`) with chain rule, and general power rule `d(u^v)`.
-   - `integrate()` conservative rules: constants/symbols, power rule (incl. `1/x = ln(x)`), linear `exp(ax+b)`/`sin(ax+b)`/`cos(ax+b)`, and `u'/u -> ln(u)`.
-   - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
- - Pattern/substitution (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
- - Polynomials (`crates/polys`): univariate dense and multivariate sparse over Q; division, GCD, square-free decomposition, resultants, discriminants; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
+- **Expression System**: Small rational arithmetic (i64) and precedence-aware pretty printer via `Store::to_string()`.
+- **Simplifier** (`crates/simplify`): Constant folding, like-term/factor collection, rational normalization, and power-merge in products.
+- **Calculus** (`crates/calculus`):
+  - `diff()` for `Add`/`Mul`/`Pow` with integer exponents, common funcs (`sin`/`cos`/`exp`/`ln`) with chain rule, and general power rule `d(u^v)`.
+  - `integrate()` conservative rules: constants/symbols, power rule (incl. `1/x = ln(x)`), linear `exp(ax+b)`/`sin(ax+b)`/`cos(ax+b)`, and `u'/u -> ln(u)`.
+  - Maclaurin series for `exp`/`sin`/`cos`/`ln(1+z)` with composition; simple polynomial limits at `0` and `+∞`.
+- **Pattern/Substitution** (`crates/pattern`): `subst_symbol()` for safe symbol replacement.
+- **Polynomials** (`crates/polys`): Univariate dense and multivariate sparse over Q; division, GCD, square-free decomposition, resultants, discriminants; `expr_to_unipoly()` and `unipoly_to_expr()` conversions.
 ## Usage Examples
 
 ### Build and Simplify Expressions
@@ -196,7 +190,27 @@ let latex = to_latex(&st, expr);
 println!("{}", latex);  // Output: (1 + x)^{2}
 ```
 
-For complete examples, see the `examples/` directory and `crates/cli/src/main.rs`.
+## Runnable Examples
+
+Symmetrica includes **13 comprehensive examples** covering all major features:
+
+- **Plotting** (7 examples): Basic polynomials, trigonometric functions, exponential/logarithm, rational functions, power functions, composite functions, plot configuration
+- **Calculus** (1 example): Functions with their derivatives visualization
+- **Comprehensive** (1 example): End-to-end workflow with all features
+- **Edge Cases** (1 example): Robustness testing
+- **Algebra** (3 examples): Polynomial operations, I/O serialization, matrix/linear algebra
+
+**[📚 View Full Examples Catalog](https://sir-teo.github.io/Symmetrica/examples-catalog.html)** with source code links and detailed instructions.
+
+Run any example with:
+```bash
+cargo run --example basic_polynomial
+cargo run --example trigonometric
+cargo run --example calculus_visualization
+# ... see examples-catalog.html for all 13 examples
+```
+
+All examples are in the `examples/` directory with detailed documentation in `examples/README.md`.
 
 ## Local quality gates (what CI enforces)
 

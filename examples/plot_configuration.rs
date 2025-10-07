@@ -1,6 +1,8 @@
 //! Plot configuration example
 //! Demonstrates different PlotConfig settings: samples, ranges, dimensions
 
+#![allow(clippy::approx_constant)]
+
 use expr_core::Store;
 use plot::{plot_svg, PlotConfig};
 use std::fs;

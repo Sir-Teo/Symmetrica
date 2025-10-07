@@ -22,7 +22,7 @@ fn main() {
     println!("\n--- S-expression Format ---");
     let sexpr = to_sexpr(&st, expr);
     println!("Serialized: {}", sexpr);
-    
+
     let mut st2 = Store::new();
     let parsed_sexpr = from_sexpr(&mut st2, &sexpr).expect("parse s-expr");
     println!("Parsed back: {}", st2.to_string(parsed_sexpr));
@@ -32,7 +32,7 @@ fn main() {
     println!("\n--- JSON Format ---");
     let json = to_json(&st, expr);
     println!("Serialized: {}", json);
-    
+
     let mut st3 = Store::new();
     let parsed_json = from_json(&mut st3, &json).expect("parse json");
     println!("Parsed back: {}", st3.to_string(parsed_json));
@@ -57,15 +57,15 @@ fn main() {
     let complex_expr = st4.add(vec![term1, term2, five]);
 
     println!("Expression: {}", st4.to_string(complex_expr));
-    
+
     // S-expr
     let sexpr2 = to_sexpr(&st4, complex_expr);
     println!("S-expr: {}", sexpr2);
-    
+
     // JSON
     let json2 = to_json(&st4, complex_expr);
     println!("JSON: {}", json2);
-    
+
     // LaTeX
     let latex2 = to_latex(&st4, complex_expr);
     println!("LaTeX: {}", latex2);
@@ -73,7 +73,10 @@ fn main() {
     // Verify roundtrip for complex expression
     let mut st5 = Store::new();
     let from_sexpr2 = from_sexpr(&mut st5, &sexpr2).expect("parse");
-    println!("\nS-expr roundtrip OK: {}", st4.to_string(complex_expr) == st5.to_string(from_sexpr2));
+    println!(
+        "\nS-expr roundtrip OK: {}",
+        st4.to_string(complex_expr) == st5.to_string(from_sexpr2)
+    );
 
     let mut st6 = Store::new();
     let from_json2 = from_json(&mut st6, &json2).expect("parse");

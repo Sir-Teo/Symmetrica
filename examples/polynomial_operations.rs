@@ -51,7 +51,7 @@ fn main() {
 
     println!("\nExpr to Polynomial conversion:");
     println!("  Expression: {}", st.to_string(expr));
-    
+
     let poly = expr_to_unipoly(&st, expr, "x").expect("convertible");
     println!("  Polynomial coeffs: {:?}", poly.coeffs);
 

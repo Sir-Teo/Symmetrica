@@ -1,6 +1,8 @@
 //! Edge cases and special behaviors example
 //! Demonstrates how the plotter handles discontinuities, undefined regions, etc.
 
+#![allow(clippy::approx_constant)]
+
 use expr_core::Store;
 use plot::{plot_svg, PlotConfig};
 use std::fs;

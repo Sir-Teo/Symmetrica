@@ -1,6 +1,8 @@
 //! Composite function plotting example
 //! Demonstrates plotting complex compositions of functions
 
+#![allow(clippy::approx_constant)]
+
 use expr_core::Store;
 use plot::{plot_svg, PlotConfig};
 use std::fs;

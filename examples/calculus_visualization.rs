@@ -1,6 +1,8 @@
 //! Calculus visualization example
 //! Demonstrates plotting functions alongside their derivatives using calculus crate
 
+#![allow(clippy::approx_constant)]
+
 use calculus::diff;
 use expr_core::Store;
 use plot::{plot_svg, PlotConfig};
