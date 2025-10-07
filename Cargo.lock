@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "algebraic"
+version = "0.1.0"
+dependencies = [
+ "arith",
+]
+
+[[package]]
 name = "anes"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

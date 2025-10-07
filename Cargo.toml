@@ -17,6 +17,7 @@ members = [
   "crates/plot",
   "crates/evalf", "crates/wasm",
   "crates/summation", "crates/special", "crates/grobner", "crates/number_theory", "crates/tensor",
+  "crates/algebraic",
 ]
 
 [workspace.package]
