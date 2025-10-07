@@ -72,7 +72,6 @@ fn test_readme_completeness() {
     let required_sections = vec![
         "Symmetrica",
         "Key Features",
-        "Quickstart",
         "Usage Examples",
         "Contributing",
         "Licensing",
@@ -81,6 +80,12 @@ fn test_readme_completeness() {
     for section in required_sections {
         assert!(content.contains(section), "README.md missing required section: {}", section);
     }
+
+    // Check for either "Quickstart" or "Quick Start"
+    assert!(
+        content.contains("Quickstart") || content.contains("Quick Start"),
+        "README.md missing required section: Quickstart or Quick Start"
+    );
 
     // Should have CI badge
     assert!(content.contains("[![CI]"), "README.md should include CI status badge");
