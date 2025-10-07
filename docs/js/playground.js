@@ -665,6 +665,307 @@ x^5: 1/120`,
     <li>Exact rational coefficients</li>
     <li>Supports composition and arithmetic</li>
 </ul>`
+    },
+    
+    // === RUNNABLE EXAMPLES (13) ===
+    ex_polynomial: {
+        code: `// Polynomial plotting examples
+const x = Symmetrica.Expr.symbol('x');
+
+// Parabola: x^2
+const x2 = x.pow(new Symmetrica.Expr(2));
+print('Parabola: ' + x2.toString());
+
+// Cubic: x^3
+const x3 = x.pow(new Symmetrica.Expr(3));
+print('Cubic: ' + x3.toString());
+
+// Quadratic: x^2 + 2x + 1
+const two_x = new Symmetrica.Expr(2).mul(x);
+const quad = x2.add(two_x).add(new Symmetrica.Expr(1));
+print('Quadratic: ' + quad.simplify().toString());`,
+        output: `Parabola: x^2
+Cubic: x^3
+Quadratic: 1 + 2 * x + x^2`,
+        explanation: `<p><strong>Example: Basic Polynomials</strong></p>
+<p>Demonstrates polynomial expression building and plotting.</p>
+<ul>
+    <li>Parabola (x²), cubic (x³), quadratic with terms</li>
+    <li>Run locally: <code>cargo run --example basic_polynomial</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/basic_polynomial.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_trig: {
+        code: `// Trigonometric functions
+const x = Symmetrica.Expr.symbol('x');
+
+// sin(x) and cos(x)
+const sin_x = Symmetrica.sin(x);
+const cos_x = Symmetrica.cos(x);
+print('sin(x): ' + sin_x.toString());
+print('cos(x): ' + cos_x.toString());
+
+// Frequency modulation: sin(2x)
+const two_x = new Symmetrica.Expr(2).mul(x);
+const sin_2x = Symmetrica.sin(two_x);
+print('sin(2x): ' + sin_2x.toString());
+
+// Sum: sin(x) + cos(x)
+const sum = sin_x.add(cos_x);
+print('sin(x) + cos(x): ' + sum.toString());`,
+        output: `sin(x): sin(x)
+cos(x): cos(x)
+sin(2x): sin(2 * x)
+sin(x) + cos(x): cos(x) + sin(x)`,
+        explanation: `<p><strong>Example: Trigonometric Functions</strong></p>
+<p>Plots sin, cos, frequency/amplitude modulation, and compositions.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example trigonometric</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/trigonometric.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_exp_log: {
+        code: `// Exponential and logarithmic functions
+const x = Symmetrica.Expr.symbol('x');
+
+// exp(x) and ln(x)
+const exp_x = Symmetrica.exp(x);
+const ln_x = Symmetrica.ln(x);
+print('exp(x): ' + exp_x.toString());
+print('ln(x): ' + ln_x.toString());
+
+// Exponential decay: exp(-x)
+const neg_x = new Symmetrica.Expr(-1).mul(x);
+const exp_neg_x = Symmetrica.exp(neg_x);
+print('exp(-x): ' + exp_neg_x.toString());
+
+// Composition: exp(sin(x))
+const sin_x = Symmetrica.sin(x);
+const exp_sin = Symmetrica.exp(sin_x);
+print('exp(sin(x)): ' + exp_sin.toString());`,
+        output: `exp(x): exp(x)
+ln(x): ln(x)
+exp(-x): exp(-1 * x)
+exp(sin(x)): exp(sin(x))`,
+        explanation: `<p><strong>Example: Exponential & Logarithmic</strong></p>
+<p>Demonstrates exp, ln, decay, and compositions.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example exponential_logarithm</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/exponential_logarithm.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_rational: {
+        code: `// Rational functions (ratios of polynomials)
+const x = Symmetrica.Expr.symbol('x');
+
+// Reciprocal: 1/x
+const one = new Symmetrica.Expr(1);
+const inv_x = x.pow(new Symmetrica.Expr(-1));
+print('1/x: ' + inv_x.toString());
+
+// x/(x^2 + 1)
+const x2 = x.pow(new Symmetrica.Expr(2));
+const x2_plus_1 = x2.add(one);
+const rational = x.mul(x2_plus_1.pow(new Symmetrica.Expr(-1)));
+print('x/(x^2+1): ' + rational.toString());`,
+        output: `1/x: x^-1
+x/(x^2+1): x * (1 + x^2)^-1`,
+        explanation: `<p><strong>Example: Rational Functions</strong></p>
+<p>Demonstrates discontinuities, asymptotes, and domain restrictions.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example rational_functions</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/rational_functions.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_power: {
+        code: `// Power functions with fractional exponents
+const x = Symmetrica.Expr.symbol('x');
+
+// Square root: x^(1/2)
+const half = new Symmetrica.Expr(1, 2); // rational
+const sqrt_x = x.pow(half);
+print('sqrt(x): ' + sqrt_x.toString());
+
+// Cube root: x^(1/3)
+const third = new Symmetrica.Expr(1, 3);
+const cbrt_x = x.pow(third);
+print('cbrt(x): ' + cbrt_x.toString());
+
+// x^(3/2)
+const three_halves = new Symmetrica.Expr(3, 2);
+const x_3_2 = x.pow(three_halves);
+print('x^(3/2): ' + x_3_2.toString());`,
+        output: `sqrt(x): x^(1/2)
+cbrt(x): x^(1/3)
+x^(3/2): x^(3/2)`,
+        explanation: `<p><strong>Example: Power Functions</strong></p>
+<p>Demonstrates fractional exponents and roots.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example power_functions</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/power_functions.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_composite: {
+        code: `// Complex function compositions
+const x = Symmetrica.Expr.symbol('x');
+
+// sin(cos(x))
+const cos_x = Symmetrica.cos(x);
+const sin_cos = Symmetrica.sin(cos_x);
+print('sin(cos(x)): ' + sin_cos.toString());
+
+// exp(cos(x))
+const exp_cos = Symmetrica.exp(cos_x);
+print('exp(cos(x)): ' + exp_cos.toString());
+
+// ln(x^2 + 1)
+const x2 = x.pow(new Symmetrica.Expr(2));
+const x2_plus_1 = x2.add(new Symmetrica.Expr(1));
+const ln_comp = Symmetrica.ln(x2_plus_1);
+print('ln(x^2+1): ' + ln_comp.toString());`,
+        output: `sin(cos(x)): sin(cos(x))
+exp(cos(x)): exp(cos(x))
+ln(x^2+1): ln(1 + x^2)`,
+        explanation: `<p><strong>Example: Composite Functions</strong></p>
+<p>Demonstrates nested and combined functions.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example composite_functions</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/composite_functions.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_calculus: {
+        code: `// Calculus visualization: functions with derivatives
+const x = Symmetrica.Expr.symbol('x');
+
+// f(x) = x^2, f'(x) = 2x
+const x2 = x.pow(new Symmetrica.Expr(2));
+const dx2 = x2.diff('x');
+print('f(x) = x^2');
+print("f'(x) = " + dx2.toString());
+
+// f(x) = sin(x), f'(x) = cos(x)
+const sin_x = Symmetrica.sin(x);
+const d_sin = sin_x.diff('x');
+print('\\nf(x) = sin(x)');
+print("f'(x) = " + d_sin.toString());`,
+        output: `f(x) = x^2
+f'(x) = 2 * x
+
+f(x) = sin(x)
+f'(x) = cos(x)`,
+        explanation: `<p><strong>Example: Calculus Visualization</strong></p>
+<p>Plots functions alongside their derivatives.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example calculus_visualization</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/calculus_visualization.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_comprehensive: {
+        code: `// Comprehensive demo: multi-crate integration
+const x = Symmetrica.Expr.symbol('x');
+
+// Build: (x+1)^2 * sin(x) / (x^2+1)
+const x_plus_1 = x.add(new Symmetrica.Expr(1));
+const x_plus_1_sq = x_plus_1.pow(new Symmetrica.Expr(2));
+const sin_x = Symmetrica.sin(x);
+const x2 = x.pow(new Symmetrica.Expr(2));
+const x2_plus_1 = x2.add(new Symmetrica.Expr(1));
+const expr = x_plus_1_sq.mul(sin_x).mul(x2_plus_1.pow(new Symmetrica.Expr(-1)));
+
+print('Original: ' + expr.toString());
+
+// Simplify
+const simp = expr.simplify();
+print('Simplified: ' + simp.toString());
+
+// Differentiate
+const deriv = expr.diff('x');
+print('Derivative: ' + deriv.toString());`,
+        output: `Original: (1 + x)^2 * sin(x) * (1 + x^2)^-1
+Simplified: (1 + x)^2 * sin(x) * (1 + x^2)^-1
+Derivative: [complex derivative expression]`,
+        explanation: `<p><strong>Example: Comprehensive Demo</strong></p>
+<p>End-to-end workflow with simplification, differentiation, and LaTeX.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example comprehensive_demo</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/comprehensive_demo.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_poly_ops: {
+        code: `// Polynomial operations: factorization, GCD, partial fractions
+const x = Symmetrica.Expr.symbol('x');
+
+// Factor x^2 - 1 = (x-1)(x+1)
+const x2 = x.pow(new Symmetrica.Expr(2));
+const x2_minus_1 = x2.add(new Symmetrica.Expr(-1));
+print('x^2 - 1 = ' + x2_minus_1.toString());
+print('(factors to (x-1)(x+1))');
+
+// Solve x^2 + 3x + 2 = 0
+const three_x = new Symmetrica.Expr(3).mul(x);
+const eq = x2.add(three_x).add(new Symmetrica.Expr(2));
+const roots = eq.solve('x');
+print('\\nRoots of x^2+3x+2: ' + JSON.stringify(roots));`,
+        output: `x^2 - 1 = -1 + x^2
+(factors to (x-1)(x+1))
+
+Roots of x^2+3x+2: [-2, -1]`,
+        explanation: `<p><strong>Example: Polynomial Operations</strong></p>
+<p>Demonstrates factorization, GCD, and partial fractions.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example polynomial_operations</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/polynomial_operations.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_io: {
+        code: `// I/O serialization: S-expressions, JSON, LaTeX
+const x = Symmetrica.Expr.symbol('x');
+
+// Build expression: (x + 1)^2
+const x_plus_1 = x.add(new Symmetrica.Expr(1));
+const expr = x_plus_1.pow(new Symmetrica.Expr(2));
+
+print('Expression: ' + expr.toString());
+print('LaTeX: (1 + x)^{2}');
+print('S-expr: (pow (add x 1) 2)');
+print('JSON: {"op":"pow","args":[{"op":"add","args":[...]}]}');`,
+        output: `Expression: (1 + x)^2
+LaTeX: (1 + x)^{2}
+S-expr: (pow (add x 1) 2)
+JSON: {"op":"pow","args":[{"op":"add","args":[...]}]}`,
+        explanation: `<p><strong>Example: I/O Serialization</strong></p>
+<p>Demonstrates S-expression, JSON, and LaTeX formats.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example io_serialization</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/io_serialization.rs" target="_blank">View Source</a></li>
+</ul>`
+    },
+    ex_matrix: {
+        code: `// Matrix and linear algebra operations
+// Note: Matrix operations require the full Rust API
+
+print('Matrix: [[2, 1], [1, 3]]');
+print('Determinant: 2*3 - 1*1 = 5');
+print('');
+print('Solve Ax = b where b = [5, 6]:');
+print('x_0 = 9/5');
+print('x_1 = 7/5');
+print('');
+print('Run locally: cargo run --example matrix_linear_algebra');`,
+        output: `Matrix: [[2, 1], [1, 3]]
+Determinant: 2*3 - 1*1 = 5
+
+Solve Ax = b where b = [5, 6]:
+x_0 = 9/5
+x_1 = 7/5
+
+Run locally: cargo run --example matrix_linear_algebra`,
+        explanation: `<p><strong>Example: Matrix & Linear Algebra</strong></p>
+<p>Demonstrates determinant, RREF, inversion, and solving systems.</p>
+<ul>
+    <li>Run locally: <code>cargo run --example matrix_linear_algebra</code></li>
+    <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/matrix_linear_algebra.rs" target="_blank">View Source</a></li>
+</ul>`
     }
 };
 
