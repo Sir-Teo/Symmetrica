@@ -841,6 +841,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "symmetrica"
+version = "1.0.0-rc.2"
+dependencies = [
+ "calculus",
+ "expr_core",
+ "io",
+ "matrix",
+ "pattern",
+ "plot",
+ "polys",
+ "simplify",
+ "solver",
+]
+
+[[package]]
 name = "symmetrica-wasm"
 version = "1.0.0-rc.1"
 dependencies = [

@@ -22,3 +22,76 @@ members = [
 
 [workspace.package]
 edition = "2021"
+
+[package]
+name = "symmetrica"
+version = "1.0.0-rc.2"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Comprehensive Computer Algebra System for symbolic mathematics"
+
+[dependencies]
+expr_core = { path = "crates/expr_core" }
+calculus = { path = "crates/calculus" }
+simplify = { path = "crates/simplify" }
+pattern = { path = "crates/pattern" }
+plot = { path = "crates/plot" }
+io = { path = "crates/io" }
+polys = { path = "crates/polys" }
+solver = { path = "crates/solver" }
+matrix = { path = "crates/matrix" }
+arith = { path = "crates/arith" }
+evalf = { path = "crates/evalf" }
+
+# Examples
+[[example]]
+name = "basic_polynomial"
+path = "examples/basic_polynomial.rs"
+
+[[example]]
+name = "trigonometric"
+path = "examples/trigonometric.rs"
+
+[[example]]
+name = "exponential_logarithm"
+path = "examples/exponential_logarithm.rs"
+
+[[example]]
+name = "rational_functions"
+path = "examples/rational_functions.rs"
+
+[[example]]
+name = "power_functions"
+path = "examples/power_functions.rs"
+
+[[example]]
+name = "composite_functions"
+path = "examples/composite_functions.rs"
+
+[[example]]
+name = "plot_configuration"
+path = "examples/plot_configuration.rs"
+
+[[example]]
+name = "calculus_visualization"
+path = "examples/calculus_visualization.rs"
+
+[[example]]
+name = "comprehensive_demo"
+path = "examples/comprehensive_demo.rs"
+
+[[example]]
+name = "edge_cases"
+path = "examples/edge_cases.rs"
+
+[[example]]
+name = "polynomial_operations"
+path = "examples/polynomial_operations.rs"
+
+[[example]]
+name = "io_serialization"
+path = "examples/io_serialization.rs"
+
+[[example]]
+name = "matrix_linear_algebra"
+path = "examples/matrix_linear_algebra.rs"

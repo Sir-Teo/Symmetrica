@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples Catalog - Symmetrica</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/docs.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <style>
+        .example-card {
+            background: var(--surface-color, #1e1e2e);
+            border: 1px solid var(--border-color, #313244);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .example-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .example-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color, #89b4fa);
+        }
+        .example-badge {
+            background: var(--accent-color, #f38ba8);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        .example-focus {
+            color: var(--text-secondary, #cdd6f4);
+            font-style: italic;
+            margin-bottom: 0.5rem;
+        }
+        .example-outputs {
+            background: var(--bg-darker, #11111b);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        .run-command {
+            background: var(--bg-darker, #11111b);
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid var(--accent-color, #f38ba8);
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        .key-concepts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .concept-tag {
+            background: var(--bg-darker, #11111b);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            color: var(--text-secondary, #cdd6f4);
+        }
+        .nav-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--bg-darker, #11111b);
+            border-radius: 8px;
+        }
+        .nav-pill {
+            padding: 0.5rem 1rem;
+            background: var(--surface-color, #1e1e2e);
+            border: 1px solid var(--border-color, #313244);
+            border-radius: 4px;
+            text-decoration: none;
+            color: var(--text-color, #cdd6f4);
+            transition: all 0.2s;
+        }
+        .nav-pill:hover {
+            background: var(--accent-color, #f38ba8);
+            color: white;
+            border-color: var(--accent-color, #f38ba8);
+        }
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--primary-color, #89b4fa);
+            color: white;
+            border-radius: 4px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .github-link:hover {
+            background: var(--accent-color, #f38ba8);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">Σ</span>
+                <span class="brand-name">Symmetrica</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="getting-started.html">Get Started</a></li>
+                <li><a href="examples.html">Examples</a></li>
+                <li><a href="examples-catalog.html" class="active">Catalog</a></li>
+                <li><a href="playground.html">Playground</a></li>
+                <li><a href="https://github.com/Sir-Teo/Symmetrica" target="_blank">GitHub</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar">
+            <nav class="docs-nav">
+                <h3>Examples</h3>
+                <ul>
+                    <li><a href="#basic-polynomial">Basic Polynomial</a></li>
+                    <li><a href="#trigonometric">Trigonometric</a></li>
+                    <li><a href="#exponential">Exponential & Log</a></li>
+                    <li><a href="#rational">Rational Functions</a></li>
+                    <li><a href="#power">Power Functions</a></li>
+                    <li><a href="#composite">Composite Functions</a></li>
+                    <li><a href="#plot-config">Plot Configuration</a></li>
+                    <li><a href="#calculus">Calculus Visualization</a></li>
+                    <li><a href="#comprehensive">Comprehensive Demo</a></li>
+                    <li><a href="#edge-cases">Edge Cases</a></li>
+                    <li><a href="#polynomial-ops">Polynomial Operations</a></li>
+                    <li><a href="#io-serialization">I/O Serialization</a></li>
+                    <li><a href="#matrix">Matrix & Linear Algebra</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="docs-content">
+            <h1>Runnable Examples Catalog</h1>
+            <p class="lead">All 13 examples with full source code and run instructions.</p>
+
+            <div class="success-box">
+                <strong>Quick Start:</strong> Clone the repository and run any example with:
+                <div class="run-command">cargo run --example &lt;example_name&gt;</div>
+            </div>
+
+            <nav class="nav-pills">
+                <a href="#basic-polynomial" class="nav-pill">Polynomials</a>
+                <a href="#trigonometric" class="nav-pill">Trig</a>
+                <a href="#exponential" class="nav-pill">Exp/Log</a>
+                <a href="#rational" class="nav-pill">Rationals</a>
+                <a href="#power" class="nav-pill">Powers</a>
+                <a href="#composite" class="nav-pill">Compositions</a>
+                <a href="#calculus" class="nav-pill">Calculus</a>
+                <a href="#comprehensive" class="nav-pill">Full Demo</a>
+            </nav>
+
+            <!-- Example 1: Basic Polynomial -->
+            <section id="basic-polynomial" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">1. Basic Polynomial</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Polynomial functions</p>
+                <p>Demonstrates plotting of basic polynomial expressions: parabola (x²), cubic (x³), quadratic with linear term, and higher degree polynomial (x⁴ - 2x²).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> parabola.svg, cubic.svg, quadratic.svg, quartic.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example basic_polynomial
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Expression Building</span>
+                    <span class="concept-tag">Power Functions</span>
+                    <span class="concept-tag">SVG Plotting</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/basic_polynomial.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 2: Trigonometric -->
+            <section id="trigonometric" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">2. Trigonometric Functions</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Trigonometric functions</p>
+                <p>Plots various trigonometric expressions including sin(x), cos(x), frequency modulation sin(2x), amplitude scaling 2·sin(x), combinations sin(x) + cos(x), and composition sin(x²).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> sin_x.svg, cos_x.svg, sin_2x.svg, 2_sin_x.svg, sin_plus_cos.svg, sin_times_cos.svg, sin_x_squared.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example trigonometric
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Function Nodes</span>
+                    <span class="concept-tag">Trig Evaluation</span>
+                    <span class="concept-tag">Frequency/Amplitude</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/trigonometric.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 3: Exponential & Logarithm -->
+            <section id="exponential" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">3. Exponential & Logarithmic</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Exponential and logarithmic functions</p>
+                <p>Demonstrates exp and ln functions including exp(x), ln(x), exponential decay exp(-x), compositions like exp(x²), ln(x²), exp(sin(x)), and products like x·exp(-x).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> exp_x.svg, ln_x.svg, exp_neg_x.svg, exp_x_squared.svg, ln_x_squared.svg, x_exp_neg_x.svg, exp_sin_x.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example exponential_logarithm
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Exponential Growth</span>
+                    <span class="concept-tag">Logarithmic Domain</span>
+                    <span class="concept-tag">Decay Functions</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/exponential_logarithm.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 4: Rational Functions -->
+            <section id="rational" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">4. Rational Functions</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Rational functions (ratios of polynomials)</p>
+                <p>Plots various rational expressions including simple reciprocals 1/x and 1/x², proper rationals like x/(x²+1), classic curves like Witch of Agnesi 1/(1+x²), and higher degree rationals.</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> reciprocal.svg, reciprocal_squared.svg, x_over_x2_plus_1.svg, x2_minus_1_over_x2_plus_1.svg, witch_of_agnesi.svg, x3_over_x2_plus_1.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example rational_functions
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Negative Exponents</span>
+                    <span class="concept-tag">Discontinuities</span>
+                    <span class="concept-tag">Asymptotic Behavior</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/rational_functions.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 5: Power Functions -->
+            <section id="power" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">5. Power Functions</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Various power functions including fractional exponents</p>
+                <p>Demonstrates different exponent types: fractional exponents x^(1/2), x^(1/3), x^(3/2), x^(2/3), negative fractional x^(-1/2), compositions (x²)^(1/2), and higher odd powers x⁵.</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> sqrt_x.svg, cbrt_x.svg, x_three_halves.svg, x_two_thirds.svg, inv_sqrt_x.svg, sqrt_x_squared.svg, x_fifth.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example power_functions
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Rational Exponents</span>
+                    <span class="concept-tag">Domain Considerations</span>
+                    <span class="concept-tag">Even Roots</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/power_functions.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 6: Composite Functions -->
+            <section id="composite" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">6. Composite Functions</h2>
+                    <span class="example-badge">Plot</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Complex function compositions</p>
+                <p>Shows nested and combined functions: trig compositions sin(cos(x)), exp + trig exp(cos(x)) and sin(exp(x/2)), log compositions ln(x²+1) and ln(sin(x)+2), oscillating x·sin(1/x), and damped cos(x)·exp(-x²).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> sin_cos_x.svg, exp_cos_x.svg, sin_exp_half_x.svg, ln_x2_plus_1.svg, ln_sin_plus_2.svg, x_sin_inv_x.svg, damped_cosine.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example composite_functions
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Function Composition</span>
+                    <span class="concept-tag">Nested Evaluation</span>
+                    <span class="concept-tag">Complex Behavior</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/composite_functions.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 7: Plot Configuration -->
+            <section id="plot-config" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">7. Plot Configuration</h2>
+                    <span class="example-badge">Config</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> PlotConfig parameters and their effects</p>
+                <p>Demonstrates different configuration settings: sampling rates (20, 100, 500), plot dimensions (small 200×150, standard 400×300, large 800×600), x-axis ranges (narrow [-1,1], wide [-20,20]), and aspect ratios (square, wide).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> config_low_samples.svg, config_medium_samples.svg, config_high_samples.svg, config_small_dims.svg, config_standard_dims.svg, config_large_dims.svg, etc.
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example plot_configuration
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">PlotConfig Usage</span>
+                    <span class="concept-tag">Sampling Effects</span>
+                    <span class="concept-tag">Dimension Choices</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/plot_configuration.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 8: Calculus Visualization -->
+            <section id="calculus" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">8. Calculus Visualization</h2>
+                    <span class="example-badge">Calculus</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Functions with their derivatives</p>
+                <p>Plots functions alongside their derivatives: parabola x² and 2x, trig sin(x) and cos(x), exponential exp(x) and exp(x), cubic x³-3x and 3x²-3, logarithm ln(x) and 1/x, and second derivatives x⁴, 4x³, 12x².</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> calc_parabola.svg, calc_parabola_deriv.svg, calc_sin.svg, calc_sin_deriv.svg, calc_exp.svg, calc_exp_deriv.svg, calc_cubic.svg, etc.
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example calculus_visualization
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Calculus Module</span>
+                    <span class="concept-tag">Derivative Visualization</span>
+                    <span class="concept-tag">Critical Points</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/calculus_visualization.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 9: Comprehensive Demo -->
+            <section id="comprehensive" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">9. Comprehensive Demo</h2>
+                    <span class="example-badge">Full Demo</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> End-to-end workflow combining multiple features</p>
+                <p>Comprehensive demonstration: building complex expressions (x+1)²·sin(x)/(x²+1), simplification, LaTeX output, plotting, differentiation, pattern substitution (x → 2x), and multiple visualizations.</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> comprehensive_original.svg, comprehensive_derivative.svg, comprehensive_substituted.svg
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example comprehensive_demo
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Complete Workflow</span>
+                    <span class="concept-tag">Multi-Crate Integration</span>
+                    <span class="concept-tag">LaTeX Output</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/comprehensive_demo.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 10: Edge Cases -->
+            <section id="edge-cases" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">10. Edge Cases</h2>
+                    <span class="example-badge">Robustness</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Special behaviors and edge cases</p>
+                <p>Demonstrates how the plotter handles: discontinuities (1/x at x=0), domain restrictions (ln(x) for x≤0), vertical asymptotes (tan(x)), rapid oscillation sin(1/x), large dynamic range exp(x), constant functions, steep slopes x¹⁰, and complex domains x^(-1/2).</p>
+                
+                <div class="example-outputs">
+                    <strong>Outputs:</strong> edge_discontinuity.svg, edge_domain_restriction.svg, edge_vertical_asymptote.svg, edge_rapid_oscillation.svg, etc.
+                </div>
+
+                <div class="run-command">
+                    $ cargo run --example edge_cases
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Robustness</span>
+                    <span class="concept-tag">Non-Finite Handling</span>
+                    <span class="concept-tag">Auto-Scaling</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/edge_cases.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 11: Polynomial Operations -->
+            <section id="polynomial-ops" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">11. Polynomial Operations</h2>
+                    <span class="example-badge">Algebra</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Polynomial algebra and operations</p>
+                <p>Demonstrates polynomial operations including factorization, GCD computation, partial fraction decomposition, and resultants using the polys crate.</p>
+                
+                <div class="run-command">
+                    $ cargo run --example polynomial_operations
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Factorization</span>
+                    <span class="concept-tag">GCD</span>
+                    <span class="concept-tag">Partial Fractions</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/polynomial_operations.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 12: I/O Serialization -->
+            <section id="io-serialization" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">12. I/O Serialization</h2>
+                    <span class="example-badge">I/O</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Expression serialization and parsing</p>
+                <p>Demonstrates various I/O formats: S-expression parsing and serialization, JSON serialization, and LaTeX output for mathematical typesetting.</p>
+                
+                <div class="run-command">
+                    $ cargo run --example io_serialization
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">S-Expressions</span>
+                    <span class="concept-tag">JSON</span>
+                    <span class="concept-tag">LaTeX</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/io_serialization.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <!-- Example 13: Matrix & Linear Algebra -->
+            <section id="matrix" class="example-card">
+                <div class="example-header">
+                    <h2 class="example-title">13. Matrix & Linear Algebra</h2>
+                    <span class="example-badge">Linear Algebra</span>
+                </div>
+                <p class="example-focus"><strong>Focus:</strong> Exact matrix operations over rationals</p>
+                <p>Demonstrates matrix operations: creation, determinant computation (Bareiss algorithm), RREF (row reduction), matrix inversion, and solving linear systems.</p>
+                
+                <div class="run-command">
+                    $ cargo run --example matrix_linear_algebra
+                </div>
+
+                <div class="key-concepts">
+                    <span class="concept-tag">Determinant</span>
+                    <span class="concept-tag">RREF</span>
+                    <span class="concept-tag">Matrix Inversion</span>
+                    <span class="concept-tag">Linear Systems</span>
+                </div>
+
+                <a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/matrix_linear_algebra.rs" 
+                   class="github-link" target="_blank">
+                    📂 View Source on GitHub
+                </a>
+            </section>
+
+            <div class="success-box" style="margin-top: 3rem;">
+                <h3>Running All Examples</h3>
+                <p>To run all examples at once:</p>
+                <div class="run-command">
+for example in basic_polynomial trigonometric exponential_logarithm rational_functions \
+power_functions composite_functions plot_configuration calculus_visualization \
+comprehensive_demo edge_cases polynomial_operations io_serialization matrix_linear_algebra; do
+    echo "Running $example..."
+    cargo run --example "$example"
+done
+                </div>
+            </div>
+
+            <div class="info-box" style="margin-top: 2rem;">
+                <h3>Key Features Demonstrated</h3>
+                <ul>
+                    <li><strong>Expression Building:</strong> Constructing symbolic expressions with Store</li>
+                    <li><strong>Function Types:</strong> Add, Mul, Pow, Symbol, Integer, Rational, Function</li>
+                    <li><strong>Standard Functions:</strong> sin, cos, exp, ln</li>
+                    <li><strong>Evaluation:</strong> f64 numerical evaluation via eval_f64</li>
+                    <li><strong>Plotting:</strong> SVG generation via plot_svg with PlotConfig</li>
+                    <li><strong>Integration:</strong> Working with other crates (calculus, simplify, pattern, io)</li>
+                    <li><strong>Edge Case Handling:</strong> Discontinuities, domain restrictions, auto-scaling</li>
+                </ul>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2025 Symmetrica Contributors. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script src="js/main.js"></script>
+</body>
+</html>
