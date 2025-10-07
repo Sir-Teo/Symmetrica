@@ -41,29 +41,6 @@ impl Monomial {
         Some(Monomial { exponents })
     }
 
-    #[test]
-    fn test_s_polynomial_structure() {
-        let mut st = Store::new();
-        let x = st.sym("x");
-        let y = st.sym("y");
-        let two = st.int(2);
-        // f = x^2 + y
-        let x2 = st.pow(x, two);
-        let f = st.add(vec![x2, y]);
-        // g = x*y + 1
-        let xy = st.mul(vec![x, y]);
-        let one = st.int(1);
-        let g = st.add(vec![xy, one]);
-
-        let vars = vec!["x".to_string(), "y".to_string()];
-        let s = s_polynomial(&mut st, f, g, &vars, MonomialOrder::Lex).expect("s poly");
-        // Should be an Add of two terms mf*f + (-1)*mg*g
-        assert_eq!(st.get(s).op, Op::Add);
-        let ch = st.get(s).children.clone();
-        assert_eq!(ch.len(), 2);
-        assert_eq!(st.get(ch[1]).op, Op::Mul);
-    }
-
     /// Total degree of the monomial
     pub fn degree(&self) -> i64 {
         self.exponents.values().sum()
@@ -170,15 +147,29 @@ pub fn s_polynomial(
     vars: &[String],
     order: MonomialOrder,
 ) -> Option<ExprId> {
-    // Extract terms (children of Add) or treat whole expr as single term
-    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+    // Extract terms (flatten nested adds)
+    fn collect_terms(store: &Store, p: ExprId, out: &mut Vec<ExprId>) {
         match store.get(p).op {
-            Op::Add => store.get(p).children.clone(),
-            _ => vec![p],
+            Op::Add => {
+                for &ch in &store.get(p).children {
+                    collect_terms(store, ch, out);
+                }
+            }
+            _ => out.push(p),
         }
     }
+    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+        let mut v = Vec::new();
+        collect_terms(store, p, &mut v);
+        v
+    }
 
-    fn leading_term(store: &Store, p: ExprId, vars: &[String], order: MonomialOrder) -> Option<ExprId> {
+    fn leading_term(
+        store: &Store,
+        p: ExprId,
+        vars: &[String],
+        order: MonomialOrder,
+    ) -> Option<ExprId> {
         let mut best: Option<(Monomial, ExprId)> = None;
         for t in terms_of(store, p) {
             if let Some(m) = Monomial::from_expr(store, t) {
@@ -203,14 +194,20 @@ pub fn s_polynomial(
                 continue;
             }
             let sym = store.sym(v);
-            if *e == 1 { factors.push(sym); } else {
+            if *e == 1 {
+                factors.push(sym);
+            } else {
                 let ei = store.int(*e);
                 let p = store.pow(sym, ei);
                 factors.push(p);
             }
         }
-        if factors.is_empty() { return store.int(1); }
-        if factors.len() == 1 { return factors[0]; }
+        if factors.is_empty() {
+            return store.int(1);
+        }
+        if factors.len() == 1 {
+            return factors[0];
+        }
         store.mul(factors)
     }
 
@@ -218,7 +215,9 @@ pub fn s_polynomial(
         let mut out = a.exponents.clone();
         for (k, vb) in &b.exponents {
             let va = *out.get(k).unwrap_or(&0);
-            if vb > &va { out.insert(k.clone(), *vb); }
+            if vb > &va {
+                out.insert(k.clone(), *vb);
+            }
         }
         out
     }
@@ -228,7 +227,9 @@ pub fn s_polynomial(
         for (k, va) in a {
             let vb = *b.exponents.get(k).unwrap_or(&0);
             let d = *va - vb;
-            if d != 0 { out.insert(k.clone(), d); }
+            if d != 0 {
+                out.insert(k.clone(), d);
+            }
         }
         out
     }
@@ -262,14 +263,28 @@ pub fn reduce(
     order: MonomialOrder,
 ) -> ExprId {
     // Helpers (duplicated from s_polynomial for now)
-    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+    fn collect_terms(store: &Store, p: ExprId, out: &mut Vec<ExprId>) {
         match store.get(p).op {
-            Op::Add => store.get(p).children.clone(),
-            _ => vec![p],
+            Op::Add => {
+                for &ch in &store.get(p).children {
+                    collect_terms(store, ch, out);
+                }
+            }
+            _ => out.push(p),
         }
     }
+    fn terms_of(store: &Store, p: ExprId) -> Vec<ExprId> {
+        let mut v = Vec::new();
+        collect_terms(store, p, &mut v);
+        v
+    }
 
-    fn leading_term(store: &Store, p: ExprId, vars: &[String], order: MonomialOrder) -> Option<ExprId> {
+    fn leading_term(
+        store: &Store,
+        p: ExprId,
+        vars: &[String],
+        order: MonomialOrder,
+    ) -> Option<ExprId> {
         let mut best: Option<(Monomial, ExprId)> = None;
         for t in terms_of(store, p) {
             if let Some(m) = Monomial::from_expr(store, t) {
@@ -289,22 +304,32 @@ pub fn reduce(
     fn monomial_expr(store: &mut Store, exps: &HashMap<String, i64>) -> ExprId {
         let mut factors: Vec<ExprId> = Vec::new();
         for (v, e) in exps.iter() {
-            if *e == 0 { continue; }
+            if *e == 0 {
+                continue;
+            }
             let sym = store.sym(v);
-            if *e == 1 { factors.push(sym); } else {
+            if *e == 1 {
+                factors.push(sym);
+            } else {
                 let ei = store.int(*e);
                 factors.push(store.pow(sym, ei));
             }
         }
-        if factors.is_empty() { return store.int(1); }
-        if factors.len() == 1 { return factors[0]; }
+        if factors.is_empty() {
+            return store.int(1);
+        }
+        if factors.len() == 1 {
+            return factors[0];
+        }
         store.mul(factors)
     }
 
     fn exp_ge(a: &HashMap<String, i64>, b: &HashMap<String, i64>) -> bool {
         for (k, vb) in b {
             let va = *a.get(k).unwrap_or(&0);
-            if va < *vb { return false; }
+            if va < *vb {
+                return false;
+            }
         }
         true
     }
@@ -314,9 +339,23 @@ pub fn reduce(
         for (k, va) in a {
             let vb = *b.get(k).unwrap_or(&0);
             let d = *va - vb;
-            if d != 0 { out.insert(k.clone(), d); }
+            if d != 0 {
+                out.insert(k.clone(), d);
+            }
         }
         out
+    }
+
+    fn rebuild_without_term(store: &mut Store, p: ExprId, t: ExprId) -> ExprId {
+        let mut terms = terms_of(store, p);
+        if let Some(pos) = terms.iter().position(|&e| e == t) {
+            terms.remove(pos);
+        }
+        match terms.len() {
+            0 => store.int(0),
+            1 => terms[0],
+            _ => store.add(terms),
+        }
     }
 
     let mut p = f;
@@ -327,20 +366,36 @@ pub fn reduce(
         steps += 1;
         changed = false;
         // Pick a term from p
-        let lt_p = if let Some(t) = leading_term(store, p, vars, order) { t } else { break; };
-        let mp = if let Some(m) = Monomial::from_expr(store, lt_p) { m } else { break; };
+        let lt_p = if let Some(t) = leading_term(store, p, vars, order) {
+            t
+        } else {
+            break;
+        };
+        let mp = if let Some(m) = Monomial::from_expr(store, lt_p) {
+            m
+        } else {
+            break;
+        };
 
         // Try to reduce with basis
         'outer: for &g in basis {
             if let Some(lt_g) = leading_term(store, g, vars, order) {
                 if let (Some(mg),) = (Monomial::from_expr(store, lt_g),) {
                     if exp_ge(&mp.exponents, &mg.exponents) {
-                        let q_exp = exp_sub(&mp.exponents, &mg.exponents);
-                        let q = monomial_expr(store, &q_exp);
-                        let qg = store.mul(vec![q, g]);
-                        let neg_one = store.int(-1);
-                        let sub = store.mul(vec![neg_one, qg]);
-                        p = store.add(vec![p, sub]);
+                        // If g is a monomial polynomial (single term), then q*g == lt_p:
+                        // remove lt_p directly to avoid coefficient arithmetic.
+                        let g_is_monomial_poly = !matches!(store.get(g).op, Op::Add)
+                            && Monomial::from_expr(store, g).is_some();
+                        if g_is_monomial_poly {
+                            p = rebuild_without_term(store, p, lt_p);
+                        } else {
+                            let q_exp = exp_sub(&mp.exponents, &mg.exponents);
+                            let q = monomial_expr(store, &q_exp);
+                            let qg = store.mul(vec![q, g]);
+                            let neg_one = store.int(-1);
+                            let sub = store.mul(vec![neg_one, qg]);
+                            p = store.add(vec![p, sub]);
+                        }
                         changed = true;
                         break 'outer;
                     }

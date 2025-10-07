@@ -7,15 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Phase 6 advanced simplifier wiring (trig/log/radicals)
-- Phase 3–5 foundations (special, grobner, summation)
-- Phase 7 scaffold (number theory: primality, modular inverse)
+- Pending
 
 ### Changed
-- Align calculus tests with simplifier contraction behavior
+- Pending
 
 ### Fixed
-- Clippy lints in number_theory
+- Pending
+
+## [1.0.0-rc.2] - 2025-10-06
+### Added
+- Phase 3 numerics: `Gamma` (Lanczos + reflection) and `Ei` (series) with unit tests in `crates/special/`.
+- Phase 4 Gröbner: `s_polynomial()` and a naive `reduce()` with unit tests in `crates/grobner/`.
+- Phase 6 E2E tests: trig identities (product-to-sum, half-angle), log quotient expansion, radical rationalization.
+- Phase 7 number theory: `is_prime_u64`, `mod_inverse`, `crt_pair`, `crt` APIs; experimental factorization (Pollard’s rho Brent variant) behind feature.
+- Docs: per-crate READMEs for `number_theory/`, `special/`, and `grobner/`; doc examples for public APIs.
+
+### Changed
+- Promoted `crt_pair()` and `crt()` to stable in `crates/number_theory/` (no feature required).
+- Satisfied `cargo-deny` by adding `license`/`description` to `special/` and `summation/`.
+- Increased coverage (~79.11%); HTML at `tarpaulin-report.html`.
+
+### Fixed
+- Clippy: precision/grouping in `Gamma` coefficients, boolean comparisons, misplaced test attributes, and minor style issues.
+- Gröbner `reduce()`: nested `Add` term handling and monomial divisor special-case to ensure structural remainder.
 
 ## [1.1.0] - 2025-10-06
 ### Added

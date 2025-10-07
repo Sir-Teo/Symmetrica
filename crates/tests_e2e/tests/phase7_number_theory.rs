@@ -1,5 +1,5 @@
 #![deny(warnings)]
-use number_theory::{factor, is_prime_u64, mod_inverse, crt_pair};
+use number_theory::{crt_pair, factor, is_prime_u64, mod_inverse};
 
 #[test]
 fn primality_various() {

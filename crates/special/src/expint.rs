@@ -20,8 +20,6 @@ impl SpecialFunction for EiFunction {
         "Ei"
     }
 
-    
-
     fn arity(&self) -> usize {
         1
     }

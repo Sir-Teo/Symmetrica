@@ -117,7 +117,10 @@ fn radical_rationalization_reciprocal_sqrt() {
             let children = &st.get(s).children;
             assert_eq!(children.len(), 2);
             // exponent must be -1/2
-            assert!(matches!((&st.get(children[1]).op, &st.get(children[1]).payload), (Op::Rational, Payload::Rat(-1, 2))));
+            assert!(matches!(
+                (&st.get(children[1]).op, &st.get(children[1]).payload),
+                (Op::Rational, Payload::Rat(-1, 2))
+            ));
         }
         Op::Mul => {
             let sstr = st.to_string(s);

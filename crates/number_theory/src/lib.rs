@@ -23,9 +23,19 @@ fn mod_pow(mut base: u128, mut exp: u128, m: u128) -> u128 {
     result
 }
 
-#[cfg(any(test, feature = "number_theory_experimental"))]
 /// Chinese Remainder Theorem for multiple congruences.
 /// Input: slice of (a_i, m_i). Returns (x, M) where M=lcm of moduli, if consistent.
+///
+/// # Examples
+///
+/// ```
+/// use number_theory::crt;
+/// let (x, m) = crt(&[(2, 3), (3, 5), (2, 7)]).unwrap();
+/// assert_eq!(m, 105);
+/// assert_eq!(x % 3, 2);
+/// assert_eq!(x % 5, 3);
+/// assert_eq!(x % 7, 2);
+/// ```
 pub fn crt(congruences: &[(u128, u128)]) -> Option<(u128, u128)> {
     if congruences.is_empty() {
         return None;
@@ -96,6 +106,91 @@ pub fn pollards_rho(n: u64) -> Option<u64> {
 }
 
 #[cfg(any(test, feature = "number_theory_experimental"))]
+struct SplitMix64 {
+    state: u64,
+}
+
+#[cfg(any(test, feature = "number_theory_experimental"))]
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    }
+}
+
+#[cfg(any(test, feature = "number_theory_experimental"))]
+/// Pollard's rho with Brent's cycle detection. Multiple randomized attempts.
+pub fn pollards_rho_brent(n: u64) -> Option<u64> {
+    if n < 2 {
+        return None;
+    }
+    if n.is_multiple_of(2) {
+        return Some(2);
+    }
+    if is_prime_u64(n) {
+        return None;
+    }
+
+    let nn = n as u128;
+    let mut rng = SplitMix64::new(n ^ 0xDEAD_BEEF_CAFE_BABE);
+    // Up to 8 attempts with different parameters
+    for _ in 0..8 {
+        let mut y = (rng.next_u64() % (n - 1) + 1) as u128;
+        let c = (rng.next_u64() % (n - 1) + 1) as u128;
+        let m = 1u64 << (4 + (rng.next_u64() % 4)); // 16,32,64,128
+        let f = |x: u128| ((x * x) + c) % nn;
+
+        let mut g: u128 = 1;
+        let mut r: u128 = 1;
+        let mut q: u128 = 1;
+        let mut x: u128 = 0;
+        let mut ys: u128 = 0;
+
+        while g == 1 {
+            x = y;
+            for _ in 0..r {
+                y = f(y);
+            }
+            let mut k: u128 = 0;
+            while k < r && g == 1 {
+                ys = y;
+                let lim = std::cmp::min(m as u128, r - k);
+                for _ in 0..lim {
+                    y = f(y);
+                    let diff = x.abs_diff(y);
+                    q = (q * (diff % nn)) % nn;
+                }
+                g = gcd_u128(q, nn);
+                k += lim;
+            }
+            r <<= 1;
+        }
+        if g == nn {
+            loop {
+                ys = f(ys);
+                let diff = x.abs_diff(ys);
+                let d = gcd_u128(diff, nn);
+                if d > 1 && d < nn {
+                    return Some(d as u64);
+                }
+                if d == nn {
+                    break;
+                }
+            }
+        } else if g > 1 && g < nn {
+            return Some(g as u64);
+        }
+    }
+    None
+}
+
+#[cfg(any(test, feature = "number_theory_experimental"))]
 /// Factor n into prime factors using Pollard's rho and primality checks.
 pub fn factor(n: u64) -> Vec<u64> {
     let mut result = Vec::new();
@@ -116,7 +211,7 @@ pub fn factor(n: u64) -> Vec<u64> {
             stack.push(m / 2);
             continue;
         }
-        if let Some(f) = pollards_rho(m) {
+        if let Some(f) = pollards_rho_brent(m).or_else(|| pollards_rho(m)) {
             stack.push(f);
             stack.push(m / f);
         } else {
@@ -139,8 +234,19 @@ pub fn factor(n: u64) -> Vec<u64> {
     result
 }
 
-#[cfg(any(test, feature = "number_theory_experimental"))]
 /// Chinese Remainder Theorem for two congruences.
+/// Returns (x, M) such that x ≡ a1 (mod m1) and x ≡ a2 (mod m2), where M = lcm(m1, m2).
+/// If the system is inconsistent, returns None.
+///
+/// # Examples
+///
+/// ```
+/// use number_theory::crt_pair;
+/// let (x, m) = crt_pair(2, 3, 3, 5).unwrap();
+/// assert_eq!(m, 15);
+/// assert_eq!(x % 3, 2);
+/// assert_eq!(x % 5, 3);
+/// ```
 pub fn crt_pair(a1: u128, m1: u128, a2: u128, m2: u128) -> Option<(u128, u128)> {
     if m1 == 0 || m2 == 0 {
         return None;
@@ -176,10 +282,16 @@ pub fn gcd_u128(a: u128, b: u128) -> u128 {
     a
 }
 
- 
-
 /// Compute modular inverse of a modulo m, if it exists.
 /// Returns Some(inv) such that (a*inv) % m == 1, or None if gcd(a,m) != 1.
+///
+/// # Examples
+///
+/// ```
+/// use number_theory::mod_inverse;
+/// assert_eq!(mod_inverse(3, 10), Some(7));
+/// assert_eq!(mod_inverse(2, 4), None);
+/// ```
 pub fn mod_inverse(a: u64, m: u64) -> Option<u64> {
     if m == 0 {
         return None;
@@ -216,6 +328,14 @@ fn miller_rabin_round(n: u128, d: u128, s: u32, a: u128) -> bool {
 
 /// Strong probable-prime test for u64 using Miller–Rabin with common bases.
 /// This is a robust check for primes; suitable as a building block for Phase 7.
+///
+/// # Examples
+///
+/// ```
+/// use number_theory::is_prime_u64;
+/// assert!(is_prime_u64(1_000_000_007));
+/// assert!(!is_prime_u64(1_000_000_008));
+/// ```
 pub fn is_prime_u64(n: u64) -> bool {
     // Handle small cases
     if n < 2 {
@@ -319,6 +439,29 @@ mod tests {
         let mut fs = factor(n);
         fs.sort_unstable();
         assert_eq!(fs, vec![p, q]);
+    }
+
+    #[test]
+    fn factor_semiprime_additional() {
+        let p: u64 = 999_983; // prime
+        let q: u64 = 1_000_003; // prime
+        let n = p * q;
+        let mut fs = factor(n);
+        fs.sort_unstable();
+        assert_eq!(fs, vec![p, q]);
+    }
+
+    #[test]
+    fn factor_with_powers() {
+        // 2^8 * 3^5
+        let n = (1u64 << 8) * 243u64;
+        let mut fs = factor(n);
+        fs.sort_unstable();
+        let mut expected = vec![];
+        expected.extend(std::iter::repeat_n(2u64, 8));
+        expected.extend(std::iter::repeat_n(3u64, 5));
+        expected.sort_unstable();
+        assert_eq!(fs, expected);
     }
 
     #[test]
