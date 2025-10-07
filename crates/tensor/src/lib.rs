@@ -14,11 +14,7 @@ impl<T: Clone> Tensor<T> {
         assert!(!shape.is_empty(), "tensor must have rank >= 1");
         let size = shape.iter().product();
         let strides = compute_strides(&shape);
-        Self {
-            shape,
-            strides,
-            data: vec![fill; size],
-        }
+        Self { shape, strides, data: vec![fill; size] }
     }
 
     pub fn from_vec(shape: Vec<usize>, data: Vec<T>) -> Self {
@@ -28,10 +24,18 @@ impl<T: Clone> Tensor<T> {
         Self { shape, strides, data }
     }
 
-    pub fn rank(&self) -> usize { self.shape.len() }
-    pub fn len(&self) -> usize { self.data.len() }
-    pub fn is_empty(&self) -> bool { self.data.is_empty() }
-    pub fn shape(&self) -> &[usize] { &self.shape }
+    pub fn rank(&self) -> usize {
+        self.shape.len()
+    }
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+    pub fn shape(&self) -> &[usize] {
+        &self.shape
+    }
 
     fn offset(&self, idx: &[usize]) -> usize {
         assert_eq!(idx.len(), self.shape.len(), "index rank mismatch");
@@ -75,7 +79,9 @@ impl<T: Clone> Tensor<T> {
         }
         // New shape
         let mut new_shape = vec![0usize; perm.len()];
-        for i in 0..perm.len() { new_shape[i] = self.shape[perm[i]]; }
+        for i in 0..perm.len() {
+            new_shape[i] = self.shape[perm[i]];
+        }
         let out_size: usize = new_shape.iter().product();
         let mut out_data = Vec::with_capacity(out_size);
         for flat in 0..out_size {
@@ -111,12 +117,8 @@ where
     /// Elementwise multiplication; shapes must match.
     pub fn elem_mul(&self, other: &Tensor<T>) -> Tensor<T> {
         assert_eq!(self.shape, other.shape, "shape mismatch");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a.clone() * b.clone())
-            .collect();
+        let data =
+            self.data.iter().zip(other.data.iter()).map(|(a, b)| a.clone() * b.clone()).collect();
         Tensor::from_vec(self.shape.clone(), data)
     }
 }
@@ -184,12 +186,8 @@ where
     /// Elementwise addition; shapes must match.
     pub fn elem_add(&self, other: &Tensor<T>) -> Tensor<T> {
         assert_eq!(self.shape, other.shape, "shape mismatch");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(a, b)| a.clone() + b.clone())
-            .collect();
+        let data =
+            self.data.iter().zip(other.data.iter()).map(|(a, b)| a.clone() + b.clone()).collect();
         Tensor::from_vec(self.shape.clone(), data)
     }
 
@@ -200,7 +198,9 @@ where
         let mut out_shape = Vec::new();
         out_shape.extend_from_slice(&self.shape[..axis]);
         out_shape.extend_from_slice(&self.shape[axis + 1..]);
-        if out_shape.is_empty() { out_shape.push(1); }
+        if out_shape.is_empty() {
+            out_shape.push(1);
+        }
         let out_size: usize = out_shape.iter().product();
         let mut out_data = vec![T::default(); out_size];
         for (flat, slot) in out_data.iter_mut().enumerate() {
@@ -257,7 +257,9 @@ where
         // Keep axes other than axis1, axis2
         let keep: Vec<usize> = (0..self.rank()).filter(|&a| a != axis1 && a != axis2).collect();
         let mut out_shape: Vec<usize> = keep.iter().map(|&a| self.shape[a]).collect();
-        if out_shape.is_empty() { out_shape.push(1); }
+        if out_shape.is_empty() {
+            out_shape.push(1);
+        }
         let out_size: usize = out_shape.iter().product();
         let mut out_data = vec![T::default(); out_size];
 

@@ -76,7 +76,9 @@ impl Mul for Quad {
 mod tests {
     use super::*;
 
-    fn q(n: i64, d: i64) -> Q { Q::new(n, d) }
+    fn q(n: i64, d: i64) -> Q {
+        Q::new(n, d)
+    }
 
     #[test]
     fn add_sub_mul_basic() {
