@@ -31,11 +31,27 @@
 .examples-sidebar {
     background: var(--bg-dark);
     border-right: 1px solid var(--border);
-    padding: 2rem 0;
+    padding: 1.5rem 0;
     max-height: calc(100vh - 70px);
     overflow-y: auto;
     position: sticky;
     top: 70px;
+}
+
+/* Category counter badge */
+.examples-sidebar h3 {
+    position: relative;
+}
+
+.examples-sidebar h3::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--primary);
+    border-radius: 50%;
+    margin-left: 0.5rem;
+    vertical-align: middle;
 }
 
 .examples-sidebar::-webkit-scrollbar {
@@ -65,6 +81,20 @@
     margin-bottom: 0.75rem;
     margin-top: 0;
     opacity: 0.8;
+}
+
+.examples-sidebar h3:first-child {
+    margin-top: 0;
+}
+
+/* Fun Math section styling */
+.examples-sidebar h3:has(+ .example-list [data-example^="fun_"]),
+.examples-sidebar h3:contains("Fun Math") {
+    background: linear-gradient(90deg, #f38ba8, #fab387);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 1;
 }
 
 .example-list {

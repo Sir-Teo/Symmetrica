@@ -966,6 +966,326 @@ Run locally: cargo run --example matrix_linear_algebra`,
     <li>Run locally: <code>cargo run --example matrix_linear_algebra</code></li>
     <li><a href="https://github.com/Sir-Teo/Symmetrica/blob/main/examples/matrix_linear_algebra.rs" target="_blank">View Source</a></li>
 </ul>`
+    },
+    
+    // === FUN & CREATIVE EXAMPLES ===
+    fun_golden_ratio: {
+        code: `// Golden Ratio: Solve x^2 - x - 1 = 0
+const x = Symmetrica.Expr.symbol('x');
+const x2 = x.pow(new Symmetrica.Expr(2));
+const eq = x2.add(x.mul(new Symmetrica.Expr(-1))).add(new Symmetrica.Expr(-1));
+
+print('Equation: x² - x - 1 = 0');
+const roots = eq.solve('x');
+print('Golden ratio φ = ' + roots[0]);
+print('Conjugate = ' + roots[1]);
+print('');
+print('φ ≈ 1.618... (positive root)');`,
+        output: `Equation: x² - x - 1 = 0
+Golden ratio φ = (1 + sqrt(5)) / 2
+Conjugate = (1 - sqrt(5)) / 2
+
+φ ≈ 1.618... (positive root)`,
+        explanation: `<p><strong>Fun: Golden Ratio</strong></p>
+<p>The golden ratio φ appears everywhere in nature!</p>
+<ul>
+    <li>Defined by x² = x + 1</li>
+    <li>φ = (1 + √5)/2 ≈ 1.618</li>
+    <li>Found in spirals, art, architecture</li>
+</ul>`
+    },
+    fun_euler_identity: {
+        code: `// Euler's Identity components: e^(iπ) + 1 = 0
+const x = Symmetrica.Expr.symbol('x');
+
+// Taylor series for e^x
+const exp_x = Symmetrica.exp(x);
+print('exp(x) = 1 + x + x²/2! + x³/3! + ...');
+
+// Derivative shows e^x is its own derivative!
+const d_exp = exp_x.diff('x');
+print('d/dx exp(x) = ' + d_exp.toString());
+print('');
+print('Fun fact: e^(iπ) + 1 = 0');
+print('(Connects e, i, π, 1, and 0!)');`,
+        output: `exp(x) = 1 + x + x²/2! + x³/3! + ...
+d/dx exp(x) = exp(x)
+
+Fun fact: e^(iπ) + 1 = 0
+(Connects e, i, π, 1, and 0!)`,
+        explanation: `<p><strong>Fun: Euler's Identity</strong></p>
+<p>The most beautiful equation in mathematics!</p>
+<ul>
+    <li>e^(iπ) + 1 = 0</li>
+    <li>Connects 5 fundamental constants</li>
+    <li>exp(x) is its own derivative</li>
+</ul>`
+    },
+    fun_fibonacci: {
+        code: `// Fibonacci via Binet's Formula
+const x = Symmetrica.Expr.symbol('n');
+
+print('Fibonacci sequence: 0, 1, 1, 2, 3, 5, 8, 13...');
+print('');
+print("Binet's Formula:");
+print('F(n) = (φⁿ - ψⁿ) / √5');
+print('where φ = (1+√5)/2, ψ = (1-√5)/2');
+print('');
+print('F(5) = 5, F(10) = 55, F(20) = 6765');
+print('');
+print('As n→∞, F(n+1)/F(n) → φ (golden ratio!)');`,
+        output: `Fibonacci sequence: 0, 1, 1, 2, 3, 5, 8, 13...
+
+Binet's Formula:
+F(n) = (φⁿ - ψⁿ) / √5
+where φ = (1+√5)/2, ψ = (1-√5)/2
+
+F(5) = 5, F(10) = 55, F(20) = 6765
+
+As n→∞, F(n+1)/F(n) → φ (golden ratio!)`,
+        explanation: `<p><strong>Fun: Fibonacci Numbers</strong></p>
+<p>Nature's favorite sequence!</p>
+<ul>
+    <li>Each number is sum of previous two</li>
+    <li>Ratio approaches golden ratio φ</li>
+    <li>Found in spirals, flowers, shells</li>
+</ul>`
+    },
+    fun_pythagorean: {
+        code: `// Pythagorean Theorem: a² + b² = c²
+const a = Symmetrica.Expr.symbol('a');
+const b = Symmetrica.Expr.symbol('b');
+const c = Symmetrica.Expr.symbol('c');
+
+// For a=3, b=4, c=5
+const three = new Symmetrica.Expr(3);
+const four = new Symmetrica.Expr(4);
+const five = new Symmetrica.Expr(5);
+
+const a2 = three.pow(new Symmetrica.Expr(2));
+const b2 = four.pow(new Symmetrica.Expr(2));
+const c2 = five.pow(new Symmetrica.Expr(2));
+
+print('3² + 4² = ' + a2.add(b2).toString());
+print('5² = ' + c2.toString());
+print('');
+print('Classic Pythagorean triple: (3, 4, 5)');
+print('Others: (5,12,13), (8,15,17), (7,24,25)');`,
+        output: `3² + 4² = 25
+5² = 25
+
+Classic Pythagorean triple: (3, 4, 5)
+Others: (5,12,13), (8,15,17), (7,24,25)`,
+        explanation: `<p><strong>Fun: Pythagorean Theorem</strong></p>
+<p>The foundation of geometry!</p>
+<ul>
+    <li>a² + b² = c² for right triangles</li>
+    <li>Infinite Pythagorean triples exist</li>
+    <li>Used in distance, navigation, graphics</li>
+</ul>`
+    },
+    fun_prime_spiral: {
+        code: `// Prime number patterns
+print('First 20 primes:');
+print('2, 3, 5, 7, 11, 13, 17, 19, 23, 29,');
+print('31, 37, 41, 43, 47, 53, 59, 61, 67, 71');
+print('');
+print('Prime gaps:');
+print('2→3: gap 1, 3→5: gap 2, 7→11: gap 4');
+print('');
+print('Twin primes: (3,5), (5,7), (11,13), (17,19)...');
+print('');
+print('Largest known prime (2024):');
+print('2^136,279,841 - 1 (41 million digits!)');`,
+        output: `First 20 primes:
+2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
+31, 37, 41, 43, 47, 53, 59, 61, 67, 71
+
+Prime gaps:
+2→3: gap 1, 3→5: gap 2, 7→11: gap 4
+
+Twin primes: (3,5), (5,7), (11,13), (17,19)...
+
+Largest known prime (2024):
+2^136,279,841 - 1 (41 million digits!)`,
+        explanation: `<p><strong>Fun: Prime Numbers</strong></p>
+<p>The atoms of mathematics!</p>
+<ul>
+    <li>Infinitely many primes (Euclid's proof)</li>
+    <li>No formula generates all primes</li>
+    <li>Used in cryptography (RSA)</li>
+</ul>`
+    },
+    fun_mandelbrot: {
+        code: `// Mandelbrot Set: z → z² + c
+const z = Symmetrica.Expr.symbol('z');
+const c = Symmetrica.Expr.symbol('c');
+
+print('Mandelbrot iteration: z_{n+1} = z_n² + c');
+print('');
+print('Starting with z_0 = 0:');
+print('z_1 = c');
+print('z_2 = c² + c');
+print('z_3 = (c² + c)² + c');
+print('...');
+print('');
+print('If |z_n| stays bounded → c is in the set');
+print('Creates infinite fractal complexity!');
+print('Zoom forever, always find new patterns.');`,
+        output: `Mandelbrot iteration: z_{n+1} = z_n² + c
+
+Starting with z_0 = 0:
+z_1 = c
+z_2 = c² + c
+z_3 = (c² + c)² + c
+...
+
+If |z_n| stays bounded → c is in the set
+Creates infinite fractal complexity!
+Zoom forever, always find new patterns.`,
+        explanation: `<p><strong>Fun: Mandelbrot Set</strong></p>
+<p>The most famous fractal!</p>
+<ul>
+    <li>Simple formula: z → z² + c</li>
+    <li>Infinite complexity from iteration</li>
+    <li>Self-similar at all scales</li>
+</ul>`
+    },
+    fun_chaos: {
+        code: `// Logistic Map: x → r·x·(1-x)
+const x = Symmetrica.Expr.symbol('x');
+const r = Symmetrica.Expr.symbol('r');
+
+print('Logistic map: x_{n+1} = r·x_n·(1 - x_n)');
+print('');
+print('Behavior depends on r:');
+print('r < 1: dies to 0');
+print('1 < r < 3: stable fixed point');
+print('3 < r < 3.57: oscillates (period doubling)');
+print('r > 3.57: CHAOS!');
+print('');
+print('Tiny changes → completely different outcomes');
+print('(Butterfly effect in action!)');`,
+        output: `Logistic map: x_{n+1} = r·x_n·(1 - x_n)
+
+Behavior depends on r:
+r < 1: dies to 0
+1 < r < 3: stable fixed point
+3 < r < 3.57: oscillates (period doubling)
+r > 3.57: CHAOS!
+
+Tiny changes → completely different outcomes
+(Butterfly effect in action!)`,
+        explanation: `<p><strong>Fun: Chaos Theory</strong></p>
+<p>Simple rules, complex behavior!</p>
+<ul>
+    <li>Deterministic but unpredictable</li>
+    <li>Sensitive to initial conditions</li>
+    <li>Found in weather, populations, markets</li>
+</ul>`
+    },
+    fun_fourier: {
+        code: `// Fourier Series: Any periodic function as sum of sines/cosines
+const x = Symmetrica.Expr.symbol('x');
+
+print('Square wave approximation:');
+print('f(x) ≈ sin(x) + sin(3x)/3 + sin(5x)/5 + ...');
+print('');
+
+const sin_x = Symmetrica.sin(x);
+const sin_3x = Symmetrica.sin(new Symmetrica.Expr(3).mul(x));
+const sin_5x = Symmetrica.sin(new Symmetrica.Expr(5).mul(x));
+
+const approx = sin_x.add(sin_3x.mul(new Symmetrica.Expr(1, 3)))
+                    .add(sin_5x.mul(new Symmetrica.Expr(1, 5)));
+
+print('3-term approximation:');
+print(approx.toString());
+print('');
+print('More terms → better square wave!');`,
+        output: `Square wave approximation:
+f(x) ≈ sin(x) + sin(3x)/3 + sin(5x)/5 + ...
+
+3-term approximation:
+sin(x) + (1/3) * sin(3 * x) + (1/5) * sin(5 * x)
+
+More terms → better square wave!`,
+        explanation: `<p><strong>Fun: Fourier Series</strong></p>
+<p>Any wave is a sum of pure tones!</p>
+<ul>
+    <li>Decomposes signals into frequencies</li>
+    <li>Used in audio, image compression (JPEG)</li>
+    <li>Foundation of signal processing</li>
+</ul>`
+    },
+    fun_calculus_area: {
+        code: `// Calculus: Area under curve via integration
+const x = Symmetrica.Expr.symbol('x');
+
+// Area under x² from 0 to 1
+const x2 = x.pow(new Symmetrica.Expr(2));
+const integral = x2.integrate('x');
+
+print('Find area under y = x² from x=0 to x=1');
+print('');
+print('∫ x² dx = ' + integral.toString());
+print('');
+print('Evaluate at bounds:');
+print('[x³/3]₀¹ = 1³/3 - 0³/3 = 1/3');
+print('');
+print('Area = 1/3 square unit');
+print('(Riemann sums → exact answer!)');`,
+        output: `Find area under y = x² from x=0 to x=1
+
+∫ x² dx = (1/3) * x^3
+
+Evaluate at bounds:
+[x³/3]₀¹ = 1³/3 - 0³/3 = 1/3
+
+Area = 1/3 square unit
+(Riemann sums → exact answer!)`,
+        explanation: `<p><strong>Fun: Calculus Magic</strong></p>
+<p>Integration finds exact areas!</p>
+<ul>
+    <li>Infinite rectangles → exact answer</li>
+    <li>Antiderivative of x² is x³/3</li>
+    <li>Fundamental theorem connects ∫ and d/dx</li>
+</ul>`
+    },
+    fun_taylor_magic: {
+        code: `// Taylor Series: Functions as infinite polynomials!
+const x = Symmetrica.Expr.symbol('x');
+
+print('sin(x) = x - x³/3! + x⁵/5! - x⁷/7! + ...');
+print('cos(x) = 1 - x²/2! + x⁴/4! - x⁶/6! + ...');
+print('exp(x) = 1 + x + x²/2! + x³/3! + ...');
+print('');
+print('At x=0, all derivatives encode the function!');
+print('');
+
+const sin_x = Symmetrica.sin(x);
+const d1 = sin_x.diff('x');
+const d2 = d1.diff('x');
+
+print('sin(x) derivatives:');
+print("f'(x) = " + d1.toString());
+print('f"(x) = ' + d2.toString());`,
+        output: `sin(x) = x - x³/3! + x⁵/5! - x⁷/7! + ...
+cos(x) = 1 - x²/2! + x⁴/4! - x⁶/6! + ...
+exp(x) = 1 + x + x²/2! + x³/3! + ...
+
+At x=0, all derivatives encode the function!
+
+sin(x) derivatives:
+f'(x) = cos(x)
+f"(x) = -1 * sin(x)`,
+        explanation: `<p><strong>Fun: Taylor Series</strong></p>
+<p>Every smooth function is a polynomial!</p>
+<ul>
+    <li>Infinite sum of powers of x</li>
+    <li>Coefficients from derivatives at a point</li>
+    <li>Used in calculators and computers</li>
+</ul>`
     }
 };
 
