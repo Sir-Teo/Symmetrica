@@ -67,7 +67,7 @@ impl<T: Clone> Tensor<T> {
         Self { shape: new_shape, strides, data: self.data.clone() }
     }
 
-    /// Permute axes in the given order, e.g. [1,0] swaps two axes.
+    /// Permute axes in the given order, e.g. `[1,0]` swaps two axes.
     pub fn permute_axes(&self, perm: &[usize]) -> Self {
         assert_eq!(perm.len(), self.rank(), "perm length must equal rank");
         // Validate permutation
@@ -248,7 +248,7 @@ where
     }
 
     /// Trace along two axes with equal dimensions (sums diagonal elements over those axes).
-    /// For a matrix, use `trace_pair(0, 1)` which yields a scalar represented as shape [1].
+    /// For a matrix, use `trace_pair(0, 1)` which yields a scalar represented as shape `[1]`.
     pub fn trace_pair(&self, axis1: usize, axis2: usize) -> Tensor<T> {
         assert!(axis1 < self.rank() && axis2 < self.rank(), "axis out of range");
         assert!(axis1 != axis2, "axes must be distinct");
