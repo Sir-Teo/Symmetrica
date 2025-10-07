@@ -1,0 +1,9 @@
+[package]
+name = "tensor"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT OR Apache-2.0"
+description = "Tensor algebra basics: indexing, outer product, contraction"
+
+[dependencies]
+expr_core = { path = "../expr_core" }
