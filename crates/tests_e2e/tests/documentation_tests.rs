@@ -69,13 +69,8 @@ fn test_readme_completeness() {
     let content =
         std::fs::read_to_string(&readme_path).expect("README.md should exist and be readable");
 
-    let required_sections = vec![
-        "Symmetrica",
-        "Key Features",
-        "Usage Examples",
-        "Contributing",
-        "Licensing",
-    ];
+    let required_sections =
+        vec!["Symmetrica", "Key Features", "Usage Examples", "Contributing", "Licensing"];
 
     for section in required_sections {
         assert!(content.contains(section), "README.md missing required section: {}", section);
