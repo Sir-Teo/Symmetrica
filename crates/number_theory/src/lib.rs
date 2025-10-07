@@ -2,12 +2,19 @@
 //! number_theory: Phase 7 scaffold
 //! - Deterministic Miller–Rabin for u64 (common bases)
 //! - Modular arithmetic helpers
+//! - Factorization algorithms
+//! - Diophantine equation solvers
+//! - Extended modular arithmetic
 //!
 //! Note: The base set used here (2, 3, 5, 7, 11, 13, 17) is commonly
 //! used for 64-bit integers and is deterministic for large ranges.
 //! For truly full 64-bit determinism, larger specialized bases exist; we
 //! can add them when needed. For now, this offers a strong probable-prime
 //! test suitable for initial Phase 7 work.
+
+pub mod diophantine;
+pub mod factorization;
+pub mod modular;
 
 /// Compute (base^exp) mod m using repeated squaring.
 fn mod_pow(mut base: u128, mut exp: u128, m: u128) -> u128 {
