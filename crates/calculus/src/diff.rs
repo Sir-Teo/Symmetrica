@@ -2,6 +2,7 @@
 
 use expr_core::{ExprId, Op, Payload, Store};
 use simplify::simplify;
+use special::SpecialFunction;
 
 /// Differentiate expression `id` with respect to symbol `var`.
 /// Supported: Add (linearity), Mul (product rule), Pow with integer exponent (chain rule).
@@ -92,7 +93,7 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
             }
         }
         Op::Function => {
-            // Chain rule for common functions with a single argument.
+            // Chain rule for functions.
             let (fname, args) = {
                 let n = store.get(id);
                 let name = match &n.payload {
@@ -101,6 +102,43 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                 };
                 (name, n.children.clone())
             };
+
+            // Handle multi-argument functions (BesselJ, LegendreP, ChebyshevT)
+            if args.len() == 2 && matches!(fname.as_str(), "BesselJ" | "LegendreP" | "ChebyshevT") {
+                // For f(n, x), we differentiate w.r.t. x (second argument)
+                let x = args[1];
+                let dx = diff(store, x, var);
+
+                let out = match fname.as_str() {
+                    "BesselJ" => {
+                        let bessel_func = special::bessel::BesselJFunction;
+                        if let Some(deriv_expr) = bessel_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    "LegendreP" => {
+                        let legendre_func = special::orthogonal::LegendreFunction;
+                        if let Some(deriv_expr) = legendre_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    "ChebyshevT" => {
+                        let cheb_func = special::orthogonal::ChebyshevTFunction;
+                        if let Some(deriv_expr) = cheb_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    _ => store.int(0),
+                };
+                return simplify(store, out);
+            }
+
             if args.len() != 1 {
                 return store.int(0);
             }
@@ -196,12 +234,34 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                     let exp_term = store.func("exp", vec![neg_u_sq]);
                     store.mul(vec![coeff, exp_term, du])
                 }
+                "erfc" => {
+                    // d/dx erfc(u) = -(2/√π) * exp(-u²) * u'
+                    let sqrt_pi = std::f64::consts::PI.sqrt();
+                    let coeff =
+                        store.rat((2.0 * 1_000_000.0) as i64, (sqrt_pi * 1_000_000.0) as i64);
+                    let two = store.int(2);
+                    let u_sq = store.pow(u, two);
+                    let neg_one = store.int(-1);
+                    let neg_u_sq = store.mul(vec![neg_one, u_sq]);
+                    let exp_term = store.func("exp", vec![neg_u_sq]);
+                    let minus_one = store.int(-1);
+                    store.mul(vec![minus_one, coeff, exp_term, du])
+                }
                 "Ei" => {
                     // d/dx Ei(u) = exp(u) / u * u'
                     let exp_u = store.func("exp", vec![u]);
                     let minus_one = store.int(-1);
                     let u_inv = store.pow(u, minus_one);
                     store.mul(vec![exp_u, u_inv, du])
+                }
+                "LambertW" => {
+                    // d/dx W(u) = W(u) / (u(1 + W(u))) * u'
+                    let lambert_func = special::lambert::LambertWFunction;
+                    if let Some(deriv_expr) = lambert_func.derivative(store, &[u], 0) {
+                        store.mul(vec![deriv_expr, du])
+                    } else {
+                        store.int(0)
+                    }
                 }
                 _ => store.int(0),
             };

@@ -82,10 +82,50 @@ impl SpecialFunction for EiFunction {
     }
 
     /// Series expansion (not implemented yet)
-    fn series(&self, _store: &mut Store, _args: &[ExprId], _order: usize) -> Option<ExprId> {
-        // TODO: Implement series expansion
-        // Ei(z) = γ + ln|z| + Σ(z^n/(n·n!)) for n=1,2,3,...
-        None
+    fn series(&self, store: &mut Store, args: &[ExprId], order: usize) -> Option<ExprId> {
+        if args.len() != 1 {
+            return None;
+        }
+
+        let z = args[0];
+
+        if order == 0 {
+            // Truncate to constant: γ + ln|z| ~ undefined at 0, but return γ for formal series
+            // Keep it simple: return Gamma constant approximation
+            const GAMMA: f64 = 0.577_215_664_901_532_9;
+            let scale = 1_000_000.0f64;
+            return Some(store.rat((GAMMA * scale) as i64, scale as i64));
+        }
+
+        // γ (Euler–Mascheroni constant) as rational approximation
+        const GAMMA: f64 = 0.577_215_664_901_532_9;
+        let scale = 1_000_000.0f64;
+        let gamma_c = store.rat((GAMMA * scale) as i64, scale as i64);
+
+        // ln|z|
+        let abs_z = store.func("abs", vec![z]);
+        let ln_abs_z = store.func("ln", vec![abs_z]);
+
+        // Σ_{k=1..N} z^k / (k * k!)
+        let mut sum_terms: Vec<ExprId> = vec![gamma_c, ln_abs_z];
+        let mut fact: i128 = 1; // k!
+        for k in 1..=order {
+            fact = fact.saturating_mul(k as i128);
+            if fact == 0 || fact.unsigned_abs() > i64::MAX as u128 {
+                break;
+            }
+            let denom = fact.saturating_mul(k as i128);
+            if denom == 0 || denom.unsigned_abs() > i64::MAX as u128 {
+                break;
+            }
+            let denom_i64 = denom as i64;
+            let coeff = store.rat(1, denom_i64);
+            let k_i = store.int(k as i64);
+            let pow = store.pow(z, k_i);
+            sum_terms.push(store.mul(vec![coeff, pow]));
+        }
+
+        Some(store.add(sum_terms))
     }
 }
 

@@ -17,9 +17,12 @@
 
 use expr_core::{ExprId, Store};
 
+pub mod bessel;
 pub mod erf;
 pub mod expint;
 pub mod gamma;
+pub mod lambert;
+pub mod orthogonal;
 
 /// Special function trait for uniform handling
 pub trait SpecialFunction {
@@ -39,10 +42,15 @@ pub trait SpecialFunction {
     fn series(&self, store: &mut Store, args: &[ExprId], order: usize) -> Option<ExprId>;
 }
 
-/// Register special functions in the expression system
+/// Register special functions in the expression system.
+///
+/// Note: At present, the project integrates special functions directly via
+/// pattern matches in `evalf` for numerical evaluation and in `calculus::diff`
+/// for symbolic differentiation. There is no global runtime registry in
+/// `expr_core`. This function is a no-op placeholder to preserve the public API
+/// and to provide a future extension point if a registry is introduced.
 pub fn register_special_functions() {
-    // TODO: Register special functions with the function registry
-    // This will allow them to be recognized in differentiation, integration, etc.
+    // Intentionally empty.
 }
 
 #[cfg(test)]

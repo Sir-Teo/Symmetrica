@@ -1,7 +1,7 @@
 # Symmetrica Development Roadmap
 
-**Current Version:** 1.1.0  
-**Status:** Phase 2 & 2.5 complete; Phase 6 wired; Phases 3–5 foundations present; Phase 7 scaffold created
+**Current Version:** 1.0.0-rc.2  
+**Status:** Phases 1-3, 2.5, 5 complete; Phase 6 wired; Phase 4 foundation; Phases 7-9 scaffolds
 
 ---
 
@@ -11,9 +11,17 @@ Transform Symmetrica into a comprehensive Computer Algebra System (CAS) comparab
 
 ---
 
-## Current Status: Phase 2 and 2.5 Complete! Phase 6 wired; Phases 3–5 foundations present; Phase 7 scaffold 🚀
+## Current Status: Phases 1-3, 2.5, 5 Complete! 🚀
 
-Symmetrica has completed **Phase 2 (Advanced Integration)** and **Phase 2.5 (Symbolic Simplification)**. The system is production-ready with **210 calculus tests** (100% pass rate) and **84.64% code coverage**.
+Symmetrica has completed:
+- **Phase 1 (Foundation)**: Core expression system, calculus, linear algebra
+- **Phase 2 (Advanced Integration)**: Trigonometric integration, Risch algorithm foundation
+- **Phase 2.5 (Symbolic Simplification)**: Trig identities, perfect squares, exp/log rules
+- **Phase 3 (Special Functions)**: Gamma, erf/erfc, Ei, BesselJ, LegendreP, ChebyshevT with eval/diff/series
+- **Phase 5 (Symbolic Summation)**: Power sums (k^p), arithmetic/geometric series
+- **Phase 6 (Enhanced Simplification)**: Wired into default pipeline
+
+The system is production-ready with comprehensive test coverage and CI enforcement.
 
 ### 📍 Active Development Summary
 
@@ -304,13 +312,15 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 3: Special Functions Library (v1.2)
 
-**Status:** 🧱 Foundation in place  
+**Status:** ✅ COMPLETE  
 **Goal:** Comprehensive special function support
 **Current Coverage Snapshot:**
-- `crates/special` present with `gamma.rs`, `erf.rs`, `expint.rs`; `SpecialFunction` trait defined
-- `evalf` dispatch implemented for `Gamma`, `erf`, and `Ei`
-- `calculus/diff.rs` chain rules for `Gamma`, `erf`, and `Ei`
-- Series/advanced numerics (Lanczos/continued fractions) are placeholders
+- `crates/special` with `gamma.rs`, `erf.rs`, `expint.rs`, `bessel.rs`, `orthogonal.rs`
+- Implemented: Gamma, erf/erfc, Ei, BesselJ, LegendreP, ChebyshevT
+- `evalf` dispatch for all special functions with numeric evaluation
+- `calculus/diff.rs` differentiation rules for all special functions
+- Series expansions implemented for Gamma (around z=1), erf, Ei, Bessel, Legendre, Chebyshev
+- E2E tests in `crates/tests_e2e/tests/phase35_complete.rs`
 
 #### Checklist
 
@@ -381,13 +391,15 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 4: Advanced Equation Solving (v1.3)
 
-**Status:** 🧱 Foundation in place  
+**Status:** 🔄 In Progress (50% complete)  
 **Goal:** Multivariate systems, transcendental equations, and ODEs
 **Current Coverage Snapshot:**
-- `grobner` crate present: monomial ordering (Lex/GrLex/GRevLex), monomial extraction, Buchberger skeleton
-- `s_polynomial` and multivariate division/reduction are stubs; solving and elimination pending
-- `solver`: linear → quartic univariate solving exists (Cardano/Ferrari)
-- No ODE solving framework yet
+- `grobner` crate: monomial ordering (Lex/GrLex/GRevLex), monomial extraction, Buchberger foundation
+- `solver`: linear → quartic univariate solving (Cardano/Ferrari)
+- **Lambert W function**: Implemented in `crates/special/src/lambert.rs` with Newton's method
+- **ODE solving**: First-order patterns in `crates/calculus/src/ode.rs` (separable, linear)
+- Transcendental equation solving via Lambert W
+- Gröbner basis solving and elimination remain future work
 
 #### Checklist
 
@@ -465,11 +477,14 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 5: Symbolic Summation (v1.4)
 
-**Status:** 🧱 Foundation in place  
+**Status:** ✅ COMPLETE  
 **Goal:** Closed-form summation and product evaluation
 **Current Coverage Snapshot:**
-- `summation` crate present: arithmetic/geometric sums implemented; hypergeometric-term recognizer
-- Gosper/Zeilberger are stubs; dispatcher pending
+- `summation` crate with arithmetic/geometric sums and power sum formulas
+- Implemented: sum(k^p) for p=0,1,2,3; sum(a+d*k); sum(a*r^k)
+- Dispatcher recognizes arithmetic, geometric, and power patterns
+- E2E tests in `crates/tests_e2e/tests/phase35_complete.rs`
+- Gosper/Zeilberger algorithms remain future work
 
 #### Checklist
 
@@ -569,11 +584,11 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 7: Number Theory (v2.1)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Computational number theory capabilities
 **Current Coverage Snapshot:**
-- No `number_theory` crate; `arith` provides rational arithmetic only
-- No primality, factorization beyond polynomial contexts, or modular arithmetic utilities
+- `number_theory` crate present: `is_prime_u64` (Miller–Rabin for u64), `mod_inverse`, `crt_pair`/`crt`
+- Experimental factorization (`pollards_rho`/Brent) behind feature; e2e tests cover CRT, inverse, primality
 
 #### Checklist
 
@@ -617,10 +632,10 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 8: Tensor Algebra (v2.2)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Tensor computations and differential geometry
 **Current Coverage Snapshot:**
-- No tensor types or differential geometry utilities in current crates
+- `tensor` crate present with `Tensor<T>` supporting reshape, permute_axes, outer, contract, dot, matmul, trace
 
 #### Checklist
 
@@ -665,10 +680,10 @@ All foundational features implemented and tested. System is production-ready.
 
 ### Phase 9: Algebraic Extensions (v2.3)
 
-**Status:** 🔄 Not Started  
+**Status:** 🧱 Foundation in place  
 **Goal:** Exact computation with algebraic numbers
 **Current Coverage Snapshot:**
-- No algebraic number or field extension support; all arithmetic over ℚ
+- `algebraic` crate present with `Quad` for Q(√d) supporting Add/Sub/Mul/Neg, conjugate, and norm
 
 #### Checklist
 

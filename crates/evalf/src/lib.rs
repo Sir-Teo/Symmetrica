@@ -330,12 +330,60 @@ fn eval_function(
                 .ok_or_else(|| EvalError::DomainError(format!("erf({}) not computable", x)))
         }
 
+        "erfc" => {
+            check_arity(name, args, 1)?;
+            let x = eval_recursive(store, args[0], ctx)?;
+            let erf_func = special::erf::ErfFunction;
+            match special::SpecialFunction::eval(&erf_func, &[x]) {
+                Some(v) => Ok(1.0 - v),
+                None => Err(EvalError::DomainError(format!("erfc({}) not computable", x))),
+            }
+        }
+
         "Ei" => {
             check_arity(name, args, 1)?;
             let x = eval_recursive(store, args[0], ctx)?;
             let ei_func = special::expint::EiFunction;
             special::SpecialFunction::eval(&ei_func, &[x])
                 .ok_or_else(|| EvalError::DomainError(format!("Ei({}) not computable", x)))
+        }
+
+        "BesselJ" => {
+            check_arity(name, args, 2)?;
+            let nu = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let bessel_func = special::bessel::BesselJFunction;
+            special::SpecialFunction::eval(&bessel_func, &[nu, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("BesselJ({}, {}) not computable", nu, x))
+            })
+        }
+
+        "LegendreP" => {
+            check_arity(name, args, 2)?;
+            let n = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let legendre_func = special::orthogonal::LegendreFunction;
+            special::SpecialFunction::eval(&legendre_func, &[n, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("LegendreP({}, {}) not computable", n, x))
+            })
+        }
+
+        "ChebyshevT" => {
+            check_arity(name, args, 2)?;
+            let n = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let cheb_func = special::orthogonal::ChebyshevTFunction;
+            special::SpecialFunction::eval(&cheb_func, &[n, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("ChebyshevT({}, {}) not computable", n, x))
+            })
+        }
+
+        "LambertW" => {
+            check_arity(name, args, 1)?;
+            let x = eval_recursive(store, args[0], ctx)?;
+            let lambert_func = special::lambert::LambertWFunction;
+            special::SpecialFunction::eval(&lambert_func, &[x])
+                .ok_or_else(|| EvalError::DomainError(format!("LambertW({}) not computable", x)))
         }
 
         _ => Err(EvalError::UnknownFunction(name.to_string())),

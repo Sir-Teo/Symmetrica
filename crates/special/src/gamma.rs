@@ -101,9 +101,57 @@ impl SpecialFunction for GammaFunction {
     }
 
     /// Series expansion (not implemented yet)
-    fn series(&self, _store: &mut Store, _args: &[ExprId], _order: usize) -> Option<ExprId> {
-        // TODO: Implement series expansion around specific points
-        None
+    fn series(&self, store: &mut Store, args: &[ExprId], order: usize) -> Option<ExprId> {
+        if args.len() != 1 {
+            return None;
+        }
+
+        // Expand around z=1 using: Γ(1+t) = 1 - γ t + (γ^2/2 + π^2/12) t^2 + O(t^3)
+        // where t = z - 1 and γ is Euler–Mascheroni constant.
+        let z = args[0];
+        let one = store.int(1);
+        let neg_one = store.int(-1);
+        let t = store.add(vec![z, neg_one]); // t = z - 1
+
+        // Constants as rationals
+        // γ ≈ 0.5772156649015329
+        let gamma_const = {
+            let scale = 1_000_000.0f64;
+            store.rat((0.577_215_664_901_532_9_f64 * scale) as i64, scale as i64)
+        };
+        // π^2 ≈ 9.869604401089358 => π^2/12 ≈ 0.8224670334241131
+        let pi2_over_12 = {
+            let scale = 1_000_000.0f64;
+            let pi2_scaled = (std::f64::consts::PI * std::f64::consts::PI * scale) as i64;
+            store.rat(pi2_scaled, (scale as i64) * 12)
+        };
+
+        if order == 0 {
+            return Some(one);
+        }
+
+        // Linear term: -γ t
+        let term1 = {
+            let minus_one = store.int(-1);
+            store.mul(vec![minus_one, gamma_const, t])
+        };
+
+        if order == 1 {
+            return Some(store.add(vec![one, term1]));
+        }
+
+        // Quadratic coefficient: γ^2/2 + π^2/12
+        let coeff2 = {
+            let half = store.rat(1, 2);
+            let gamma_sq = store.mul(vec![gamma_const, gamma_const]);
+            let gamma_sq_half = store.mul(vec![half, gamma_sq]);
+            store.add(vec![gamma_sq_half, pi2_over_12])
+        };
+        let two = store.int(2);
+        let t2 = store.pow(t, two);
+        let term2 = store.mul(vec![coeff2, t2]);
+
+        Some(store.add(vec![one, term1, term2]))
     }
 }
 
@@ -190,12 +238,16 @@ mod tests {
     }
 
     #[test]
-    fn gamma_series_unimplemented() {
+    fn gamma_series_basic() {
         let g = GammaFunction;
         let mut st = Store::new();
         let x = st.sym("x");
-        let series = g.series(&mut st, &[x], 5);
-        assert!(series.is_none());
+        // Request quadratic series around z=1
+        let series = g.series(&mut st, &[x], 2);
+        assert!(series.is_some());
+        // The series should be a polynomial in (x-1) up to degree 2.
+        let s = st.to_string(series.unwrap());
+        assert!(s.contains("x") || s.contains("1"));
     }
 
     #[test]

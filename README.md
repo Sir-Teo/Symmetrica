@@ -1,7 +1,7 @@
 # Symmetrica
 [![CI](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml/badge.svg)](https://github.com/Sir-Teo/Symmetrica/actions/workflows/ci.yml)
 
-**Symmetrica v2.0** is a production-ready symbolic mathematics engine written in Rust, featuring advanced simplification, calculus, summation, and algebraic capabilities.
+**Symmetrica v1.0.0-rc.2** is a production-ready symbolic mathematics engine written in Rust, featuring advanced simplification, calculus, summation, and algebraic capabilities.
 
 ## Key Features
 
@@ -222,7 +222,7 @@ CI is defined in `.github/workflows/ci.yml` and runs on Ubuntu/macOS/Windows:
  - Docs: `cargo doc --workspace --no-deps`
  - Audit: `cargo audit`
  - Deny: `cargo deny check`
- - Coverage: `cargo tarpaulin -p expr_core -p simplify --engine llvm --fail-under 80`
+ - Coverage: `cargo tarpaulin -p expr_core -p simplify -p polys -p calculus -p io -p plot -p matrix -p solver --engine llvm --fail-under 80`
 
 Recommended to run locally before pushing:
 
@@ -236,7 +236,7 @@ cargo doc --workspace --no-deps
 cargo install cargo-audit cargo-deny cargo-tarpaulin --locked
 cargo audit
 cargo deny check
-cargo tarpaulin -p expr_core -p simplify --engine llvm --fail-under 80
+cargo tarpaulin -p expr_core -p simplify -p polys -p calculus -p io -p plot -p matrix -p solver --engine llvm --fail-under 80
 ```
 
 Pre-commit hooks are configured in `.pre-commit-config.yaml`:

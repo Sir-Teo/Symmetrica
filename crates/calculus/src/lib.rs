@@ -2,12 +2,13 @@
 //! Phase 3: definite integrals, limit evaluation, constant folding, and special functions
 //! Phase 4: symbolic simplification and advanced features
 mod definite;
-mod diff;
+pub mod diff;
 mod evaluate;
-mod integrate;
-mod limit;
+pub mod integrate;
+pub mod limit;
+pub mod ode;
 mod risch;
-mod series;
+pub mod series;
 mod symbolic_simplify;
 
 pub use definite::{definite_integrate, Bound, DefiniteResult};
@@ -15,6 +16,7 @@ pub use diff::diff;
 pub use evaluate::{fold_constants, try_eval_constant, try_eval_float};
 pub use integrate::integrate;
 pub use limit::{limit, LimitPoint as LimitPointCalc, LimitResult as LimitResultCalc};
+pub use ode::solve_ode_first_order;
 pub use risch::{
     build_tower, detect_extension, is_exponential, is_logarithm, logarithmic_derivative,
     try_integrate_logarithmic, ExtensionType, TowerElement,
