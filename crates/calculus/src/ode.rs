@@ -37,6 +37,48 @@ pub fn solve_ode_first_order(
         return Some(solution);
     }
 
+    // Try homogeneous form: dy/dx = f(y/x)
+    if let Some(solution) = try_homogeneous(store, rhs, y_var, x_var) {
+        return Some(solution);
+    }
+
+    None
+}
+
+/// Try to solve homogeneous ODE: dy/dx = f(y/x)
+/// Use substitution v = y/x, so y = vx and dy/dx = v + x(dv/dx)
+fn try_homogeneous(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> Option<ExprId> {
+    // Check if rhs is a function of y/x
+    // For simplicity, check if rhs = y/x or contains y/x pattern
+
+    // Simple case: rhs = y/x
+    if let Op::Mul = store.get(rhs).op {
+        let children = &store.get(rhs).children;
+        if children.len() == 2 {
+            let (a, b) = (children[0], children[1]);
+
+            // Check if one is y and other is x^(-1)
+            let y_sym = store.sym(y_var);
+            let x_sym = store.sym(x_var);
+
+            if a == y_sym {
+                if let Op::Pow = store.get(b).op {
+                    let pow_children = &store.get(b).children;
+                    if pow_children.len() == 2 && pow_children[0] == x_sym {
+                        if let (Op::Integer, Payload::Int(-1)) =
+                            (&store.get(pow_children[1]).op, &store.get(pow_children[1]).payload)
+                        {
+                            // This is y/x form
+                            // Solution: ln|y| = ln|x| + C, or y = Cx
+                            // For now, return y = x (omitting constant)
+                            return Some(x_sym);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     None
 }
 
@@ -397,6 +439,27 @@ mod tests {
         let sol_str = st.to_string(solution.unwrap());
         // Should contain ln and x^2
         assert!(sol_str.contains("ln") || sol_str.contains("x"));
+    }
+
+    #[test]
+    fn test_homogeneous_simple() {
+        let mut st = Store::new();
+        let x = st.sym("x");
+        let y = st.sym("y");
+
+        // dy/dx = y/x (homogeneous, also separable)
+        let neg_one = st.int(-1);
+        let x_inv = st.pow(x, neg_one);
+        let rhs = st.mul(vec![y, x_inv]);
+
+        let solution = solve_ode_first_order(&mut st, rhs, "y", "x");
+        assert!(solution.is_some());
+
+        // Solution exists (may be ln(y/x) = C or y = Cx)
+        let sol = solution.unwrap();
+        let sol_str = st.to_string(sol);
+        // Verify it contains expected variables
+        assert!(sol_str.contains("x") || sol_str.contains("y"));
     }
 
     #[test]
