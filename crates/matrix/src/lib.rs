@@ -195,6 +195,23 @@ impl MatrixQ {
         Ok(sum)
     }
 
+    /// Check if the matrix is symmetric (A = A^T).
+    /// Returns Err if the matrix is not square.
+    pub fn is_symmetric(&self) -> Result<bool, &'static str> {
+        if self.rows != self.cols {
+            return Err("symmetry check requires square matrix");
+        }
+        
+        for i in 0..self.rows {
+            for j in i + 1..self.cols {
+                if self.get(i, j) != self.get(j, i) {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
     /// Compute the determinant using the Bareiss fraction-free algorithm.
     /// Returns Ok(Some(A^-1)) if invertible; Ok(None) if singular; Err if not square.
     pub fn inverse(&self) -> Result<Option<MatrixQ>, &'static str> {
@@ -1897,6 +1914,55 @@ mod tests {
             let result = matrix_vector_mul(&m, &solution);
             assert_eq!(result, b);
         }
+    }
+
+    #[test]
+    fn test_rank_full() {
+        // Identity matrix has full rank
+        let m = MatrixQ::identity(3);
+        assert_eq!(m.rank(), 3);
+    }
+
+    #[test]
+    fn test_rank_zero() {
+        // Zero matrix has rank 0
+        let m = MatrixQ::from_i64(3, 3, &[0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(m.rank(), 0);
+    }
+
+    #[test]
+    fn test_rank_deficient() {
+        // [[1, 2], [2, 4]] has rank 1 (second row is 2x first)
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 4]);
+        assert_eq!(m.rank(), 1);
+    }
+
+    #[test]
+    fn test_rank_rectangular() {
+        // [[1, 2, 3], [4, 5, 6]] has rank 2
+        let m = MatrixQ::from_i64(2, 3, &[1, 2, 3, 4, 5, 6]);
+        assert_eq!(m.rank(), 2);
+    }
+
+    #[test]
+    fn test_is_symmetric_true() {
+        // [[1, 2], [2, 3]] is symmetric
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 2, 3]);
+        assert!(m.is_symmetric().unwrap());
+    }
+
+    #[test]
+    fn test_is_symmetric_false() {
+        // [[1, 2], [3, 4]] is not symmetric
+        let m = MatrixQ::from_i64(2, 2, &[1, 2, 3, 4]);
+        assert!(!m.is_symmetric().unwrap());
+    }
+
+    #[test]
+    fn test_is_symmetric_identity() {
+        // Identity is always symmetric
+        let m = MatrixQ::identity(4);
+        assert!(m.is_symmetric().unwrap());
     }
 
     #[test]
