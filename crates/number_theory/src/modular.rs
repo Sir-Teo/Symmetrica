@@ -156,6 +156,90 @@ pub fn discrete_log(base: u64, target: u64, modulus: u64) -> Option<u64> {
     None
 }
 
+/// Euler's totient function φ(n): count of integers k in 1..n with gcd(k,n) = 1
+pub fn euler_totient(n: u64) -> u64 {
+    if n == 1 {
+        return 1;
+    }
+
+    // Use formula: φ(n) = n * ∏(1 - 1/p) for all prime factors p
+    let mut result = n;
+    let mut n_mut = n;
+
+    // Check factor 2
+    if n_mut.is_multiple_of(2) {
+        result /= 2;
+        while n_mut.is_multiple_of(2) {
+            n_mut /= 2;
+        }
+    }
+
+    // Check odd factors
+    let mut p = 3u64;
+    while p * p <= n_mut {
+        if n_mut.is_multiple_of(p) {
+            result -= result / p;
+            while n_mut.is_multiple_of(p) {
+                n_mut /= p;
+            }
+        }
+        p += 2;
+    }
+
+    // If n_mut > 1, then it's a prime factor
+    if n_mut > 1 {
+        result -= result / n_mut;
+    }
+
+    result
+}
+
+/// Find a primitive root modulo p (generator of multiplicative group)
+/// Returns the smallest primitive root if p is prime, None otherwise
+pub fn primitive_root(p: u64) -> Option<u64> {
+    if p < 2 {
+        return None;
+    }
+
+    // For simplicity, only handle prime p
+    // A primitive root g satisfies: ord_p(g) = φ(p) = p-1
+
+    let phi = p - 1; // For prime p, φ(p) = p-1
+
+    // Find prime factors of phi
+    let mut factors = Vec::new();
+    let mut temp = phi;
+
+    for d in 2..=phi {
+        if d * d > temp {
+            break;
+        }
+        if temp.is_multiple_of(d) {
+            factors.push(d);
+            while temp.is_multiple_of(d) {
+                temp /= d;
+            }
+        }
+    }
+    if temp > 1 {
+        factors.push(temp);
+    }
+
+    // Test candidates
+    'outer: for g in 2..p {
+        // Check if g^(phi/q) ≢ 1 (mod p) for all prime factors q of phi
+        for &q in &factors {
+            if mod_pow(g, phi / q, p) == 1 {
+                continue 'outer;
+            }
+        }
+        // g is a primitive root
+        return Some(g);
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +300,57 @@ mod tests {
         // 2^x ≡ 8 (mod 11), x = 3
         let result = discrete_log(2, 8, 11);
         assert_eq!(result, Some(3));
+    }
+
+    #[test]
+    fn test_euler_totient_small() {
+        assert_eq!(euler_totient(1), 1);
+        assert_eq!(euler_totient(2), 1); // φ(2) = 1
+        assert_eq!(euler_totient(6), 2); // φ(6) = 2 (1,5 coprime to 6)
+        assert_eq!(euler_totient(9), 6); // φ(9) = 6
+    }
+
+    #[test]
+    fn test_euler_totient_prime() {
+        // For prime p, φ(p) = p-1
+        assert_eq!(euler_totient(7), 6);
+        assert_eq!(euler_totient(11), 10);
+        assert_eq!(euler_totient(13), 12);
+    }
+
+    #[test]
+    fn test_euler_totient_prime_power() {
+        // φ(p^k) = p^k - p^(k-1) = p^(k-1)(p-1)
+        assert_eq!(euler_totient(4), 2); // φ(2^2) = 2
+        assert_eq!(euler_totient(8), 4); // φ(2^3) = 4
+        assert_eq!(euler_totient(25), 20); // φ(5^2) = 20
+    }
+
+    #[test]
+    fn test_primitive_root_small_primes() {
+        // 2 is a primitive root mod 5
+        let root = primitive_root(5);
+        assert!(root.is_some());
+        let g = root.unwrap();
+        // Verify g generates all non-zero elements mod 5
+        assert!((2..5).contains(&g));
+    }
+
+    #[test]
+    fn test_primitive_root_seven() {
+        // 3 is the smallest primitive root mod 7
+        let root = primitive_root(7);
+        assert_eq!(root, Some(3));
+
+        // Verify: 3^1=3, 3^2=2, 3^3=6, 3^4=4, 3^5=5, 3^6=1 (mod 7)
+        // This generates all elements 1..6
+    }
+
+    #[test]
+    fn test_primitive_root_eleven() {
+        // 2 is a primitive root mod 11
+        let root = primitive_root(11);
+        assert_eq!(root, Some(2));
     }
 
     #[test]
