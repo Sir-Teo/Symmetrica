@@ -31,6 +31,45 @@ impl Quad {
         let bd = Q(b2.0 * self.d, b2.1);
         sub_q(a2, bd)
     }
+
+    /// Multiplicative inverse: 1/(a + b√d) = (a - b√d)/(a² - b²d)
+    pub fn inv(&self) -> Option<Self> {
+        let n = self.norm();
+        if n.0 == 0 {
+            return None; // Division by zero
+        }
+        let conj = self.conj();
+        // Divide conjugate by norm
+        let a_inv = Q(conj.a.0 * n.1, conj.a.1 * n.0);
+        let b_inv = Q(conj.b.0 * n.1, conj.b.1 * n.0);
+        Some(Quad::new(a_inv, b_inv, self.d))
+    }
+
+    /// Division: self / rhs
+    pub fn div(&self, rhs: &Quad) -> Option<Self> {
+        let rhs_inv = rhs.inv()?;
+        Some(*self * rhs_inv)
+    }
+
+    /// Trace: Tr(a + b√d) = 2a
+    pub fn trace(&self) -> Q {
+        let (num, den) = arith::normalize_rat(self.a.0 * 2, self.a.1);
+        Q(num, den)
+    }
+
+    /// Check if element is in base field Q (i.e., b = 0)
+    pub fn is_rational(&self) -> bool {
+        self.b.0 == 0
+    }
+
+    /// Get rational part if element is in Q
+    pub fn as_rational(&self) -> Option<Q> {
+        if self.is_rational() {
+            Some(self.a)
+        } else {
+            None
+        }
+    }
 }
 
 impl Add for Quad {
@@ -134,5 +173,93 @@ mod tests {
         assert_eq!(diff.d, d);
         assert_eq!(diff.a, sub_q(q(3, 2), q(1, 2)));
         assert_eq!(diff.b, sub_q(q(1, 3), q(1, 6)));
+    }
+
+    #[test]
+    fn test_inverse() {
+        let d = 2;
+        // (1 + √2)
+        let x = Quad::new(q(1, 1), q(1, 1), d);
+        let x_inv = x.inv().unwrap();
+
+        // x * x^(-1) should equal 1
+        let prod = x * x_inv;
+        assert_eq!(prod.a, Q::new(1, 1));
+        assert_eq!(prod.b, Q::zero());
+    }
+
+    #[test]
+    fn test_inverse_zero() {
+        let d = 3;
+        let zero = Quad::new(Q::zero(), Q::zero(), d);
+        assert!(zero.inv().is_none());
+    }
+
+    #[test]
+    fn test_division() {
+        let d = 5;
+        let x = Quad::new(q(3, 1), q(2, 1), d); // 3 + 2√5
+        let y = Quad::new(q(1, 1), q(1, 1), d); // 1 + √5
+
+        let quotient = x.div(&y).unwrap();
+        // Verify: quotient * y = x
+        let prod = quotient * y;
+        assert_eq!(prod.a, x.a);
+        assert_eq!(prod.b, x.b);
+    }
+
+    #[test]
+    fn test_trace() {
+        let d = 7;
+        let x = Quad::new(q(5, 2), q(3, 4), d); // 5/2 + (3/4)√7
+        let tr = x.trace();
+        // Trace = 2 * (5/2) = 5
+        assert_eq!(tr, Q::new(5, 1));
+    }
+
+    #[test]
+    fn test_is_rational() {
+        let d = 3;
+        let rational = Quad::new(q(7, 3), Q::zero(), d);
+        let irrational = Quad::new(q(1, 1), q(1, 1), d);
+
+        assert!(rational.is_rational());
+        assert!(!irrational.is_rational());
+    }
+
+    #[test]
+    fn test_as_rational() {
+        let d = 11;
+        let x = Quad::new(q(5, 2), Q::zero(), d);
+        let y = Quad::new(q(1, 1), q(1, 1), d);
+
+        assert_eq!(x.as_rational(), Some(q(5, 2)));
+        assert_eq!(y.as_rational(), None);
+    }
+
+    #[test]
+    fn test_field_axioms() {
+        let d = 2;
+        let x = Quad::new(q(1, 1), q(1, 1), d);
+        let y = Quad::new(q(2, 1), q(1, 2), d);
+        let z = Quad::new(q(1, 3), q(1, 4), d);
+
+        // Associativity of addition
+        let lhs = (x + y) + z;
+        let rhs = x + (y + z);
+        assert_eq!(lhs.a, rhs.a);
+        assert_eq!(lhs.b, rhs.b);
+
+        // Commutativity of multiplication
+        let lhs = x * y;
+        let rhs = y * x;
+        assert_eq!(lhs.a, rhs.a);
+        assert_eq!(lhs.b, rhs.b);
+
+        // Distributivity
+        let lhs = x * (y + z);
+        let rhs = (x * y) + (x * z);
+        assert_eq!(lhs.a, rhs.a);
+        assert_eq!(lhs.b, rhs.b);
     }
 }
