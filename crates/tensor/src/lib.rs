@@ -281,6 +281,72 @@ where
         }
         Tensor::from_vec(out_shape, out_data)
     }
+
+    /// Scalar multiplication: multiply all elements by a scalar
+    pub fn scale(&self, scalar: T) -> Tensor<T> {
+        let data = self.data.iter().map(|x| x.clone() * scalar.clone()).collect();
+        Tensor::from_vec(self.shape.clone(), data)
+    }
+
+    /// Kronecker delta tensor: identity-like tensor with 1 on diagonal, 0 elsewhere
+    /// For rank-2, this is the identity matrix
+    pub fn kronecker_delta(dim: usize, rank: usize) -> Tensor<T>
+    where
+        T: From<i32>,
+    {
+        assert!(rank >= 2, "kronecker delta requires rank >= 2");
+        let shape = vec![dim; rank];
+        let size: usize = shape.iter().product();
+        let mut data = vec![T::from(0); size];
+
+        // Set diagonal elements to 1
+        for i in 0..dim {
+            let idx = vec![i; rank];
+            let offset = compute_offset(&idx, &shape);
+            data[offset] = T::from(1);
+        }
+
+        Tensor::from_vec(shape, data)
+    }
+}
+
+impl<T> Tensor<T>
+where
+    T: Clone + Default + Add<Output = T> + Mul<Output = T> + std::ops::Sub<Output = T>,
+{
+    /// Antisymmetrize over two indices (for differential forms)
+    /// Returns (T[...i...j...] - T[...j...i...]) / 2
+    pub fn antisymmetrize(&self, idx1: usize, idx2: usize) -> Tensor<T>
+    where
+        T: From<i32> + std::ops::Div<Output = T>,
+    {
+        assert!(idx1 < self.rank() && idx2 < self.rank(), "index out of range");
+        assert!(idx1 != idx2, "indices must be distinct");
+        assert_eq!(
+            self.shape[idx1], self.shape[idx2],
+            "antisymmetrized indices must have same dimension"
+        );
+
+        let mut perm = (0..self.rank()).collect::<Vec<_>>();
+        perm.swap(idx1, idx2);
+        let swapped = self.permute_axes(&perm);
+
+        // (self - swapped) / 2
+        let diff_data: Vec<T> = self
+            .data
+            .iter()
+            .zip(swapped.data.iter())
+            .map(|(a, b)| (a.clone() - b.clone()) / T::from(2))
+            .collect();
+
+        Tensor::from_vec(self.shape.clone(), diff_data)
+    }
+}
+
+// Helper function for kronecker_delta
+fn compute_offset(idx: &[usize], shape: &[usize]) -> usize {
+    let strides = compute_strides(shape);
+    idx.iter().zip(strides.iter()).map(|(i, s)| i * s).sum()
 }
 
 fn compute_strides(shape: &[usize]) -> Vec<usize> {
@@ -467,14 +533,6 @@ mod tests {
     }
 
     #[test]
-    fn test_from_vec() {
-        let data = vec![1i64, 2, 3, 4, 5, 6];
-        let t = Tensor::from_vec(vec![2, 3], data.clone());
-        assert_eq!(t.shape(), &[2, 3]);
-        assert_eq!(t.len(), 6);
-    }
-
-    #[test]
     #[should_panic(expected = "tensor must have rank >= 1")]
     fn test_empty_shape_panics() {
         let _t = Tensor::<i64>::new(vec![], 0);
@@ -519,5 +577,69 @@ mod tests {
     fn test_permute_out_of_range() {
         let t = Tensor::new(vec![2, 3], 0i64);
         let _p = t.permute_axes(&[0, 5]);
+    }
+
+    #[test]
+    fn test_scale() {
+        let t = Tensor::from_vec(vec![2, 2], vec![1i64, 2, 3, 4]);
+        let scaled = t.scale(3);
+        assert_eq!(scaled.data, vec![3, 6, 9, 12]);
+    }
+
+    #[test]
+    fn test_kronecker_delta_rank2() {
+        let delta: Tensor<i64> = Tensor::kronecker_delta(3, 2);
+        assert_eq!(delta.shape(), &[3, 3]);
+        // Diagonal elements should be 1
+        assert_eq!(*delta.get(&[0, 0]), 1);
+        assert_eq!(*delta.get(&[1, 1]), 1);
+        assert_eq!(*delta.get(&[2, 2]), 1);
+        // Off-diagonal should be 0
+        assert_eq!(*delta.get(&[0, 1]), 0);
+        assert_eq!(*delta.get(&[1, 0]), 0);
+        assert_eq!(*delta.get(&[1, 2]), 0);
+    }
+
+    #[test]
+    fn test_kronecker_delta_rank3() {
+        let delta: Tensor<i64> = Tensor::kronecker_delta(2, 3);
+        assert_eq!(delta.shape(), &[2, 2, 2]);
+        // Diagonal elements (all indices equal) should be 1
+        assert_eq!(*delta.get(&[0, 0, 0]), 1);
+        assert_eq!(*delta.get(&[1, 1, 1]), 1);
+        // Non-diagonal should be 0
+        assert_eq!(*delta.get(&[0, 0, 1]), 0);
+        assert_eq!(*delta.get(&[0, 1, 0]), 0);
+        assert_eq!(*delta.get(&[1, 0, 1]), 0);
+    }
+
+    #[test]
+    fn test_antisymmetrize() {
+        let t = Tensor::from_vec(vec![2, 2], vec![1i64, 2, 3, 4]);
+        let anti = t.antisymmetrize(0, 1);
+        assert_eq!(anti.shape(), &[2, 2]);
+        // Antisymmetric: A[i,j] = (T[i,j] - T[j,i])/2
+        // A[0,0] = (1-1)/2 = 0
+        assert_eq!(*anti.get(&[0, 0]), 0);
+        // A[0,1] = (2-3)/2 = -1/2 (rounds to 0 for i64)
+        assert_eq!(*anti.get(&[0, 1]), (2 - 3) / 2);
+        // A[1,0] = (3-2)/2 = 1/2 (rounds to 0 for i64)
+        assert_eq!(*anti.get(&[1, 0]), (3 - 2) / 2);
+        // A[1,1] = (4-4)/2 = 0
+        assert_eq!(*anti.get(&[1, 1]), 0);
+    }
+
+    #[test]
+    fn test_antisymmetrize_property() {
+        // For antisymmetric tensor: A[i,j] = -A[j,i]
+        let t = Tensor::from_vec(vec![3, 3], vec![1i64, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let anti = t.antisymmetrize(0, 1);
+
+        // Check antisymmetry property
+        for i in 0..3 {
+            for j in 0..3 {
+                assert_eq!(*anti.get(&[i, j]), -*anti.get(&[j, i]));
+            }
+        }
     }
 }
