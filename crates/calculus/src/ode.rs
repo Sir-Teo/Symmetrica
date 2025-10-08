@@ -42,7 +42,7 @@ pub fn solve_ode_first_order(
 
 /// Try to solve Bernoulli ODE: dy/dx + p(x)y = q(x)y^n
 /// Transform via v = y^(1-n) to get linear ODE
-fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> Option<ExprId> {
+fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, _x_var: &str) -> Option<ExprId> {
     // rhs should be: -p(x)y + q(x)y^n
     // We need to identify n, p(x), and q(x)
 
@@ -75,8 +75,8 @@ fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> Op
 
     // Check if we found both terms
     let n = power_n?;
-    let p_x = linear_coeff?;
-    let q_x = power_coeff?;
+    let _p_x = linear_coeff?;
+    let _q_x = power_coeff?;
 
     if n == 1 {
         // This is actually linear, not Bernoulli

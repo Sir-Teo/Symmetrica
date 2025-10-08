@@ -245,3 +245,50 @@ fn phase35_comprehensive_workflow() {
     let deriv_str = st.to_string(deriv_simp);
     assert!(deriv_str.contains("LegendreP") || deriv_str.contains("x"));
 }
+
+#[test]
+fn phase3_bessel_i_numeric_and_symbolic() {
+    let mut st = Store::new();
+    let ctx = EvalContext::new();
+
+    // BesselI(0, 1) ≈ 1.2661
+    let zero = st.int(0);
+    let one = st.int(1);
+    let bessel_expr = st.func("BesselI", vec![zero, one]);
+
+    let result = eval(&st, bessel_expr, &ctx).unwrap();
+    assert!((result - 1.2661).abs() < 0.001);
+
+    // Symbolic differentiation: d/dx BesselI(0, x)
+    let x = st.sym("x");
+    let bessel_x = st.func("BesselI", vec![zero, x]);
+    let deriv = diff(&mut st, bessel_x, "x");
+    let deriv_str = st.to_string(deriv);
+    assert!(deriv_str.contains("BesselI"));
+}
+
+#[test]
+fn phase3_bessel_y_symbolic() {
+    let mut st = Store::new();
+
+    // Symbolic differentiation: d/dx BesselY(1, x)
+    let one = st.int(1);
+    let x = st.sym("x");
+    let bessel_x = st.func("BesselY", vec![one, x]);
+    let deriv = diff(&mut st, bessel_x, "x");
+    let deriv_str = st.to_string(deriv);
+    assert!(deriv_str.contains("BesselY"));
+}
+
+#[test]
+fn phase3_bessel_k_symbolic() {
+    let mut st = Store::new();
+
+    // Symbolic differentiation: d/dx BesselK(0, x)
+    let zero = st.int(0);
+    let x = st.sym("x");
+    let bessel_x = st.func("BesselK", vec![zero, x]);
+    let deriv = diff(&mut st, bessel_x, "x");
+    let deriv_str = st.to_string(deriv);
+    assert!(deriv_str.contains("BesselK"));
+}

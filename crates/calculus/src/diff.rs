@@ -103,8 +103,13 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                 (name, n.children.clone())
             };
 
-            // Handle multi-argument functions (BesselJ, LegendreP, ChebyshevT)
-            if args.len() == 2 && matches!(fname.as_str(), "BesselJ" | "LegendreP" | "ChebyshevT") {
+            // Handle multi-argument functions (BesselJ, BesselY, BesselI, BesselK, LegendreP, ChebyshevT)
+            if args.len() == 2
+                && matches!(
+                    fname.as_str(),
+                    "BesselJ" | "BesselY" | "BesselI" | "BesselK" | "LegendreP" | "ChebyshevT"
+                )
+            {
                 // For f(n, x), we differentiate w.r.t. x (second argument)
                 let x = args[1];
                 let dx = diff(store, x, var);
@@ -112,6 +117,30 @@ fn diff_impl(store: &mut Store, id: ExprId, var: &str) -> ExprId {
                 let out = match fname.as_str() {
                     "BesselJ" => {
                         let bessel_func = special::bessel::BesselJFunction;
+                        if let Some(deriv_expr) = bessel_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    "BesselY" => {
+                        let bessel_func = special::bessel::BesselYFunction;
+                        if let Some(deriv_expr) = bessel_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    "BesselI" => {
+                        let bessel_func = special::bessel::BesselIFunction;
+                        if let Some(deriv_expr) = bessel_func.derivative(store, &args, 1) {
+                            store.mul(vec![deriv_expr, dx])
+                        } else {
+                            store.int(0)
+                        }
+                    }
+                    "BesselK" => {
+                        let bessel_func = special::bessel::BesselKFunction;
                         if let Some(deriv_expr) = bessel_func.derivative(store, &args, 1) {
                             store.mul(vec![deriv_expr, dx])
                         } else {

@@ -358,6 +358,36 @@ fn eval_function(
             })
         }
 
+        "BesselY" => {
+            check_arity(name, args, 2)?;
+            let nu = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let bessel_func = special::bessel::BesselYFunction;
+            special::SpecialFunction::eval(&bessel_func, &[nu, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("BesselY({}, {}) not computable", nu, x))
+            })
+        }
+
+        "BesselI" => {
+            check_arity(name, args, 2)?;
+            let nu = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let bessel_func = special::bessel::BesselIFunction;
+            special::SpecialFunction::eval(&bessel_func, &[nu, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("BesselI({}, {}) not computable", nu, x))
+            })
+        }
+
+        "BesselK" => {
+            check_arity(name, args, 2)?;
+            let nu = eval_recursive(store, args[0], ctx)?;
+            let x = eval_recursive(store, args[1], ctx)?;
+            let bessel_func = special::bessel::BesselKFunction;
+            special::SpecialFunction::eval(&bessel_func, &[nu, x]).ok_or_else(|| {
+                EvalError::DomainError(format!("BesselK({}, {}) not computable", nu, x))
+            })
+        }
+
         "LegendreP" => {
             check_arity(name, args, 2)?;
             let n = eval_recursive(store, args[0], ctx)?;

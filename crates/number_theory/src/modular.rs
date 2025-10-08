@@ -75,7 +75,7 @@ pub fn tonelli_shanks(n: u64, p: u64) -> Option<u64> {
     // Factor out powers of 2 from p-1
     let mut q = p - 1;
     let mut s = 0u32;
-    while q % 2 == 0 {
+    while q.is_multiple_of(2) {
         q /= 2;
         s += 1;
     }
@@ -89,7 +89,7 @@ pub fn tonelli_shanks(n: u64, p: u64) -> Option<u64> {
     let mut m = s;
     let mut c = mod_pow(z, q, p);
     let mut t = mod_pow(n, q, p);
-    let mut r = mod_pow(n, (q + 1) / 2, p);
+    let mut r = mod_pow(n, q.div_ceil(2), p);
 
     loop {
         if t == 0 {
@@ -140,7 +140,7 @@ pub fn discrete_log(base: u64, target: u64, modulus: u64) -> Option<u64> {
 
     // Giant step: compute target * (base^(-m))^i for i = 1..m
     let base_m = mod_pow(base, m, modulus);
-    
+
     // Compute base_m^(-1) using Fermat's little theorem (assuming modulus is prime)
     // For general modulus, would need extended GCD
     let base_m_inv = mod_pow(base_m, modulus - 2, modulus);

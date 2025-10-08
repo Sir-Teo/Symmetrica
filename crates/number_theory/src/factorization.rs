@@ -17,7 +17,7 @@ pub fn trial_division(n: u64, limit: Option<u64>) -> Vec<(u64, u32)> {
 
     // Handle 2
     let mut count = 0u32;
-    while n % 2 == 0 && count < 64 {
+    while n.is_multiple_of(2) && count < 64 {
         count += 1;
         n /= 2;
     }
@@ -27,7 +27,7 @@ pub fn trial_division(n: u64, limit: Option<u64>) -> Vec<(u64, u32)> {
 
     // Handle 3
     count = 0;
-    while n % 3 == 0 && count < 64 {
+    while n.is_multiple_of(3) && count < 64 {
         count += 1;
         n /= 3;
     }
@@ -37,7 +37,7 @@ pub fn trial_division(n: u64, limit: Option<u64>) -> Vec<(u64, u32)> {
 
     // Handle 5
     count = 0;
-    while n % 5 == 0 && count < 64 {
+    while n.is_multiple_of(5) && count < 64 {
         count += 1;
         n /= 5;
     }
@@ -48,20 +48,20 @@ pub fn trial_division(n: u64, limit: Option<u64>) -> Vec<(u64, u32)> {
     // Simple trial division for remaining factors
     let limit = limit.unwrap_or_else(|| (n as f64).sqrt() as u64 + 1);
     let mut d = 7u64;
-    
+
     while d <= limit && n > 1 {
         count = 0;
-        while n % d == 0 && count < 64 {
+        while n.is_multiple_of(d) && count < 64 {
             count += 1;
             n /= d;
         }
         if count > 0 {
             factors.push((d, count));
         }
-        
+
         // Skip even numbers
         d += if d % 6 == 1 { 4 } else { 2 };
-        
+
         if d > limit {
             break;
         }
@@ -124,26 +124,26 @@ fn try_pollard_rho(n: u64) -> Option<Vec<(u64, u32)>> {
         x = f(x);
         y = f(f(y));
 
-        let diff = if x > y { x - y } else { y - x };
+        let diff = x.abs_diff(y);
         let d = gcd(diff, n);
 
         if d != 1 && d != n {
             // Found a factor
             let mut result = Vec::new();
-            
+
             // Recursively factor both parts
             if let Some(mut f1) = try_pollard_rho(d) {
                 result.append(&mut f1);
             } else {
                 result.push((d, 1));
             }
-            
+
             if let Some(mut f2) = try_pollard_rho(n / d) {
                 result.append(&mut f2);
             } else {
                 result.push((n / d, 1));
             }
-            
+
             return Some(merge_factors(result));
         }
 
@@ -168,12 +168,12 @@ fn gcd(mut a: u64, mut b: u64) -> u64 {
 /// Merge duplicate factors and sort
 fn merge_factors(factors: Vec<(u64, u32)>) -> Vec<(u64, u32)> {
     use std::collections::HashMap;
-    
+
     let mut map: HashMap<u64, u32> = HashMap::new();
     for (prime, exp) in factors {
         *map.entry(prime).or_insert(0) += exp;
     }
-    
+
     let mut result: Vec<_> = map.into_iter().collect();
     result.sort_by_key(|&(p, _)| p);
     result
