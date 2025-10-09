@@ -10,6 +10,7 @@
 //! - Field extension towers
 
 pub mod cyclotomic;
+pub mod denesting;
 pub mod galois;
 pub mod minimal_poly;
 
