@@ -1,9 +1,10 @@
 #![deny(warnings)]
-//! number_theory: Phase 7 scaffold
+//! number_theory: Phase 7 - Computational Number Theory
 //! - Deterministic Miller–Rabin for u64 (common bases)
 //! - Modular arithmetic helpers
 //! - Factorization algorithms
 //! - Diophantine equation solvers
+//! - Integer partition functions
 //! - Extended modular arithmetic
 //!
 //! Note: The base set used here (2, 3, 5, 7, 11, 13, 17) is commonly
@@ -15,6 +16,7 @@
 pub mod diophantine;
 pub mod factorization;
 pub mod modular;
+pub mod partitions;
 
 /// Compute (base^exp) mod m using repeated squaring.
 fn mod_pow(mut base: u128, mut exp: u128, m: u128) -> u128 {
