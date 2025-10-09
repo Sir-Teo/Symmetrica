@@ -201,7 +201,7 @@ impl MatrixQ {
         if self.rows != self.cols {
             return Err("symmetry check requires square matrix");
         }
-        
+
         for i in 0..self.rows {
             for j in i + 1..self.cols {
                 if self.get(i, j) != self.get(j, i) {

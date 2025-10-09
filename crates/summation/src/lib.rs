@@ -113,11 +113,11 @@ pub fn sum_squares(store: &mut Store, n: ExprId) -> ExprId {
     let one = store.int(1);
     let two = store.int(2);
     let six = store.int(6);
-    
+
     let n_plus_1 = store.add(vec![n, one]);
     let two_n = store.mul(vec![two, n]);
     let two_n_plus_1 = store.add(vec![two_n, one]);
-    
+
     let product = store.mul(vec![n, n_plus_1, two_n_plus_1]);
     let neg_one = store.int(-1);
     let inv_six = store.pow(six, neg_one);
@@ -581,7 +581,7 @@ mod tests {
         let mut st = Store::new();
         let n = st.sym("n");
         let result = sum_natural_numbers(&mut st, n);
-        
+
         let result_str = st.to_string(result);
         assert!(result_str.contains("n"));
     }
@@ -591,7 +591,7 @@ mod tests {
         let mut st = Store::new();
         let n = st.sym("n");
         let result = sum_squares(&mut st, n);
-        
+
         let result_str = st.to_string(result);
         assert!(result_str.contains("n"));
     }
@@ -601,7 +601,7 @@ mod tests {
         let mut st = Store::new();
         let n = st.sym("n");
         let result = sum_cubes(&mut st, n);
-        
+
         let result_str = st.to_string(result);
         assert!(result_str.contains("n"));
     }
@@ -611,7 +611,7 @@ mod tests {
         let mut st = Store::new();
         let n = st.sym("n");
         let result = sum_binomial_row(&mut st, n);
-        
+
         let result_str = st.to_string(result);
         assert_eq!(result_str, "2^n");
     }
