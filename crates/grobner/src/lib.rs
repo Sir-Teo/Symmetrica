@@ -473,6 +473,8 @@ pub fn solve_system(
     equations: Vec<ExprId>,
     vars: Vec<String>,
 ) -> Option<Vec<HashMap<String, ExprId>>> {
+    use solver::solve_univariate;
+
     // Compute Gröbner basis with lex ordering for triangular form
     let basis = buchberger(store, equations, vars.clone(), MonomialOrder::Lex);
 
@@ -487,26 +489,57 @@ pub fn solve_system(
         }
     }
 
-    // Try to solve via back-substitution
-    // For now, handle simple univariate case
-    let mut solutions = vec![HashMap::new()];
+    // Back-substitution: solve from last variable to first
+    let mut solutions: Vec<HashMap<String, ExprId>> = vec![HashMap::new()];
 
-    // Sort basis by leading variable (lex ordering should already do this)
     for var in vars.iter().rev() {
-        // Find polynomial with only this variable
-        let mut univariate_poly = None;
+        // Find polynomial with only this variable (and possibly already-solved variables)
+        let mut target_poly = None;
         for &poly in &basis {
-            if is_univariate_in(store, poly, var, &vars) {
-                univariate_poly = Some(poly);
-                break;
+            if contains_variable(store, poly, var) {
+                // Check if this polynomial only contains var and already-solved variables
+                let mut valid = true;
+                for other_var in &vars {
+                    if other_var == var {
+                        continue;
+                    }
+                    if contains_variable(store, poly, other_var)
+                        && !solutions[0].contains_key(other_var)
+                    {
+                        valid = false;
+                        break;
+                    }
+                }
+                if valid {
+                    target_poly = Some(poly);
+                    break;
+                }
             }
         }
 
-        if let Some(poly) = univariate_poly {
-            // Try to solve univariate polynomial
-            // For now, just store the polynomial as implicit solution
-            for solution in &mut solutions {
-                solution.insert(var.clone(), poly);
+        if let Some(poly) = target_poly {
+            // Substitute already-solved variables
+            let mut substituted = poly;
+            for (solved_var, value) in &solutions[0] {
+                substituted = substitute_var(store, substituted, solved_var.as_str(), *value);
+            }
+
+            // Try to solve for current variable
+            if let Some(roots) = solve_univariate(store, substituted, var) {
+                if roots.is_empty() {
+                    return None; // No solutions
+                }
+
+                // For simplicity, take the first root
+                // A complete implementation would branch for multiple roots
+                for solution in &mut solutions {
+                    solution.insert(var.clone(), roots[0]);
+                }
+            } else {
+                // Cannot solve - store implicit form
+                for solution in &mut solutions {
+                    solution.insert(var.clone(), substituted);
+                }
             }
         }
     }
@@ -515,6 +548,33 @@ pub fn solve_system(
         None
     } else {
         Some(solutions)
+    }
+}
+
+/// Substitute a variable with a value in an expression
+fn substitute_var(store: &mut Store, expr: ExprId, var: &str, value: ExprId) -> ExprId {
+    match (&store.get(expr).op, &store.get(expr).payload) {
+        (Op::Symbol, Payload::Sym(s)) if s == var => value,
+        (Op::Integer, _) | (Op::Rational, _) => expr,
+        (Op::Add, _) => {
+            let children: Vec<ExprId> = store.get(expr).children.clone();
+            let new_children: Vec<ExprId> =
+                children.iter().map(|&c| substitute_var(store, c, var, value)).collect();
+            store.add(new_children)
+        }
+        (Op::Mul, _) => {
+            let children: Vec<ExprId> = store.get(expr).children.clone();
+            let new_children: Vec<ExprId> =
+                children.iter().map(|&c| substitute_var(store, c, var, value)).collect();
+            store.mul(new_children)
+        }
+        (Op::Pow, _) => {
+            let children = store.get(expr).children.clone();
+            let base = substitute_var(store, children[0], var, value);
+            let exp = substitute_var(store, children[1], var, value);
+            store.pow(base, exp)
+        }
+        _ => expr,
     }
 }
 
@@ -527,21 +587,6 @@ fn is_constant_nonzero(store: &Store, expr: ExprId) -> bool {
         (&store.get(expr).op, &store.get(expr).payload),
         (Op::Rational, Payload::Rat(n, d)) if *n != 0 && *d != 0
     )
-}
-
-/// Check if polynomial is univariate in given variable
-fn is_univariate_in(store: &Store, expr: ExprId, var: &str, all_vars: &[String]) -> bool {
-    let mut has_var = false;
-    for v in all_vars {
-        if v == var {
-            if contains_variable(store, expr, v) {
-                has_var = true;
-            }
-        } else if contains_variable(store, expr, v) {
-            return false; // Contains other variables
-        }
-    }
-    has_var
 }
 
 /// Check if expression contains a specific variable

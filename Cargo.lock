@@ -105,6 +105,7 @@ dependencies = [
  "polys",
  "proptest",
  "simplify",
+ "solver",
  "special",
 ]
 
@@ -293,6 +294,8 @@ version = "0.1.0"
 dependencies = [
  "expr_core",
  "polys",
+ "simplify",
+ "solver",
 ]
 
 [[package]]

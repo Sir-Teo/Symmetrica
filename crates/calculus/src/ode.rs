@@ -37,6 +37,10 @@ pub fn solve_ode_first_order(
         return Some(solution);
     }
 
+    // Try exact form: M(x,y) + N(x,y)dy/dx = 0
+    // Note: This requires the equation in the form M dx + N dy = 0
+    // For now, we skip exact equations as they need different input format
+
     // Try homogeneous form: dy/dx = f(y/x)
     if let Some(solution) = try_homogeneous(store, rhs, y_var, x_var) {
         return Some(solution);
@@ -84,7 +88,7 @@ fn try_homogeneous(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> 
 
 /// Try to solve Bernoulli ODE: dy/dx + p(x)y = q(x)y^n
 /// Transform via v = y^(1-n) to get linear ODE
-fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, _x_var: &str) -> Option<ExprId> {
+fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> Option<ExprId> {
     // rhs should be: -p(x)y + q(x)y^n
     // We need to identify n, p(x), and q(x)
 
@@ -117,8 +121,8 @@ fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, _x_var: &str) -> O
 
     // Check if we found both terms
     let n = power_n?;
-    let _p_x = linear_coeff?;
-    let _q_x = power_coeff?;
+    let p_x = linear_coeff?;
+    let q_x = power_coeff?;
 
     if n == 1 {
         // This is actually linear, not Bernoulli
@@ -130,11 +134,41 @@ fn try_bernoulli(store: &mut Store, rhs: ExprId, y_var: &str, _x_var: &str) -> O
     // Original: dy/dx = -p(x)y + q(x)y^n
     // Multiply by (1-n)y^(-n): (1-n)y^(-n) dy/dx = (1-n)(-p(x)y^(1-n) + q(x))
     // This gives: dv/dx = (1-n)(-p(x)v + q(x))
-    // Which is linear in v
+    // Which is linear in v: dv/dx + (1-n)p(x)v = (1-n)q(x)
 
-    // For now, return None as full implementation requires more work
-    // This is a placeholder showing the algorithm
-    None
+    // Solve the linear ODE in v
+    let one_minus_n = 1 - n;
+    let one_minus_n_expr = store.int(one_minus_n);
+
+    // New p(x) for linear equation: (1-n)p(x)
+    let new_p = store.mul(vec![one_minus_n_expr, p_x]);
+
+    // New q(x) for linear equation: (1-n)q(x)
+    let new_q = store.mul(vec![one_minus_n_expr, q_x]);
+
+    // Build RHS for linear solver: -new_p * v + new_q
+    // We'll use a dummy variable name for v
+    let v_var = format!("{}_bernoulli_v", y_var);
+    let v = store.sym(&v_var);
+    let neg_one = store.int(-1);
+    let neg_new_p = store.mul(vec![neg_one, new_p]);
+    let neg_new_p_v = store.mul(vec![neg_new_p, v]);
+    let linear_rhs = store.add(vec![neg_new_p_v, new_q]);
+
+    // Solve linear ODE for v
+    let v_solution = try_linear(store, linear_rhs, &v_var, x_var)?;
+
+    // Transform back: y = v^(1/(1-n))
+    let exponent = if one_minus_n != 0 {
+        store.rat(1, one_minus_n)
+    } else {
+        return None;
+    };
+
+    // Substitute v with v_solution in y = v^(1/(1-n))
+    let y_solution = store.pow(v_solution, exponent);
+
+    Some(simplify(store, y_solution))
 }
 
 /// Check if expression is y^n and return n
@@ -418,6 +452,67 @@ fn contains_var(store: &Store, id: ExprId, var: &str) -> bool {
         (Op::Function, _) => store.get(id).children.iter().any(|&c| contains_var(store, c, var)),
         _ => false,
     }
+}
+
+/// Solve second-order linear ODE with constant coefficients:
+/// a*y'' + b*y' + c*y = 0
+///
+/// Uses characteristic equation: a*r^2 + b*r + c = 0
+/// Returns general solution with arbitrary constants C1, C2
+pub fn solve_ode_second_order_constant_coeff(
+    store: &mut Store,
+    a: ExprId,
+    b: ExprId,
+    c: ExprId,
+    x_var: &str,
+) -> Option<ExprId> {
+    use solver::solve_univariate;
+
+    // Build characteristic equation: a*r^2 + b*r + c = 0
+    let r = store.sym("r");
+    let two = store.int(2);
+    let r2 = store.pow(r, two);
+    let ar2 = store.mul(vec![a, r2]);
+    let br = store.mul(vec![b, r]);
+    let char_eq = store.add(vec![ar2, br, c]);
+
+    // Solve characteristic equation
+    let roots = solve_univariate(store, char_eq, "r")?;
+
+    if roots.is_empty() {
+        return None;
+    }
+
+    let x = store.sym(x_var);
+    let c1 = store.sym("C1");
+    let c2 = store.sym("C2");
+
+    if roots.len() == 1 {
+        // Repeated root: y = (C1 + C2*x)*e^(r*x)
+        let r_val = roots[0];
+        let rx = store.mul(vec![r_val, x]);
+        let exp_rx = store.func("exp", vec![rx]);
+        let c2x = store.mul(vec![c2, x]);
+        let c1_plus_c2x = store.add(vec![c1, c2x]);
+        let solution = store.mul(vec![c1_plus_c2x, exp_rx]);
+        return Some(simplify(store, solution));
+    }
+
+    // Two distinct roots
+    let r1 = roots[0];
+    let r2 = roots[1];
+
+    // Check if roots are complex conjugates (contain sqrt of negative)
+    // For simplicity, construct: y = C1*e^(r1*x) + C2*e^(r2*x)
+    let r1x = store.mul(vec![r1, x]);
+    let r2x = store.mul(vec![r2, x]);
+    let exp_r1x = store.func("exp", vec![r1x]);
+    let exp_r2x = store.func("exp", vec![r2x]);
+    let term1 = store.mul(vec![c1, exp_r1x]);
+    let term2 = store.mul(vec![c2, exp_r2x]);
+    let solution = store.add(vec![term1, term2]);
+
+    Some(simplify(store, solution))
 }
 
 #[cfg(test)]

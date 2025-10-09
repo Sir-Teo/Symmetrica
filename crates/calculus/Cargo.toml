@@ -14,6 +14,7 @@ simplify  = { path = "../simplify" }
 arith = { path = "../arith" }
 polys = { path = "../polys" }
 special = { path = "../special" }
+solver = { path = "../solver" }
 
 [dev-dependencies]
 proptest = "1.5"

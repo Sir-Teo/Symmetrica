@@ -2,8 +2,11 @@
 //! - Linear and quadratic closed forms
 //! - Rational-root search for higher degrees (factor out simple rational roots)
 //! - Phase J: Simple exponential equation patterns (a*exp(b*x) = c)
+//! - Phase 4: Inverse trig and logarithmic equation patterns
 
 #![deny(warnings)]
+
+pub mod transcendental;
 
 use arith::{add_q, div_q, mul_q, sub_q, Q};
 use expr_core::{ExprId, Op, Payload, Store};
