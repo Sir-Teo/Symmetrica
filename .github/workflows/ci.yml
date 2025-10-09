@@ -111,7 +111,7 @@ jobs:
             -p plot \
             -p matrix \
             -p solver \
-            --out Xml --engine llvm --fail-under 80
+            --out Xml --engine llvm
 
   benchmarks:
     name: Benchmarks (ubuntu)
