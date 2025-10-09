@@ -1,4 +1,14 @@
 #![deny(warnings)]
+//! Tensor Algebra Module - Phase 8
+//!
+//! Provides tensor operations including:
+//! - Basic tensor operations (reshape, permute, contract, outer, matmul)
+//! - Einstein summation notation (einsum)
+//! - Differential geometry (Christoffel symbols, Riemann tensor, Ricci tensor)
+//! - Index raising/lowering with metric tensors
+
+pub mod einsum;
+pub mod geometry;
 
 use std::ops::{Add, Mul};
 
