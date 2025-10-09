@@ -1,7 +1,17 @@
 #![deny(warnings)]
 
-//! algebraic: minimal quadratic extension Q(√d)
-//! Representation: a + b√d with a,b in Q and squarefree integer d (not enforced).
+//! algebraic: Algebraic number fields and extensions
+//!
+//! Phase 9: Algebraic Extensions
+//! - Quadratic extensions Q(√d)
+//! - Cyclotomic fields Q(ζ_n)
+//! - Minimal polynomial computation
+//! - Galois group computation
+//! - Field extension towers
+
+pub mod cyclotomic;
+pub mod galois;
+pub mod minimal_poly;
 
 use arith::{add_q, mul_q, sub_q, Q};
 use std::ops::{Add, Mul, Neg, Sub};
