@@ -26,14 +26,23 @@ Instead of trying to implement everything, let's focus on the **20% of features 
 ### Phase 5: Symbolic Summation ✅ 100%
 - Power sums, arithmetic, geometric series
 
-### Phase 7: Number Theory 🧱 30%
+### Phase 7: Number Theory ✅ 70%
 - ✅ Miller-Rabin primality
 - ✅ Modular inverse, CRT
-- ✅ Experimental factorization
+- ✅ Enhanced factorization (trial division + Pollard's rho)
+- ✅ Linear Diophantine solver
+- ✅ Modular arithmetic (mod_pow, Legendre symbol, Tonelli-Shanks)
+- ✅ Pythagorean triples, Pell's equation
+- ✅ Integer partitions
+- 54 tests passing
 
-### Phase 8: Tensor Algebra 🧱 20%
+### Phase 8: Tensor Algebra ✅ 60%
 - ✅ Basic Tensor<T> type
-- ✅ reshape, permute, contract, matmul
+- ✅ reshape, permute, contract, matmul, outer, trace
+- ✅ Einstein summation notation (einsum)
+- ✅ Differential geometry operations (Christoffel, Riemann, Ricci)
+- ✅ Symbolic tensors with expression components
+- 45 tests passing
 
 ### Phase 9: Algebraic Extensions 🧱 15%
 - ✅ Quad type for Q(√d)

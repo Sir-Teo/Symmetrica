@@ -9,6 +9,7 @@
 
 pub mod einsum;
 pub mod geometry;
+pub mod symbolic;
 
 use std::ops::{Add, Mul};
 
