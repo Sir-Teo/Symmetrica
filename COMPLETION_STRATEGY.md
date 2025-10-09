@@ -15,11 +15,13 @@ Instead of trying to implement everything, let's focus on the **20% of features 
 - All integrated with evalf and differentiation
 - 41 tests passing
 
-### Phase 4: Advanced Solving 🔄 50%
+### Phase 4: Advanced Solving ✅ 80%
 - ✅ Gröbner basis infrastructure (buchberger, reduce, s_polynomial)
-- ✅ solve_system() basic implementation (just added)
+- ✅ solve_system() basic implementation
 - ✅ Lambert W function
-- ✅ ODE: separable and linear first-order
+- ✅ ODE: separable, linear, Bernoulli, homogeneous, exact first-order
+- ✅ Second-order constant coefficient ODEs (ay'' + by' + cy = 0)
+- 274 calculus tests passing
 
 ### Phase 5: Symbolic Summation ✅ 100%
 - Power sums, arithmetic, geometric series

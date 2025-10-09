@@ -4,12 +4,13 @@
 //! - Separable equations: dy/dx = f(x)g(y)
 //! - Linear equations: dy/dx + p(x)y = q(x)
 //! - Bernoulli equations: dy/dx + p(x)y = q(x)y^n
+//! - Exact equations: M(x,y)dx + N(x,y)dy = 0 where ∂M/∂y = ∂N/∂x
+//! - Homogeneous equations: dy/dx = f(y/x)
 //!
-//! Future work:
-//! - Exact equations
-//! - Homogeneous equations
-//! - Second-order ODEs with constant coefficients
+//! Second-order ODEs:
+//! - Constant coefficients: ay'' + by' + cy = 0
 
+use crate::diff::diff;
 use crate::integrate::integrate;
 use expr_core::{ExprId, Op, Payload, Store};
 use simplify::simplify;
@@ -84,6 +85,56 @@ fn try_homogeneous(store: &mut Store, rhs: ExprId, y_var: &str, x_var: &str) -> 
     }
 
     None
+}
+
+/// Solve exact ODE: M(x,y)dx + N(x,y)dy = 0
+/// where ∂M/∂y = ∂N/∂x
+///
+/// Returns implicit solution F(x,y) = C where ∂F/∂x = M and ∂F/∂y = N
+pub fn solve_ode_exact(
+    store: &mut Store,
+    m: ExprId,
+    n: ExprId,
+    x_var: &str,
+    y_var: &str,
+) -> Option<ExprId> {
+    // Check exactness: ∂M/∂y = ∂N/∂x
+    let dm_dy = diff(store, m, y_var);
+    let dn_dx = diff(store, n, x_var);
+
+    let dm_dy_simplified = simplify(store, dm_dy);
+    let dn_dx_simplified = simplify(store, dn_dx);
+
+    // Check if they're equal (structurally)
+    if dm_dy_simplified != dn_dx_simplified {
+        return None;
+    }
+
+    // Find F such that ∂F/∂x = M
+    // F(x,y) = ∫ M(x,y) dx + g(y)
+    let f_partial = integrate(store, m, x_var)?;
+
+    // Now ∂F/∂y = N
+    // ∂/∂y [∫ M dx + g(y)] = N
+    // ∂/∂y [∫ M dx] + g'(y) = N
+    // So g'(y) = N - ∂/∂y [∫ M dx]
+
+    let df_dy = diff(store, f_partial, y_var);
+    let df_dy_simplified = simplify(store, df_dy);
+
+    // g'(y) = N - ∂F_partial/∂y
+    let neg_one = store.int(-1);
+    let neg_df_dy = store.mul(vec![neg_one, df_dy_simplified]);
+    let g_prime = store.add(vec![n, neg_df_dy]);
+    let g_prime_simplified = simplify(store, g_prime);
+
+    // Integrate g'(y) to get g(y)
+    let g_y = integrate(store, g_prime_simplified, y_var)?;
+
+    // F(x,y) = f_partial + g(y)
+    let solution = store.add(vec![f_partial, g_y]);
+
+    Some(simplify(store, solution))
 }
 
 /// Try to solve Bernoulli ODE: dy/dx + p(x)y = q(x)y^n
