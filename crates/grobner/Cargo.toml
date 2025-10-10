@@ -12,6 +12,7 @@ path = "src/lib.rs"
 expr_core = { path = "../expr_core" }
 polys = { path = "../polys" }
 solver = { path = "../solver" }
+simplify = { path = "../simplify" }
 
 [dev-dependencies]
 simplify = { path = "../simplify" }

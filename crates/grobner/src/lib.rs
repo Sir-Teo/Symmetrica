@@ -358,6 +358,8 @@ pub fn reduce(
         }
     }
 
+    use simplify::simplify;
+
     let mut p = f;
     let mut changed = true;
     let max_steps = 256;
@@ -396,6 +398,8 @@ pub fn reduce(
                             let sub = store.mul(vec![neg_one, qg]);
                             p = store.add(vec![p, sub]);
                         }
+                        // Simplify after each reduction step
+                        p = simplify(store, p);
                         changed = true;
                         break 'outer;
                     }
@@ -414,6 +418,8 @@ pub fn buchberger(
     vars: Vec<String>,
     order: MonomialOrder,
 ) -> Vec<ExprId> {
+    use simplify::simplify;
+
     if polys.is_empty() {
         return vec![];
     }
@@ -430,7 +436,7 @@ pub fn buchberger(
 
     // Simplified Buchberger: process pairs and add non-zero remainders
     let mut iteration = 0;
-    let max_iterations = 100; // Prevent infinite loops
+    let max_iterations = 1000; // Prevent infinite loops
 
     while !pairs.is_empty() && iteration < max_iterations {
         iteration += 1;
@@ -445,16 +451,19 @@ pub fn buchberger(
             // Reduce S-polynomial with respect to current basis
             let remainder = reduce(store, s, &basis, &vars, order);
 
-            // Check if remainder is non-zero (simplified: check if not zero constant)
+            // Simplify to check if it's truly zero
+            let simplified = simplify(store, remainder);
+
+            // Check if remainder is non-zero
             let is_zero = matches!(
-                (&store.get(remainder).op, &store.get(remainder).payload),
+                (&store.get(simplified).op, &store.get(simplified).payload),
                 (Op::Integer, Payload::Int(0))
             );
 
             if !is_zero {
                 // Add remainder to basis and generate new pairs
                 let new_idx = basis.len();
-                basis.push(remainder);
+                basis.push(simplified);
 
                 for k in 0..new_idx {
                     pairs.push((k, new_idx));
@@ -473,7 +482,12 @@ pub fn solve_system(
     equations: Vec<ExprId>,
     vars: Vec<String>,
 ) -> Option<Vec<HashMap<String, ExprId>>> {
+    use simplify::simplify;
     use solver::solve_univariate;
+
+    if equations.is_empty() {
+        return None;
+    }
 
     // Compute Gröbner basis with lex ordering for triangular form
     let basis = buchberger(store, equations, vars.clone(), MonomialOrder::Lex);
@@ -522,6 +536,14 @@ pub fn solve_system(
             let mut substituted = poly;
             for (solved_var, value) in &solutions[0] {
                 substituted = substitute_var(store, substituted, solved_var.as_str(), *value);
+            }
+
+            // Simplify the substituted polynomial
+            substituted = simplify(store, substituted);
+
+            // Check if substitution resulted in a non-zero constant (inconsistency)
+            if is_constant_nonzero(store, substituted) {
+                return None; // Inconsistent after substitution
             }
 
             // Try to solve for current variable
