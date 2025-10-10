@@ -34,12 +34,7 @@ impl SpecialFunction for BesselJFunction {
         Some(bessel_j(nu as i32, x))
     }
 
-    fn derivative(
-        &self,
-        store: &mut Store,
-        args: &[ExprId],
-        arg_index: usize,
-    ) -> Option<ExprId> {
+    fn derivative(&self, store: &mut Store, args: &[ExprId], arg_index: usize) -> Option<ExprId> {
         if args.len() != 2 || arg_index != 1 {
             return None;
         }
@@ -70,11 +65,7 @@ impl SpecialFunction for BesselJFunction {
 /// Compute Bessel J function using series expansion
 fn bessel_j(n: i32, x: f64) -> f64 {
     if n < 0 {
-        return if n % 2 == 0 {
-            bessel_j(-n, x)
-        } else {
-            -bessel_j(-n, x)
-        };
+        return if n % 2 == 0 { bessel_j(-n, x) } else { -bessel_j(-n, x) };
     }
 
     // Series: J_n(x) = sum_{k=0}^inf (-1)^k / (k! * (n+k)!) * (x/2)^(n+2k)
@@ -118,12 +109,7 @@ impl SpecialFunction for BesselYFunction {
         None
     }
 
-    fn derivative(
-        &self,
-        store: &mut Store,
-        args: &[ExprId],
-        arg_index: usize,
-    ) -> Option<ExprId> {
+    fn derivative(&self, store: &mut Store, args: &[ExprId], arg_index: usize) -> Option<ExprId> {
         if args.len() != 2 || arg_index != 1 {
             return None;
         }
@@ -175,12 +161,7 @@ impl SpecialFunction for BesselIFunction {
         Some(bessel_i(nu as i32, x))
     }
 
-    fn derivative(
-        &self,
-        store: &mut Store,
-        args: &[ExprId],
-        arg_index: usize,
-    ) -> Option<ExprId> {
+    fn derivative(&self, store: &mut Store, args: &[ExprId], arg_index: usize) -> Option<ExprId> {
         if args.len() != 2 || arg_index != 1 {
             return None;
         }
@@ -243,12 +224,7 @@ impl SpecialFunction for BesselKFunction {
         None
     }
 
-    fn derivative(
-        &self,
-        store: &mut Store,
-        args: &[ExprId],
-        arg_index: usize,
-    ) -> Option<ExprId> {
+    fn derivative(&self, store: &mut Store, args: &[ExprId], arg_index: usize) -> Option<ExprId> {
         if args.len() != 2 || arg_index != 1 {
             return None;
         }
