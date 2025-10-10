@@ -209,9 +209,10 @@ pub fn primitive_root(p: u64) -> Option<u64> {
     // Find prime factors of phi
     let mut factors = Vec::new();
     let mut temp = phi;
+    let limit = (phi as f64).sqrt() as u64 + 1;
 
-    for d in 2..=phi {
-        if d * d > temp {
+    for d in 2..=limit {
+        if temp == 1 {
             break;
         }
         if temp.is_multiple_of(d) {
