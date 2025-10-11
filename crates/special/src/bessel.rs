@@ -27,7 +27,7 @@ impl SpecialFunction for BesselJFunction {
         let x = args[1];
 
         // Only support integer orders for now
-        if nu.fract() != 0.0 || nu < 0.0 || nu > 20.0 {
+        if nu.fract() != 0.0 || !(0.0..=20.0).contains(&nu) {
             return None;
         }
 
@@ -154,7 +154,7 @@ impl SpecialFunction for BesselIFunction {
         let x = args[1];
 
         // Only support integer orders for now
-        if nu.fract() != 0.0 || nu < 0.0 || nu > 20.0 {
+        if nu.fract() != 0.0 || !(0.0..=20.0).contains(&nu) {
             return None;
         }
 
