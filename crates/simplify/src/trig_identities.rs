@@ -77,10 +77,12 @@ pub fn simplify_trig(store: &mut Store, expr: ExprId) -> ExprId {
     match &store.get(expr_after_children).op {
         Op::Add => try_sum_to_product(store, expr_after_children),
         Op::Mul => {
+            // Only apply double-angle simplification (sin(2x) ← 2*sin(x)*cos(x))
+            // Product-to-sum formulas make expressions more complex, not simpler
             if let Some(dbl) = try_double_angle_in_mul(store, expr_after_children) {
                 dbl
             } else {
-                try_product_to_sum(store, expr_after_children)
+                expr_after_children
             }
         }
         Op::Pow => try_half_angle_expansion(store, expr_after_children),
@@ -241,6 +243,11 @@ fn try_half_angle_expansion(store: &mut Store, expr: ExprId) -> ExprId {
 /// - sin(A) * cos(B) → [sin(A+B) + sin(A-B)] / 2
 /// - cos(A) * cos(B) → [cos(A+B) + cos(A-B)] / 2
 /// - sin(A) * sin(B) → [cos(A-B) - cos(A+B)] / 2
+///
+/// NOTE: This function is currently unused in simplify because product-to-sum
+/// formulas make expressions more complex. It's kept for potential future use
+/// in integration or other contexts where expanding products is beneficial.
+#[allow(dead_code)]
 fn try_product_to_sum(store: &mut Store, expr: ExprId) -> ExprId {
     let children = store.get(expr).children.clone();
 

@@ -9,7 +9,8 @@ fn contains_func(store: &Store, id: expr_core::ExprId, name: &str) -> bool {
 
 #[test]
 fn product_to_sum_sin_times_sin() {
-    // sin(x) * sin(y) -> [cos(x-y) - cos(x+y)] / 2
+    // sin(x) * sin(y) is NOT expanded by simplify
+    // Product-to-sum formulas make expressions more complex, not simpler
     let mut st = Store::new();
     let x = st.sym("x");
     let y = st.sym("y");
@@ -18,14 +19,14 @@ fn product_to_sum_sin_times_sin() {
     let prod = st.mul(vec![sinx, siny]);
 
     let s = simplify(&mut st, prod);
-    assert_eq!(st.get(s).op, Op::Mul);
-    let sstr = st.to_string(s);
-    assert!(sstr.contains("1/2") && sstr.contains("cos"));
+    // Should remain as product (product-to-sum disabled)
+    assert_eq!(s, prod);
 }
 
 #[test]
 fn product_to_sum_cos_times_cos() {
-    // cos(x) * cos(y) -> [cos(x+y) + cos(x-y)] / 2
+    // cos(x) * cos(y) is NOT expanded by simplify
+    // Product-to-sum formulas make expressions more complex, not simpler
     let mut st = Store::new();
     let x = st.sym("x");
     let y = st.sym("y");
@@ -34,9 +35,8 @@ fn product_to_sum_cos_times_cos() {
     let prod = st.mul(vec![cosx, cosy]);
 
     let s = simplify(&mut st, prod);
-    assert_eq!(st.get(s).op, Op::Mul);
-    let sstr = st.to_string(s);
-    assert!(sstr.contains("1/2") && sstr.contains("cos"));
+    // Should remain as product (product-to-sum disabled)
+    assert_eq!(s, prod);
 }
 
 #[test]

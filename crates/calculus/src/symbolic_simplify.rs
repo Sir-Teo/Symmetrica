@@ -617,17 +617,18 @@ fn simplify_mul(store: &mut Store, expr: ExprId) -> ExprId {
 /// Detects and simplifies 2sin(x)cos(x) → sin(2x)
 fn try_double_angle_sin(store: &mut Store, children: &[ExprId]) -> Option<ExprId> {
     // Look for pattern: 2 * sin(arg) * cos(arg)
-    // or any permutation thereof
+    // or any permutation thereof, including even coefficients like 6 = 3*2
 
-    let mut has_two = false;
+    let mut even_coeff: Option<(i64, i64)> = None; // (original, remaining after extracting 2)
     let mut sin_arg: Option<ExprId> = None;
     let mut cos_arg: Option<ExprId> = None;
     let mut other_factors = Vec::new();
 
     for &child in children {
         match (&store.get(child).op, &store.get(child).payload) {
-            (Op::Integer, Payload::Int(2)) => {
-                has_two = true;
+            (Op::Integer, Payload::Int(n)) if *n != 0 && n % 2 == 0 => {
+                // Found an even integer - extract factor of 2
+                even_coeff = Some((*n, n / 2));
             }
             (Op::Function, Payload::Func(fname)) => {
                 if store.get(child).children.len() == 1 {
@@ -647,20 +648,24 @@ fn try_double_angle_sin(store: &mut Store, children: &[ExprId]) -> Option<ExprId
         }
     }
 
-    // Check if we have 2 * sin(arg) * cos(arg) with matching args
-    if has_two {
+    // Check if we have even_coeff * sin(arg) * cos(arg) with matching args
+    if let Some((_, remaining)) = even_coeff {
         if let (Some(s_arg), Some(c_arg)) = (sin_arg, cos_arg) {
             if s_arg == c_arg {
-                // Found 2sin(x)cos(x)!
-                // Create sin(2x)
+                // Found (2k)*sin(x)*cos(x)!
+                // Create k*sin(2x)
                 let two = store.int(2);
                 let two_arg = store.mul(vec![two, s_arg]);
                 let sin_2arg = store.func("sin", vec![two_arg]);
 
-                if other_factors.is_empty() {
+                if remaining == 1 && other_factors.is_empty() {
                     return Some(sin_2arg);
                 }
 
+                // Add remaining coefficient if not 1
+                if remaining != 1 {
+                    other_factors.push(store.int(remaining));
+                }
                 other_factors.push(sin_2arg);
                 return Some(store.mul(other_factors));
             }

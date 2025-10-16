@@ -8,7 +8,8 @@ use simplify::simplify_trig;
 
 #[test]
 fn test_product_to_sum_sin_cos() {
-    // sin(x) * cos(y) → [sin(x+y) + sin(x-y)] / 2
+    // sin(x) * cos(y) is NOT expanded by simplify_trig
+    // Product-to-sum formulas make expressions more complex, not simpler
     let mut st = Store::new();
     let x = st.sym("x");
     let y = st.sym("y");
@@ -18,15 +19,14 @@ fn test_product_to_sum_sin_cos() {
 
     let result = simplify_trig(&mut st, product);
 
-    // Result should be a multiplication with 1/2
-    assert_eq!(st.get(result).op, Op::Mul);
-    let result_str = st.to_string(result);
-    assert!(result_str.contains("1/2"));
+    // Result should remain unchanged (product-to-sum disabled)
+    assert_eq!(result, product);
 }
 
 #[test]
 fn test_product_to_sum_cos_cos() {
-    // cos(x) * cos(y) → [cos(x+y) + cos(x-y)] / 2
+    // cos(x) * cos(y) is NOT expanded by simplify_trig
+    // Product-to-sum formulas make expressions more complex, not simpler
     let mut st = Store::new();
     let x = st.sym("x");
     let y = st.sym("y");
@@ -36,9 +36,8 @@ fn test_product_to_sum_cos_cos() {
 
     let result = simplify_trig(&mut st, product);
 
-    assert_eq!(st.get(result).op, Op::Mul);
-    let result_str = st.to_string(result);
-    assert!(result_str.contains("cos") && result_str.contains("1/2"));
+    // Result should remain unchanged (product-to-sum disabled)
+    assert_eq!(result, product);
 }
 
 #[test]

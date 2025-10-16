@@ -10,23 +10,25 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
 name = "arith"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 
 [[package]]
 name = "assumptions"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
 ]
 
 [[package]]
 name = "calculus"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "expr_core",
  "polys",
  "simplify",
+ "solver",
+ "special",
 ]
 
 [[package]]
@@ -49,7 +51,7 @@ checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
 name = "expr_core"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
 ]
@@ -74,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "io"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "expr_core",
 ]
@@ -107,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "matrix"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "expr_core",
@@ -115,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "polys"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "expr_core",
@@ -136,7 +138,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "simplify"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "assumptions",
@@ -145,11 +147,20 @@ dependencies = [
 
 [[package]]
 name = "solver"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "arith",
  "expr_core",
  "polys",
+ "simplify",
+]
+
+[[package]]
+name = "special"
+version = "0.1.0"
+dependencies = [
+ "arith",
+ "expr_core",
  "simplify",
 ]
 
